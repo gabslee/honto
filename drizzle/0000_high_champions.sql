@@ -10,7 +10,6 @@ CREATE TABLE `players` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `players_token_unique` ON `players` (`token`);--> statement-breakpoint
-CREATE INDEX `idx_players_room_joined` ON `players` (`room_id`,`joined_at`);--> statement-breakpoint
 CREATE TABLE `rooms` (
 	`id` text PRIMARY KEY NOT NULL,
 	`code` text NOT NULL,
@@ -43,6 +42,4 @@ CREATE TABLE `rounds` (
 	FOREIGN KEY (`room_id`) REFERENCES `rooms`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`author_id`) REFERENCES `players`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`guesser_id`) REFERENCES `players`(`id`) ON UPDATE no action ON DELETE no action
-);--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_rounds_room_number` ON `rounds` (`room_id`,`round_number`);--> statement-breakpoint
-PRAGMA optimize;
+);
