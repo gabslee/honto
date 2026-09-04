@@ -61,6 +61,7 @@ export default function GameClient() {
   const [reveal, setReveal] = useState<{ correct: boolean; truthIndex: number; drinkerId: string; roundNumber: number; authorId: string; guesserId: string; statements: string[] } | null>(null);
   const [seenRevealRound, setSeenRevealRound] = useState<number | null>(null);
   const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminderZeroTick, setReminderZeroTick] = useState<number | null>(null);
   const [dismissedReminder, setDismissedReminder] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
   const hydratedRef = useRef(false);
@@ -121,9 +122,10 @@ export default function GameClient() {
   const author = game ? game.players[(game.room.currentRound - 1) % game.players.length] : null;
   const parseTime = (value: string | null) => value ? new Date(value.includes("Z") ? value : `${value}Z`).getTime() : 0;
   const elapsedSeconds = game?.room.startedAt ? Math.max(0, Math.floor((now - parseTime(game.room.startedAt)) / 1000) - (game.room.pausedSeconds ?? 0) - (game.room.sessionPaused && game.room.pausedAt ? Math.floor((now - parseTime(game.room.pausedAt)) / 1000) : 0)) : 0;
-  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-  const nextTimerSip = game?.room.timerMinutes ? game.room.timerMinutes - (elapsedMinutes % game.room.timerMinutes) : null;
-  const reminderTick = game?.room.timerMinutes && elapsedMinutes > 0 ? Math.floor(elapsedMinutes / game.room.timerMinutes) : 0;
+  const reminderTotalSeconds = game?.room.timerMinutes ? game.room.timerMinutes * 60 : null;
+  const reminderTick = reminderTotalSeconds && elapsedSeconds >= reminderTotalSeconds ? Math.floor(elapsedSeconds / reminderTotalSeconds) : 0;
+  const reminderRemainingSeconds = reminderTotalSeconds ? reminderTotalSeconds - (elapsedSeconds % reminderTotalSeconds) : null;
+  const nextTimerSip = reminderZeroTick === reminderTick && reminderOpen ? 0 : reminderRemainingSeconds;
   const turnStartedAt = game?.activeRound?.createdAt ?? game?.room.roundStartedAt;
   const turnLimit = game?.activeRound ? game.room.guessTimerMinutes : game?.room.writeTimerMinutes;
   const turnElapsed = turnStartedAt ? Math.max(0, Math.floor((now - parseTime(turnStartedAt)) / 1000)) : 0;
@@ -149,6 +151,7 @@ export default function GameClient() {
   useEffect(() => {
     if (reminderTick > 0 && reminderTick !== dismissedReminder && !game?.room.sessionPaused) {
       setReminderOpen(true);
+      setReminderZeroTick(reminderTick);
       setDismissedReminder(reminderTick);
       try { const context = new AudioContext(); const oscillator = context.createOscillator(); const gain = context.createGain(); oscillator.frequency.value = 660; gain.gain.value = 0.04; oscillator.connect(gain); gain.connect(context.destination); oscillator.start(); oscillator.stop(context.currentTime + 0.12); } catch { /* audio needs browser permission */ }
     }
@@ -253,6 +256,8 @@ export default function GameClient() {
   if (!session) return <Landing mode={mode} setMode={setMode} name={name} setName={setName} code={joinCode} setCode={setJoinCode} enter={enter} busy={busy} error={error} />;
   if (!game) return <main className="loading"><div className="stamp">本当?!</div><p>{t.loading}</p><button className="text-button" onClick={leave}>{t.common.back}</button></main>;
 
+  const closeReminder = () => { setReminderOpen(false); setReminderZeroTick(null); };
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -267,7 +272,7 @@ export default function GameClient() {
           <div className="round-strip">
             <span>{t.round} <b>{game.room.currentRound}</b>/{game.room.roundCount}</span>
             <div className="progress"><i style={{ width: `${(game.room.currentRound / game.room.roundCount) * 100}%` }} /></div>
-            {nextTimerSip && <span className="timer">{t.groupSipIn} {nextTimerSip} {t.minutesShort}</span>}
+            {nextTimerSip !== null && <span className={`timer ${nextTimerSip === 0 ? "urgent" : ""}`}>{t.groupSipIn} {formatClock(nextTimerSip)}</span>}
             {turnRemaining !== null && <span className={`timer ${turnRemaining < 30 ? "urgent" : ""}`}>⏱ {formatClock(turnRemaining)}</span>}
           </div>
           <ScoreRail players={game.players} meId={game.meId} />
@@ -279,7 +284,7 @@ export default function GameClient() {
       )}
       {game.room.status === "finished" && <Finished players={game.players} leave={leave} />}
       {reveal && <Reveal reveal={reveal} players={game.players} meId={game.meId} close={() => { setReveal(null); refresh(); }} groupSipEvery={game.room.groupSipEvery && reveal.roundNumber % game.room.groupSipEvery === 0 ? game.room.groupSipEvery : null} />}
-      {reminderOpen && <ReminderModal close={() => setReminderOpen(false)} minutes={game.room.timerMinutes ?? 0} />}
+      {reminderOpen && <ReminderModal close={closeReminder} minutes={game.room.timerMinutes ?? 0} />}
     </main>
   );
 }

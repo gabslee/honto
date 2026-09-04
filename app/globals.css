@@ -108,4 +108,8 @@ h1 em,h2 em { color:var(--red); font-style:normal; position:relative; }
 .subject-check.spicy-check.selected { background:#ff9eb7; }
 @media (max-width:800px) {
   .prompt-row textarea.prompt-input { min-height:82px; }
+  .topbar { grid-template-columns:minmax(0,1fr) auto; }
+  .session-tools { grid-column:1 / -1; width:100%; justify-content:space-between; padding-top:3px; }
+  .session-control { min-width:0; }
+  .session-clock { max-width:none; }
 }
