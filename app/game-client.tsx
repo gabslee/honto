@@ -52,7 +52,7 @@ export default function GameClient() {
   const [lieOptions, setLieOptions] = useState<string[]>([]);
   const [selectedLies, setSelectedLies] = useState<number[]>([]);
   const [generatingLies, setGeneratingLies] = useState(false);
-  const [reveal, setReveal] = useState<{ correct: boolean; truthIndex: number; drinkerId: string; roundNumber: number; statements: string[] } | null>(null);
+  const [reveal, setReveal] = useState<{ correct: boolean; truthIndex: number; drinkerId: string; roundNumber: number; authorId: string; guesserId: string; statements: string[] } | null>(null);
   const [seenRevealRound, setSeenRevealRound] = useState<number | null>(null);
   const [reminderOpen, setReminderOpen] = useState(false);
   const [dismissedReminder, setDismissedReminder] = useState<number | null>(null);
@@ -104,7 +104,7 @@ export default function GameClient() {
     if (!game || (game.room.status !== "playing" && game.room.status !== "finished")) return;
     if (game.lastReveal && game.lastReveal.roundNumber !== seenRevealRound && (game.lastReveal.roundNumber < game.room.currentRound || game.room.status === "finished")) {
       const result = game.lastReveal;
-      setReveal({ correct: result.result === "correct", truthIndex: result.truthIndex, drinkerId: result.drinkerId, roundNumber: result.roundNumber, statements: [result.statementOne, result.statementTwo, result.statementThree] });
+      setReveal({ correct: result.result === "correct", truthIndex: result.truthIndex, drinkerId: result.drinkerId, roundNumber: result.roundNumber, authorId: result.authorId, guesserId: result.guesserId, statements: [result.statementOne, result.statementTwo, result.statementThree] });
       setSeenRevealRound(result.roundNumber);
     }
   }, [game, seenRevealRound]);
@@ -193,7 +193,7 @@ export default function GameClient() {
     if (!game?.activeRound) return;
     const currentStatements = [game.activeRound.statementOne, game.activeRound.statementTwo, game.activeRound.statementThree];
     const data = await act("guess", { guessedIndex: index });
-    if (data?.reveal) { setReveal({ ...data.reveal, statements: currentStatements }); setSeenRevealRound(data.reveal.roundNumber); }
+    if (data?.reveal) { setReveal({ ...data.reveal, authorId: game.activeRound.authorId, guesserId: game.meId, statements: currentStatements }); setSeenRevealRound(data.reveal.roundNumber); }
   }
 
   if (!session) return <Landing mode={mode} setMode={setMode} name={name} setName={setName} code={joinCode} setCode={setJoinCode} enter={enter} busy={busy} error={error} />;
@@ -224,7 +224,7 @@ export default function GameClient() {
         </section>
       )}
       {game.room.status === "finished" && <Finished players={game.players} leave={leave} />}
-      {reveal && <Reveal reveal={reveal} players={game.players} close={() => { setReveal(null); refresh(); }} groupSip={Boolean(game.room.groupSipEvery && reveal.roundNumber % game.room.groupSipEvery === 0)} />}
+      {reveal && <Reveal reveal={reveal} players={game.players} meId={game.meId} close={() => { setReveal(null); refresh(); }} groupSip={Boolean(game.room.groupSipEvery && reveal.roundNumber % game.room.groupSipEvery === 0)} />}
       {reminderOpen && <ReminderModal close={() => setReminderOpen(false)} />}
     </main>
   );
@@ -306,9 +306,14 @@ function ReminderModal({ close }: { close: () => void }) {
   return <div className="modal-backdrop"><div className="reminder-card"><div className="reminder-icon">{t.reminder.icon}</div><span className="eyebrow">{t.reminder.title}</span><h2>{t.reminder.body}</h2><button className="primary-button" onClick={close}>{t.reminder.ok}</button></div></div>;
 }
 
-function Reveal({ reveal, players, close, groupSip }: { reveal: { correct: boolean; truthIndex: number; drinkerId: string; roundNumber: number; statements: string[] }; players: Player[]; close: () => void; groupSip: boolean }) {
+function Reveal({ reveal, players, meId, close, groupSip }: { reveal: { correct: boolean; truthIndex: number; drinkerId: string; roundNumber: number; authorId: string; guesserId: string; statements: string[] }; players: Player[]; meId: string; close: () => void; groupSip: boolean }) {
   const drinker = players.find((p) => p.id === reveal.drinkerId)?.name;
-  return <div className="modal-backdrop"><div className={`reveal-card ${reveal.correct ? "correct" : "wrong"}`}><div className="result-mark">{reveal.correct ? "✓" : "×"}</div><span className="eyebrow">{reveal.correct ? t.reveal.correct : t.reveal.wrong}</span><h2>{reveal.correct ? `${drinker} ${t.reveal.drinks}` : `${drinker}, ${t.reveal.yourTurn}`}</h2><p>{t.reveal.truthWas}</p><blockquote>“{reveal.statements[reveal.truthIndex]}”</blockquote>{groupSip && <div className="group-sip">{t.reveal.group}</div>}<button className="primary-button" onClick={close}>{t.reveal.next}</button></div></div>;
+  const guesser = players.find((p) => p.id === reveal.guesserId)?.name ?? "That player";
+  const isGuesser = meId === reveal.guesserId;
+  const isAuthor = meId === reveal.authorId;
+  const title = reveal.correct ? (isAuthor ? t.reveal.foundTruth : `${drinker} ${t.reveal.drinks}`) : (isGuesser ? t.reveal.wrong : t.reveal.bluffSuccess);
+  const outcome = reveal.correct ? (isAuthor ? t.reveal.yourSip : t.reveal.drinks) : (isGuesser ? `${drinker}, ${t.reveal.yourTurn}` : `${guesser} ${t.reveal.guessedWrong} ${t.reveal.theySip}`);
+  return <div className="modal-backdrop"><div className={`reveal-card ${reveal.correct ? "correct" : "wrong"}`}><div className="result-mark">{reveal.correct ? "✓" : "×"}</div><span className="eyebrow">{reveal.correct ? t.reveal.correct : (isGuesser ? t.reveal.wrong : t.reveal.bluffSuccess)}</span><h2>{title}</h2><p>{outcome}</p><p>{t.reveal.truthWas}</p><blockquote>“{reveal.statements[reveal.truthIndex]}”</blockquote>{groupSip && <div className="group-sip">{t.reveal.group}</div>}<button className="primary-button" onClick={close}>{t.reveal.next}</button></div></div>;
 }
 
 function Finished({ players, leave }: { players: Player[]; leave: () => void }) {

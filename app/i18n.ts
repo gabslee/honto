@@ -70,7 +70,7 @@ export const messages = {
       sentTitle: "Stories sent!", sentBody: "Keep a straight face and wait for the guess.",
     },
     reveal: {
-      correct: "NAILED IT!", wrong: "YOU FELL FOR THE BLUFF!", drinks: "takes a sip.",
+      correct: "NAILED IT!", wrong: "YOU FELL FOR THE BLUFF!", bluffSuccess: "BLUFF SUCCESS!", foundTruth: "THE TRUTH WAS FOUND!", drinks: "takes a sip.", guessedWrong: "guessed wrong.", theySip: "They take a sip.", yourSip: "You take a sip.",
       yourTurn: "your drink is waiting.", truthWas: "The truth was:",
       group: "🥂 House rule: everyone takes a sip!", next: "NEXT ROUND →",
     },

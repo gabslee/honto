@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       ? `Write five believable but clearly fictional alternative statements for a party game. The player's true statement is: "${(body.truth ?? "").slice(0, 180)}". Theme: ${(body.prompt ?? "anything goes").slice(0, 80)}. Return five short English statements as a JSON array of strings. Keep them safe, playful, non-defamatory, and non-explicit.`
       : `Give one fresh, playful English theme for a two-lies-one-truth party game in the ${(Array.isArray(categories) ? categories.join(", ") : categories)} categories. Avoid: ${(body.exclude ?? []).join(", ") || "none"}. Return only a 2–8 word noun phrase.`;
     const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` }, body: JSON.stringify({ model: process.env.OPENAI_MODEL ?? "gpt-5.4-nano", store: false, input: instruction, text: { format: body.kind === "lies" ? { type: "json_schema", name: "lie_options", strict: true, schema: { type: "object", properties: { lies: { type: "array", items: { type: "string" }, minItems: 5, maxItems: 5 } }, required: ["lies"], additionalProperties: false } } : { type: "text" } }, max_output_tokens: body.kind === "lies" ? 260 : 30 }) });
-    if (!response.ok) throw new Error("OpenAI request failed");
+    if (!response.ok) { const detail = await response.text(); console.error("[suggest] OpenAI request failed", { status: response.status, model: process.env.OPENAI_MODEL ?? "gpt-5.4-nano", detail: detail.slice(0, 500) }); throw new Error(`OpenAI request failed (${response.status})`); }
     const data = await response.json() as { output_text?: string };
     if (body.kind === "lies") {
       const parsed = JSON.parse(data.output_text ?? "{}");
@@ -43,7 +43,8 @@ export async function POST(request: Request) {
     const prompt = data.output_text?.trim().replace(/[.!?]+$/, "").slice(0, 100);
     if (!prompt) throw new Error("Invalid theme");
     return Response.json({ prompt, source: "ai" });
-  } catch {
+  } catch (error) {
+    console.error("[suggest] Returning fallback", { kind: body.kind ?? "theme", hasKey: Boolean(apiKey), placeholder: Boolean(apiKey?.startsWith("REPLACE_")), model: process.env.OPENAI_MODEL ?? "gpt-5.4-nano", error: error instanceof Error ? error.message : String(error) });
     return Response.json(body.kind === "lies" ? { lies: fallbackLies(body.truth ?? "my secret"), source: "fallback" } : { prompt: fallbackTheme(categories, body.exclude), source: "fallback" });
   }
 }

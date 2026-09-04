@@ -125,7 +125,7 @@ export default async function handler(req: any, res: any) {
       await sql`UPDATE rounds SET guessed_index = ${body.guessedIndex}, guesser_id = ${me.id}, result = ${correct ? "correct" : "wrong"}, revealed_at = now() WHERE id = ${round.id}`;
       await sql`UPDATE players SET sips = sips + 1 WHERE id = ${drinkerId}`;
       await sql`UPDATE rooms SET current_round = ${finished ? room.current_round : nextRound}, status = ${finished ? "finished" : "playing"}, round_started_at = CASE WHEN ${finished} THEN round_started_at ELSE now() END, updated_at = now() WHERE id = ${room.id}`;
-      return json(res, { ...(await state(roomCode, token)), reveal: { correct, truthIndex: round.truth_index, drinkerId, roundNumber: room.current_round } });
+      return json(res, { ...(await state(roomCode, token)), reveal: { correct, truthIndex: round.truth_index, drinkerId, authorId: round.author_id, guesserId: me.id, roundNumber: room.current_round } });
     }
     return json(res, await state(roomCode, token));
   } catch (error) {
