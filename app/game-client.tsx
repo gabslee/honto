@@ -19,6 +19,7 @@ const PROMPTS: string[] = [...t.prompts];
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const THEME_KEYS = ["mixed", "family", "innocent", "life", "flirty", "spicy"] as const;
 type ThemeKey = (typeof THEME_KEYS)[number];
+type QuestionCategory = "session" | "custom" | ThemeKey;
 
 function storedThemeKeys(value: string | null | undefined): ThemeKey[] {
   if (!value || value === "safe") return [];
@@ -256,11 +257,12 @@ export default function GameClient() {
     finally { setGeneratingLies(false); }
   }
 
-  async function suggestMiniQuestion() {
+  async function suggestMiniQuestion(category: QuestionCategory, hint: string) {
     if (!game) return "";
     setSuggestingMiniQuestion(true); setError("");
     try {
-      const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "question", category: activeThemeKeys(game.room.themeCategory), customTheme: game.room.customTheme }) });
+      const categories = category === "session" || category === "custom" ? activeThemeKeys(game.room.themeCategory) : [category];
+      const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "question", category: categories, customTheme: category === "custom" || category === "session" ? game.room.customTheme : null, questionHint: hint.trim().slice(0, 160) }) });
       const data = await response.json() as { question?: string };
       if (!response.ok || !data.question?.trim()) throw new Error("We couldn't think of a question.");
       return data.question.trim();
@@ -322,7 +324,7 @@ export default function GameClient() {
       {reveal && <Reveal reveal={reveal} players={game.players} meId={game.meId} close={() => { setReveal(null); refresh(); }} groupSipEvery={game.room.groupSipEvery && reveal.roundNumber % game.room.groupSipEvery === 0 ? game.room.groupSipEvery : null} />}
       {reminderOpen && <ReminderModal close={closeReminder} minutes={game.room.timerMinutes ?? 0} />}
       {timeoutNotice && <TimeoutModal notice={timeoutNotice} players={game.players} close={() => { setTimeoutNotice(null); refresh(); }} />}
-      {game.miniGame && !reveal && !timeoutNotice && !reminderOpen && <MiniGameModal miniGame={game.miniGame} meId={game.meId} act={act} busy={busy} suggestQuestion={suggestMiniQuestion} suggestingQuestion={suggestingMiniQuestion} />}
+      {game.miniGame && !reveal && !timeoutNotice && !reminderOpen && <MiniGameModal miniGame={game.miniGame} meId={game.meId} act={act} busy={busy} categories={activeThemeKeys(game.room.themeCategory)} customTheme={game.room.customTheme} suggestQuestion={suggestMiniQuestion} suggestingQuestion={suggestingMiniQuestion} />}
     </main>
   );
 }
@@ -408,7 +410,7 @@ function ScoreRail({ players, meId }: { players: Player[]; meId: string }) {
 }
 
 function Writer({ prompt, setPrompt, newPrompt, suggestPrompt, suggestingPrompt, truthText, setTruthText, lieOptions, selectedLies, toggleLie, updateLie, generateLies, generatingLies, submit, busy }: { prompt: string; setPrompt: (v: string) => void; newPrompt: () => void; suggestPrompt: () => void; suggestingPrompt: boolean; truthText: string; setTruthText: (v: string) => void; lieOptions: string[]; selectedLies: number[]; toggleLie: (index: number) => void; updateLie: (index: number, value: string) => void; generateLies: () => void; generatingLies: boolean; submit: (e: FormEvent) => void; busy: boolean }) {
-  return <form className="play-card writer" onSubmit={submit}><span className="turn-badge">{t.writer.badge}</span><h2>{t.writer.title}</h2><div className="prompt-row"><textarea className="prompt-input" rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={140}/><button type="button" onClick={newPrompt} disabled={suggestingPrompt}><StarIcon />{suggestingPrompt ? t.writer.aiLoading : t.writer.another}</button></div><p className="hint">{t.writer.hint}</p><label className="truth-editor"><span>{t.writer.truthLabel}</span><textarea value={truthText} onChange={(e) => setTruthText(e.target.value)} placeholder={t.writer.truthPlaceholder} maxLength={180}/></label><button type="button" className="ai-button" onClick={generateLies} disabled={generatingLies || !truthText.trim()}>{generatingLies ? t.writer.generating : t.writer.generate}</button>{lieOptions.length > 0 && <><p className="hint">{t.writer.chooseTwo}</p><div className="lie-options">{lieOptions.map((lie, index) => <label key={index} className={selectedLies.includes(index) ? "selected" : ""}><input type="checkbox" checked={selectedLies.includes(index)} onChange={() => toggleLie(index)} /><textarea value={lie} onChange={(e) => updateLie(index, e.target.value)} maxLength={180}/><b>{selectedLies.includes(index) ? t.writer.selected : t.writer.select}</b></label>)}</div><button className="primary-button" disabled={busy || selectedLies.length !== 2}>{t.writer.submit}</button></>}</form>;
+  return <form className="play-card writer" onSubmit={submit}><span className="turn-badge">{t.writer.badge}</span><h2>{t.writer.title}</h2><div className="prompt-row"><textarea className="prompt-input" rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={140}/><button type="button" onClick={newPrompt} disabled={suggestingPrompt}><StarIcon />{suggestingPrompt ? t.writer.aiLoading : t.writer.another}</button></div><p className="hint">{t.writer.hint}</p><label className="truth-editor"><span>{t.writer.truthLabel}</span><textarea value={truthText} onChange={(e) => setTruthText(e.target.value)} placeholder={t.writer.truthPlaceholder} maxLength={180}/></label><button type="button" className="ai-button" onClick={generateLies} disabled={generatingLies || !truthText.trim()}>{generatingLies ? t.writer.generating : t.writer.generate}</button>{lieOptions.length > 0 && <><p className="hint">{t.writer.chooseTwo}</p><div className="lie-options">{lieOptions.map((lie, index) => <label key={index} className={selectedLies.includes(index) ? "selected" : ""}><input type="checkbox" checked={selectedLies.includes(index)} onChange={() => toggleLie(index)} /><textarea value={lie} onChange={(e) => updateLie(index, e.target.value)} maxLength={180}/><b>{selectedLies.includes(index) ? t.writer.selected : t.writer.select}</b></label>)}</div><button className="primary-button" disabled={busy || suggestingPrompt || selectedLies.length !== 2}>{t.writer.submit}</button></>}</form>;
 }
 
 function StarIcon() {
@@ -437,20 +439,26 @@ function TimeoutModal({ notice, players, close }: { notice: { playerId: string; 
   return <div className="modal-backdrop"><div className="reminder-card timeout-card"><div className="reminder-icon">⏰</div><span className="eyebrow">TIME'S UP!</span><h2>{`${player} ran out of time.`}</h2><p>{`${player} takes a sip and the game moves to the next round.`}</p><button className="primary-button" onClick={close}>{t.reveal.next}</button></div></div>;
 }
 
-function MiniGameModal({ miniGame, meId, act, busy, suggestQuestion, suggestingQuestion }: { miniGame: { id: string; status: "ask" | "answer"; question: string | null; sips: number; assignedPlayerId: string; assignedPlayerName: string; askerName: string | null; targetPlayerName: string | null }; meId: string; act: (action: string, extras?: Record<string, unknown>) => Promise<any>; busy: boolean; suggestQuestion: () => Promise<string>; suggestingQuestion: boolean }) {
+function MiniGameModal({ miniGame, meId, act, busy, categories, customTheme, suggestQuestion, suggestingQuestion }: { miniGame: { id: string; status: "ask" | "answer"; question: string | null; sips: number; assignedPlayerId: string; assignedPlayerName: string; askerName: string | null; targetPlayerName: string | null }; meId: string; act: (action: string, extras?: Record<string, unknown>) => Promise<any>; busy: boolean; categories: ThemeKey[]; customTheme: string | null; suggestQuestion: (category: QuestionCategory, hint: string) => Promise<string>; suggestingQuestion: boolean }) {
   const [question, setQuestion] = useState("");
   const [sips, setSips] = useState(1);
   const [choice, setChoice] = useState<"truth" | "dare" | null>(null);
+  const [questionIdeaOpen, setQuestionIdeaOpen] = useState(false);
+  const [ideaCategory, setIdeaCategory] = useState<QuestionCategory>("session");
+  const [ideaHint, setIdeaHint] = useState("");
   useEffect(() => {
     setQuestion("");
     setSips(1);
     setChoice(null);
+    setQuestionIdeaOpen(false);
+    setIdeaCategory("session");
+    setIdeaHint("");
   }, [miniGame.id]);
   const isMine = miniGame.assignedPlayerId === meId;
   const submitQuestion = async () => { if (question.trim().length < 3) return; await act("submitMiniQuestion", { question, sips }); };
   const chooseTruth = async () => { const result = await act("answerMini", { miniChoice: "truth" }); if (result) setChoice("truth"); };
   const chooseDare = async () => { await act("answerMini", { miniChoice: "dare" }); };
-  const getQuestionIdea = async () => { const idea = await suggestQuestion(); if (idea) setQuestion(idea); };
+  const getQuestionIdea = async () => { const idea = await suggestQuestion(ideaCategory, ideaHint); if (idea) setQuestion(idea); };
   return <div className="modal-backdrop"><div className="reminder-card mini-game-card">
     <div className="reminder-icon">{miniGame.status === "ask" ? "❓" : choice === "dare" ? "🥃" : "💬"}</div>
     <span className="eyebrow">{t.miniGame.title}</span>
@@ -458,7 +466,12 @@ function MiniGameModal({ miniGame, meId, act, busy, suggestQuestion, suggestingQ
       <h2>{t.miniGame.ask}</h2>
       <p className="mini-game-copy">{t.miniGame.askHint}</p>
       <textarea className="mini-game-input" value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={180} placeholder={t.miniGame.questionPlaceholder} />
-      <button type="button" className="mini-question-idea" disabled={suggestingQuestion || busy} onClick={getQuestionIdea}>{suggestingQuestion ? "THINKING…" : "GET AN AI QUESTION ✦"}</button>
+      <button type="button" className="mini-question-idea" disabled={busy} onClick={() => setQuestionIdeaOpen((open) => !open)}>{questionIdeaOpen ? t.miniGame.closeQuestionOptions : t.miniGame.getQuestionIdea}</button>
+      {questionIdeaOpen && <div className="mini-question-options">
+        <label><span>{t.miniGame.questionCategory}</span><select value={ideaCategory} disabled={suggestingQuestion || busy} onChange={(event) => setIdeaCategory(event.target.value as QuestionCategory)}><option value="session">{t.miniGame.sessionThemes}</option>{categories.map((category) => <option value={category} key={category}>{t.lobby[category]}</option>)}{customTheme && <option value="custom">{t.miniGame.customSubject}</option>}</select></label>
+        <label><span>{t.miniGame.questionDirection}</span><textarea value={ideaHint} disabled={suggestingQuestion || busy} onChange={(event) => setIdeaHint(event.target.value)} maxLength={160} placeholder={t.miniGame.questionDirectionPlaceholder} /></label>
+        <button type="button" className="mini-question-generate" disabled={suggestingQuestion || busy} onClick={getQuestionIdea}>{suggestingQuestion ? t.miniGame.thinkingQuestion : t.miniGame.generateQuestion}</button>
+      </div>}
       <div className="mini-game-sips"><span>{t.miniGame.sipsLabel}</span><div className="sip-picker" role="group" aria-label={t.miniGame.sipsLabel}>{[1,2,3].map((value) => <button type="button" key={value} className={`sip-choice ${sips === value ? "active" : ""}`} aria-pressed={sips === value} onClick={() => setSips(value)}><BeerIcon active={sips === value} /><strong>{value}</strong><small>{value === 1 ? t.common.sip : t.common.sips}</small></button>)}</div></div>
       <button className="primary-button" disabled={busy || question.trim().length < 3} onClick={submitQuestion}>{t.miniGame.sendQuestion}</button>
     </>}

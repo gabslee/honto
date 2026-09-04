@@ -162,6 +162,12 @@ h1 em,h2 em { color:var(--red); font-style:normal; position:relative; }
 .beer-icon.active .beer-liquid { fill:#f4a51c; }
 .mini-question-idea { width:100%; margin:0 0 14px; border:2px solid var(--ink); border-radius:9px; padding:10px 12px; background:var(--pink); color:var(--ink); font-size:10px; font-weight:1000; letter-spacing:.05em; box-shadow:3px 3px 0 var(--ink); cursor:pointer; }
 .mini-question-idea:hover:not(:disabled) { transform:translate(2px,2px) rotate(-.5deg); box-shadow:2px 2px 0 var(--ink); }
+.mini-question-options { display:grid; gap:12px; margin:0 0 16px; padding:13px; border:2px dashed var(--ink); border-radius:10px; background:#fff7c7; text-align:left; }
+.mini-question-options label { display:grid; gap:6px; font:900 10px/1.2 Arial,sans-serif; letter-spacing:.05em; text-transform:uppercase; }
+.mini-question-options select,.mini-question-options textarea { width:100%; border:2px solid var(--ink); border-radius:8px; padding:10px; background:#fffdf8; color:var(--ink); font:14px/1.35 Arial,sans-serif; text-transform:none; letter-spacing:normal; }
+.mini-question-options textarea { min-height:58px; resize:vertical; }
+.mini-question-generate { border:2px solid var(--ink); border-radius:8px; padding:10px 12px; background:var(--mint); color:var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:10px; font-weight:1000; letter-spacing:.05em; cursor:pointer; }
+.mini-question-generate:hover:not(:disabled) { transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink); }
 @media (max-width:520px) {
   .mini-game-sips { display:block; }
   .mini-game-sips > span { display:block; margin-bottom:8px; }
