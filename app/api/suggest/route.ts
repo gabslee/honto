@@ -20,14 +20,14 @@ const fallbackLies = (truth: string) => [
 ];
 const responseText = (data: { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }) => data.output_text ?? data.output?.flatMap((item) => item.content ?? []).map((item) => item.text ?? "").join("") ?? "";
 const normalizeTheme = (value: string) => value.trim().replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").replace(/[.!?]+$/g, "").replace(/\s+/g, " ");
-const usableTheme = (value: string, exclude: string[] = []) => { const theme = normalizeTheme(value); const words = theme.split(" ").filter(Boolean); return words.length >= 5 && words.length <= 12 && !/[—–\-:;|]/.test(theme) && !/\b(edition|confession|confessions|category|categories|theme|party game|two lies|one truth|your relatives|family tradition)$\b/i.test(theme) && !/\b(spicy sausage|chemistry class).*(spicy sausage|chemistry class)\b/i.test(theme) && !exclude.some((item) => item.toLowerCase() === theme.toLowerCase()) ? theme : null; };
+const usableTheme = (value: string, exclude: string[] = []) => { const theme = normalizeTheme(value); const words = theme.split(" ").filter(Boolean); return words.length >= 3 && words.length <= 8 && !/[—–\-:;|]/.test(theme) && !/\b(edition|confession|confessions|category|categories|theme|party game|two lies|one truth|your relatives|family tradition)$\b/i.test(theme) && !/\b(spicy sausage|chemistry class).*(spicy sausage|chemistry class)\b/i.test(theme) && !exclude.some((item) => item.toLowerCase() === theme.toLowerCase()) ? theme : null; };
 const categoryGuidance = (categories: string | string[]) => {
   const key = Array.isArray(categories) ? categories[0] : categories;
-  if (key === "spicy") return "This is an adults only 18+ category for consenting adults. Topics may openly discuss sex, sexual experiences, desire, intimacy, and bedroom communication, but never minors, coercion, exploitation, incest, or violence. Keep each topic non graphic and suitable as a conversation prompt.";
-  if (key === "flirty") return "Keep this flirty but not explicit: dating, attraction, crushes, romance, kissing, relationship choices, and playful adult tension. Do not turn it into food, school science, or unrelated shock humor.";
-  if (key === "family") return "Keep every topic about a family relationship, home tradition, relative, or shared family memory.";
-  if (key === "innocent") return "Keep every topic light, wholesome, and suitable for mixed ages, focused on school, hobbies, food, memories, and harmless mistakes.";
-  return "Keep every topic grounded in one ordinary personal situation from this category, with no unrelated mashups.";
+  if (key === "spicy") return "This is an adults only 18+ category for consenting adults. Topics may openly discuss sex, sexual experiences, desire, intimacy, and bedroom communication, but never minors, coercion, exploitation, incest, or violence. Keep each topic non graphic and suitable as a conversation prompt. Use only 3 to 8 simple words, like a short subject someone can answer easily.";
+  if (key === "flirty") return "Keep this flirty but not explicit: dating, attraction, crushes, romance, kissing, relationship choices, and playful adult tension. Do not turn it into food, school science, or unrelated shock humor. Use only 3 to 8 simple words, like a short subject someone can answer easily.";
+  if (key === "family") return "Keep every topic about a family relationship, home tradition, relative, or shared family memory. Use only 3 to 8 simple words, like a short subject someone can answer easily.";
+  if (key === "innocent") return "Keep every topic light, wholesome, and suitable for mixed ages, focused on school, hobbies, food, memories, and harmless mistakes. Use only 3 to 8 simple words, like a short subject someone can answer easily.";
+  return "Keep every topic grounded in one ordinary personal situation from this category, with no unrelated mashups. Use only 3 to 8 simple words, like a short subject someone can answer easily.";
 };
 
 export async function POST(request: Request) {
