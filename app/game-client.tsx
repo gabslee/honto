@@ -257,16 +257,17 @@ export default function GameClient() {
     finally { setGeneratingLies(false); }
   }
 
-  async function suggestMiniQuestion(category: QuestionCategory, hint: string) {
-    if (!game) return "";
+  async function suggestMiniQuestion(category: QuestionCategory, hint: string): Promise<string[]> {
+    if (!game) return [];
     setSuggestingMiniQuestion(true); setError("");
     try {
       const categories = category === "session" || category === "custom" ? activeThemeKeys(game.room.themeCategory) : [category];
       const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "question", category: categories, customTheme: category === "custom" || category === "session" ? game.room.customTheme : null, questionHint: hint.trim().slice(0, 160) }) });
-      const data = await response.json() as { question?: string };
-      if (!response.ok || !data.question?.trim()) throw new Error("We couldn't think of a question.");
-      return data.question.trim();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "We couldn't think of a question."); return ""; }
+      const data = await response.json() as { questions?: string[]; question?: string };
+      const questions = data.questions?.filter((item): item is string => Boolean(item?.trim())).map((item) => item.trim()) ?? (data.question?.trim() ? [data.question.trim()] : []);
+      if (!response.ok || questions.length < 3) throw new Error("We couldn't think of three questions.");
+      return questions.slice(0, 3);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "We couldn't think of three questions."); return []; }
     finally { setSuggestingMiniQuestion(false); }
   }
 
@@ -439,13 +440,14 @@ function TimeoutModal({ notice, players, close }: { notice: { playerId: string; 
   return <div className="modal-backdrop"><div className="reminder-card timeout-card"><div className="reminder-icon">⏰</div><span className="eyebrow">TIME'S UP!</span><h2>{`${player} ran out of time.`}</h2><p>{`${player} takes a sip and the game moves to the next round.`}</p><button className="primary-button" onClick={close}>{t.reveal.next}</button></div></div>;
 }
 
-function MiniGameModal({ miniGame, meId, act, busy, categories, customTheme, suggestQuestion, suggestingQuestion }: { miniGame: { id: string; status: "ask" | "answer"; question: string | null; sips: number; assignedPlayerId: string; assignedPlayerName: string; askerName: string | null; targetPlayerName: string | null }; meId: string; act: (action: string, extras?: Record<string, unknown>) => Promise<any>; busy: boolean; categories: ThemeKey[]; customTheme: string | null; suggestQuestion: (category: QuestionCategory, hint: string) => Promise<string>; suggestingQuestion: boolean }) {
+function MiniGameModal({ miniGame, meId, act, busy, categories, customTheme, suggestQuestion, suggestingQuestion }: { miniGame: { id: string; status: "ask" | "answer"; question: string | null; sips: number; assignedPlayerId: string; assignedPlayerName: string; askerName: string | null; targetPlayerName: string | null }; meId: string; act: (action: string, extras?: Record<string, unknown>) => Promise<any>; busy: boolean; categories: ThemeKey[]; customTheme: string | null; suggestQuestion: (category: QuestionCategory, hint: string) => Promise<string[]>; suggestingQuestion: boolean }) {
   const [question, setQuestion] = useState("");
   const [sips, setSips] = useState(1);
   const [choice, setChoice] = useState<"truth" | "dare" | null>(null);
   const [questionIdeaOpen, setQuestionIdeaOpen] = useState(false);
   const [ideaCategory, setIdeaCategory] = useState<QuestionCategory>("session");
   const [ideaHint, setIdeaHint] = useState("");
+  const [questionOptions, setQuestionOptions] = useState<string[]>([]);
   useEffect(() => {
     setQuestion("");
     setSips(1);
@@ -453,12 +455,14 @@ function MiniGameModal({ miniGame, meId, act, busy, categories, customTheme, sug
     setQuestionIdeaOpen(false);
     setIdeaCategory("session");
     setIdeaHint("");
+    setQuestionOptions([]);
   }, [miniGame.id]);
   const isMine = miniGame.assignedPlayerId === meId;
   const submitQuestion = async () => { if (question.trim().length < 3) return; await act("submitMiniQuestion", { question, sips }); };
   const chooseTruth = async () => { const result = await act("answerMini", { miniChoice: "truth" }); if (result) setChoice("truth"); };
   const chooseDare = async () => { await act("answerMini", { miniChoice: "dare" }); };
-  const getQuestionIdea = async () => { const idea = await suggestQuestion(ideaCategory, ideaHint); if (idea) setQuestion(idea); };
+  const getQuestionIdeas = async () => { const ideas = await suggestQuestion(ideaCategory, ideaHint); if (ideas.length) setQuestionOptions(ideas); };
+  const chooseQuestion = (idea: string) => { setQuestion(idea); setQuestionOptions([]); setQuestionIdeaOpen(false); };
   return <div className="modal-backdrop"><div className="reminder-card mini-game-card">
     <div className="reminder-icon">{miniGame.status === "ask" ? "❓" : choice === "dare" ? "🥃" : "💬"}</div>
     <span className="eyebrow">{t.miniGame.title}</span>
@@ -470,7 +474,8 @@ function MiniGameModal({ miniGame, meId, act, busy, categories, customTheme, sug
       {questionIdeaOpen && <div className="mini-question-options">
         <label><span>{t.miniGame.questionCategory}</span><select value={ideaCategory} disabled={suggestingQuestion || busy} onChange={(event) => setIdeaCategory(event.target.value as QuestionCategory)}><option value="session">{t.miniGame.sessionThemes}</option>{categories.map((category) => <option value={category} key={category}>{t.lobby[category]}</option>)}{customTheme && <option value="custom">{t.miniGame.customSubject}</option>}</select></label>
         <label><span>{t.miniGame.questionDirection}</span><textarea value={ideaHint} disabled={suggestingQuestion || busy} onChange={(event) => setIdeaHint(event.target.value)} maxLength={160} placeholder={t.miniGame.questionDirectionPlaceholder} /></label>
-        <button type="button" className="mini-question-generate" disabled={suggestingQuestion || busy} onClick={getQuestionIdea}>{suggestingQuestion ? t.miniGame.thinkingQuestion : t.miniGame.generateQuestion}</button>
+        <button type="button" className="mini-question-generate" disabled={suggestingQuestion || busy} onClick={getQuestionIdeas}>{suggestingQuestion ? t.miniGame.thinkingQuestion : questionOptions.length ? t.miniGame.generateMoreQuestions : t.miniGame.generateQuestion}</button>
+        {questionOptions.length > 0 && <div className="question-option-list" role="listbox" aria-label={t.miniGame.questionOptions}><span>{t.miniGame.questionOptions}</span>{questionOptions.map((idea, index) => <button type="button" role="option" aria-selected={false} className="question-option" key={`${idea}-${index}`} onClick={() => chooseQuestion(idea)}>{idea}</button>)}</div>}
       </div>}
       <div className="mini-game-sips"><span>{t.miniGame.sipsLabel}</span><div className="sip-picker" role="group" aria-label={t.miniGame.sipsLabel}>{[1,2,3].map((value) => <button type="button" key={value} className={`sip-choice ${sips === value ? "active" : ""}`} aria-pressed={sips === value} onClick={() => setSips(value)}><BeerIcon active={sips === value} /><strong>{value}</strong><small>{value === 1 ? t.common.sip : t.common.sips}</small></button>)}</div></div>
       <button className="primary-button" disabled={busy || question.trim().length < 3} onClick={submitQuestion}>{t.miniGame.sendQuestion}</button>

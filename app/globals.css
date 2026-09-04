@@ -168,6 +168,10 @@ h1 em,h2 em { color:var(--red); font-style:normal; position:relative; }
 .mini-question-options textarea { min-height:58px; resize:vertical; }
 .mini-question-generate { border:2px solid var(--ink); border-radius:8px; padding:10px 12px; background:var(--mint); color:var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:10px; font-weight:1000; letter-spacing:.05em; cursor:pointer; }
 .mini-question-generate:hover:not(:disabled) { transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink); }
+.question-option-list { display:grid; gap:8px; margin-top:2px; }
+.question-option-list > span { font-size:10px; font-weight:1000; letter-spacing:.05em; text-transform:uppercase; }
+.question-option { width:100%; border:2px solid var(--ink); border-radius:9px; padding:11px 12px; background:#fffdf8; color:var(--ink); box-shadow:2px 2px 0 var(--ink); text-align:left; font:14px/1.35 Arial,sans-serif; cursor:pointer; }
+.question-option:hover { background:var(--pink); transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink); }
 @media (max-width:520px) {
   .mini-game-sips { display:block; }
   .mini-game-sips > span { display:block; margin-bottom:8px; }
