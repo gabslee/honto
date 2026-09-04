@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 
-type Body = { action?: string; code?: string; name?: string; token?: string; roundCount?: number; groupSipEvery?: number | null; timerMinutes?: number | null; prompt?: string; statements?: string[]; truthIndex?: number; guessedIndex?: number };
+type Body = { action?: string; code?: string; name?: string; token?: string; roundCount?: number; groupSipEvery?: number | null; timerMinutes?: number | null; reminderMinutes?: number | null; writeTimerMinutes?: number | null; guessTimerMinutes?: number | null; themeCategory?: string; prompt?: string; statements?: string[]; truthIndex?: number; guessedIndex?: number };
 
 const WORDS = ["MOON", "MINT", "WAVE", "SAKE", "NEON", "MISO", "YUZU", "NORI", "KITSU", "MOMO", "SORA", "KUMA", "HOSHI", "RAMEN", "UMAMI"];
 const sql = neon(process.env.DATABASE_URL ?? "");
@@ -9,7 +9,14 @@ let schemaReady: Promise<void> | null = null;
 function ensureSchema() {
   if (!schemaReady) schemaReady = (async () => {
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured.");
-    await sql`CREATE TABLE IF NOT EXISTS rooms (id text PRIMARY KEY, code text UNIQUE NOT NULL, status text NOT NULL DEFAULT 'lobby', round_count integer NOT NULL DEFAULT 10, current_round integer NOT NULL DEFAULT 1, group_sip_every integer, timer_minutes integer, started_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
+    await sql`CREATE TABLE IF NOT EXISTS rooms (id text PRIMARY KEY, code text UNIQUE NOT NULL, status text NOT NULL DEFAULT 'lobby', round_count integer NOT NULL DEFAULT 10, current_round integer NOT NULL DEFAULT 1, group_sip_every integer, timer_minutes integer, write_timer_minutes integer, guess_timer_minutes integer, theme_category text NOT NULL DEFAULT 'mixed', session_paused boolean NOT NULL DEFAULT false, paused_at timestamptz, paused_seconds integer NOT NULL DEFAULT 0, round_started_at timestamptz, started_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS write_timer_minutes integer`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS guess_timer_minutes integer`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS theme_category text NOT NULL DEFAULT 'mixed'`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS session_paused boolean NOT NULL DEFAULT false`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS paused_at timestamptz`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS paused_seconds integer NOT NULL DEFAULT 0`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS round_started_at timestamptz`;
     await sql`CREATE TABLE IF NOT EXISTS players (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, name text NOT NULL, token text UNIQUE NOT NULL, is_host boolean NOT NULL DEFAULT false, sips integer NOT NULL DEFAULT 0, joined_at timestamptz NOT NULL DEFAULT now())`;
     await sql`CREATE TABLE IF NOT EXISTS rounds (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, round_number integer NOT NULL, author_id text NOT NULL REFERENCES players(id), prompt text NOT NULL, statement_one text NOT NULL, statement_two text NOT NULL, statement_three text NOT NULL, truth_index integer NOT NULL, guessed_index integer, guesser_id text REFERENCES players(id), result text, created_at timestamptz NOT NULL DEFAULT now(), revealed_at timestamptz, UNIQUE(room_id, round_number))`;
   })();
@@ -28,8 +35,11 @@ async function state(roomCode: string, token: string) {
   const meRows = await sql`SELECT id FROM players WHERE room_id = ${room.id} AND token = ${token}`;
   if (!meRows[0]) throw new Error("Your session is not valid for this room.");
   const players = await sql`SELECT id, name, is_host AS "isHost", sips, joined_at AS "joinedAt" FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
-  const rounds = await sql`SELECT r.id, r.round_number AS "roundNumber", r.author_id AS "authorId", p.name AS "authorName", r.prompt, r.statement_one AS "statementOne", r.statement_two AS "statementTwo", r.statement_three AS "statementThree", r.guessed_index AS "guessedIndex", r.guesser_id AS "guesserId", r.result, CASE WHEN r.result IS NOT NULL THEN r.truth_index ELSE NULL END AS "truthIndex" FROM rounds r JOIN players p ON p.id = r.author_id WHERE r.room_id = ${room.id} AND r.round_number = ${room.current_round} LIMIT 1`;
-  return { room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, groupSipEvery: room.group_sip_every, timerMinutes: room.timer_minutes, startedAt: room.started_at }, players, activeRound: rounds[0] ?? null, meId: meRows[0].id };
+  const rounds = await sql`SELECT r.id, r.round_number AS "roundNumber", r.author_id AS "authorId", p.name AS "authorName", r.prompt, r.statement_one AS "statementOne", r.statement_two AS "statementTwo", r.statement_three AS "statementThree", r.guessed_index AS "guessedIndex", r.guesser_id AS "guesserId", r.result, r.created_at AS "createdAt", CASE WHEN r.result IS NOT NULL THEN r.truth_index ELSE NULL END AS "truthIndex" FROM rounds r JOIN players p ON p.id = r.author_id WHERE r.room_id = ${room.id} AND r.round_number = ${room.current_round} LIMIT 1`;
+  const lastRows = await sql`SELECT r.round_number AS "roundNumber", r.author_id AS "authorId", r.guesser_id AS "guesserId", r.truth_index AS "truthIndex", r.guessed_index AS "guessedIndex", r.result, r.statement_one AS "statementOne", r.statement_two AS "statementTwo", r.statement_three AS "statementThree" FROM rounds r WHERE r.room_id = ${room.id} AND r.result IS NOT NULL ORDER BY r.round_number DESC LIMIT 1`;
+  const last = lastRows[0] as any;
+  const drinkerId = last ? (last.result === "correct" ? last.authorId : last.guesserId) : null;
+  return { room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, groupSipEvery: room.group_sip_every, timerMinutes: room.timer_minutes, writeTimerMinutes: room.write_timer_minutes, guessTimerMinutes: room.guess_timer_minutes, themeCategory: room.theme_category, startedAt: room.started_at, roundStartedAt: room.round_started_at, sessionPaused: room.session_paused, pausedAt: room.paused_at, pausedSeconds: room.paused_seconds }, players, activeRound: rounds[0] ?? null, lastReveal: last ? { ...last, drinkerId } : null, meId: meRows[0].id };
 }
 
 export default async function handler(req: any, res: any) {
@@ -69,16 +79,28 @@ export default async function handler(req: any, res: any) {
     if (!me) return json(res, { error: "Invalid session." }, 401);
     if (body.action === "configure") {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can change the room settings.");
-      const rounds = [10, 20, 30].includes(body.roundCount ?? 0) ? body.roundCount : 10;
-      const group = [3, 5].includes(body.groupSipEvery ?? 0) ? body.groupSipEvery : null;
-      const timer = [10, 15].includes(body.timerMinutes ?? 0) ? body.timerMinutes : null;
-      await sql`UPDATE rooms SET round_count = ${rounds}, group_sip_every = ${group}, timer_minutes = ${timer}, updated_at = now() WHERE id = ${room.id}`;
+      const rounds = Number.isInteger(body.roundCount) && (body.roundCount ?? 0) >= 1 && (body.roundCount ?? 0) <= 100 ? body.roundCount : 10;
+      const group = Number.isInteger(body.groupSipEvery) && (body.groupSipEvery ?? 0) >= 1 && (body.groupSipEvery ?? 0) <= 30 ? body.groupSipEvery : null;
+      const timer = Number.isInteger(body.reminderMinutes ?? body.timerMinutes) && (body.reminderMinutes ?? body.timerMinutes ?? 0) >= 1 && (body.reminderMinutes ?? body.timerMinutes ?? 0) <= 180 ? (body.reminderMinutes ?? body.timerMinutes) : null;
+      const writeTimer = Number.isInteger(body.writeTimerMinutes) && (body.writeTimerMinutes ?? 0) >= 1 && (body.writeTimerMinutes ?? 0) <= 60 ? body.writeTimerMinutes : null;
+      const guessTimer = Number.isInteger(body.guessTimerMinutes) && (body.guessTimerMinutes ?? 0) >= 1 && (body.guessTimerMinutes ?? 0) <= 60 ? body.guessTimerMinutes : null;
+      const category = ["mixed", "family", "life", "spicy", "wild"].includes(body.themeCategory ?? "") ? body.themeCategory : "mixed";
+      await sql`UPDATE rooms SET round_count = ${rounds}, group_sip_every = ${group}, timer_minutes = ${timer}, write_timer_minutes = ${writeTimer}, guess_timer_minutes = ${guessTimer}, theme_category = ${category}, updated_at = now() WHERE id = ${room.id}`;
     }
     if (body.action === "start") {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can start the game.");
       const count = await sql`SELECT COUNT(*)::int AS total FROM players WHERE room_id = ${room.id}`;
       if ((count[0]?.total ?? 0) < 2) throw new Error("Wait for at least one more player.");
-      await sql`UPDATE rooms SET status = 'playing', current_round = 1, started_at = now(), updated_at = now() WHERE id = ${room.id}`;
+      await sql`UPDATE rooms SET status = 'playing', current_round = 1, round_started_at = now(), started_at = now(), session_paused = false, paused_seconds = 0, updated_at = now() WHERE id = ${room.id}`;
+    }
+    if (body.action === "pause") {
+      if (!me.is_host || room.status !== "playing") throw new Error("Only the host can pause the session.");
+      if (room.session_paused) {
+        const extra = room.paused_at ? Math.max(0, Math.floor((Date.now() - new Date(room.paused_at).getTime()) / 1000)) : 0;
+        await sql`UPDATE rooms SET session_paused = false, paused_at = null, paused_seconds = paused_seconds + ${extra}, updated_at = now() WHERE id = ${room.id}`;
+      } else {
+        await sql`UPDATE rooms SET session_paused = true, paused_at = now(), updated_at = now() WHERE id = ${room.id}`;
+      }
     }
     if (body.action === "submit") {
       if (room.status !== "playing") throw new Error("The game is not in progress.");
@@ -100,7 +122,7 @@ export default async function handler(req: any, res: any) {
       const nextRound = Number(room.current_round) + 1; const finished = nextRound > Number(room.round_count);
       await sql`UPDATE rounds SET guessed_index = ${body.guessedIndex}, guesser_id = ${me.id}, result = ${correct ? "correct" : "wrong"}, revealed_at = now() WHERE id = ${round.id}`;
       await sql`UPDATE players SET sips = sips + 1 WHERE id = ${drinkerId}`;
-      await sql`UPDATE rooms SET current_round = ${finished ? room.current_round : nextRound}, status = ${finished ? "finished" : "playing"}, updated_at = now() WHERE id = ${room.id}`;
+      await sql`UPDATE rooms SET current_round = ${finished ? room.current_round : nextRound}, status = ${finished ? "finished" : "playing"}, round_started_at = CASE WHEN ${finished} THEN round_started_at ELSE now() END, updated_at = now() WHERE id = ${room.id}`;
       return json(res, { ...(await state(roomCode, token)), reveal: { correct, truthIndex: round.truth_index, drinkerId, roundNumber: room.current_round } });
     }
     return json(res, await state(roomCode, token));
