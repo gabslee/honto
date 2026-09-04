@@ -230,6 +230,10 @@ export default function GameClient() {
       }));
       const seen = new Set(excluded.map((item) => item.toLowerCase()));
       const prompts = responses.flat().filter((item) => { const key = item.toLowerCase(); if (seen.has(key)) return false; seen.add(key); return true; });
+      for (let index = prompts.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [prompts[index], prompts[swapIndex]] = [prompts[swapIndex], prompts[index]];
+      }
       if (prompts.length) { setPrompt(prompts[0]); setPromptPool(prompts.slice(1)); }
       else rotateLocalPrompt();
     } catch { rotateLocalPrompt(); }
