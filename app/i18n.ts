@@ -49,7 +49,7 @@ export const messages = {
       hostNote: "The host chooses the rules and starts the game.",
     },
     writer: {
-      badge: "YOUR TURN TO TELL", title: "Two lies and one truth about…", another: "✨ another idea",
+      badge: "YOUR TURN TO TELL", title: "Two lies and one truth about…", another: "✨ another idea", aiIdea: "✨ GET AN AI IDEA", aiLoading: "THINKING…",
       hint: "Use a similar tone for all three so you don't give it away. Only you will see which one is true.",
       placeholders: ["I once…", "One time, I…", "No one knows, but I…"], truth: "✓ TRUTH",
       markTruth: "MARK AS TRUTH", submit: "SEND ALL THREE →",

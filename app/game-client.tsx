@@ -35,6 +35,7 @@ export default function GameClient() {
   const [copied, setCopied] = useState(false);
   const [promptIndex, setPromptIndex] = useState(0);
   const [prompt, setPrompt] = useState(PROMPTS[0]);
+  const [suggestingPrompt, setSuggestingPrompt] = useState(false);
   const [statements, setStatements] = useState(["", "", ""]);
   const [truthIndex, setTruthIndex] = useState<number | null>(null);
   const [reveal, setReveal] = useState<{ correct: boolean; truthIndex: number; drinkerId: string; roundNumber: number; statements: string[] } | null>(null);
@@ -111,6 +112,17 @@ export default function GameClient() {
     const next = (promptIndex + 1) % PROMPTS.length; setPromptIndex(next); setPrompt(PROMPTS[next]);
   }
 
+  async function suggestPrompt() {
+    setSuggestingPrompt(true);
+    try {
+      const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ exclude: [prompt] }) });
+      const data = await response.json() as { prompt?: string };
+      if (response.ok && data.prompt) setPrompt(data.prompt);
+      else newPrompt();
+    } catch { newPrompt(); }
+    finally { setSuggestingPrompt(false); }
+  }
+
   async function submitStories(event: FormEvent) {
     event.preventDefault();
     const result = await act("submit", { prompt, statements, truthIndex });
@@ -144,7 +156,7 @@ export default function GameClient() {
             {nextTimerSip && <span className="timer">{t.groupSipIn} {nextTimerSip} {t.minutesShort}</span>}
           </div>
           <ScoreRail players={game.players} meId={game.meId} />
-          {!game.activeRound && author?.id === game.meId && <Writer prompt={prompt} setPrompt={setPrompt} newPrompt={newPrompt} statements={statements} setStatements={setStatements} truthIndex={truthIndex} setTruthIndex={setTruthIndex} submit={submitStories} busy={busy} />}
+          {!game.activeRound && author?.id === game.meId && <Writer prompt={prompt} setPrompt={setPrompt} newPrompt={newPrompt} suggestPrompt={suggestPrompt} suggestingPrompt={suggestingPrompt} statements={statements} setStatements={setStatements} truthIndex={truthIndex} setTruthIndex={setTruthIndex} submit={submitStories} busy={busy} />}
           {!game.activeRound && author?.id !== game.meId && <Waiting title={`${author?.name} ${t.waiting.writingSuffix}`} text={t.waiting.writingBody} />}
           {game.activeRound && game.activeRound.authorId === game.meId && <Waiting title={t.waiting.sentTitle} text={t.waiting.sentBody} />}
           {game.activeRound && game.activeRound.authorId !== game.meId && <Guesser round={game.activeRound} onGuess={guess} busy={busy} />}
@@ -199,8 +211,8 @@ function ScoreRail({ players, meId }: { players: Player[]; meId: string }) {
   return <aside className="score-rail">{players.map((p, i) => <div key={p.id}><span className={`avatar avatar-${i % 4}`}>{p.name[0]}</span><strong>{p.name}{p.id === meId ? ` · ${t.common.you}` : ""}</strong><small>{p.sips} {p.sips === 1 ? t.common.sip : t.common.sips}</small></div>)}</aside>;
 }
 
-function Writer({ prompt, setPrompt, newPrompt, statements, setStatements, truthIndex, setTruthIndex, submit, busy }: { prompt: string; setPrompt: (v: string) => void; newPrompt: () => void; statements: string[]; setStatements: (v: string[]) => void; truthIndex: number | null; setTruthIndex: (v: number) => void; submit: (e: FormEvent) => void; busy: boolean }) {
-  return <form className="play-card writer" onSubmit={submit}><span className="turn-badge">{t.writer.badge}</span><h2>{t.writer.title}</h2><div className="prompt-row"><input value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={100}/><button type="button" onClick={newPrompt}>{t.writer.another}</button></div><p className="hint">{t.writer.hint}</p><div className="story-inputs">{statements.map((statement, index) => <label key={index} className={truthIndex === index ? "is-truth" : ""}><span>{index + 1}</span><textarea value={statement} onChange={(e) => { const next = [...statements]; next[index] = e.target.value; setStatements(next); }} placeholder={t.writer.placeholders[index]} maxLength={180}/><button type="button" onClick={() => setTruthIndex(index)}>{truthIndex === index ? t.writer.truth : t.writer.markTruth}</button></label>)}</div><button className="primary-button" disabled={busy}>{t.writer.submit}</button></form>;
+function Writer({ prompt, setPrompt, newPrompt, suggestPrompt, suggestingPrompt, statements, setStatements, truthIndex, setTruthIndex, submit, busy }: { prompt: string; setPrompt: (v: string) => void; newPrompt: () => void; suggestPrompt: () => void; suggestingPrompt: boolean; statements: string[]; setStatements: (v: string[]) => void; truthIndex: number | null; setTruthIndex: (v: number) => void; submit: (e: FormEvent) => void; busy: boolean }) {
+  return <form className="play-card writer" onSubmit={submit}><span className="turn-badge">{t.writer.badge}</span><h2>{t.writer.title}</h2><div className="prompt-row"><input value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={100}/><button type="button" onClick={newPrompt}>{t.writer.another}</button><button type="button" onClick={suggestPrompt} disabled={suggestingPrompt}>{suggestingPrompt ? t.writer.aiLoading : t.writer.aiIdea}</button></div><p className="hint">{t.writer.hint}</p><div className="story-inputs">{statements.map((statement, index) => <label key={index} className={truthIndex === index ? "is-truth" : ""}><span>{index + 1}</span><textarea value={statement} onChange={(e) => { const next = [...statements]; next[index] = e.target.value; setStatements(next); }} placeholder={t.writer.placeholders[index]} maxLength={180}/><button type="button" onClick={() => setTruthIndex(index)}>{truthIndex === index ? t.writer.truth : t.writer.markTruth}</button></label>)}</div><button className="primary-button" disabled={busy}>{t.writer.submit}</button></form>;
 }
 
 function Guesser({ round, onGuess, busy }: { round: ActiveRound; onGuess: (i: number) => void; busy: boolean }) {
