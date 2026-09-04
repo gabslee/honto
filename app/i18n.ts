@@ -56,7 +56,7 @@ export const messages = {
       hostNote: "The host chooses the rules and starts the game.",
     },
     writer: {
-      badge: "YOUR TURN TO TELL", title: "Start with one truth about…", another: "✨ another idea", aiIdea: "✨ GET AN AI IDEA", aiLoading: "THINKING…",
+      badge: "YOUR TURN TO TELL", title: "Start with one truth about…", another: "another idea", aiIdea: "GET AN AI IDEA", aiLoading: "THINKING…",
       truthLabel: "YOUR TRUTH", truthPlaceholder: "Type one true story about yourself…", generate: "GENERATE 5 LIES", generating: "WRITING LIES…", chooseTwo: "Choose two lies, then edit them if you want.", selected: "SELECTED", select: "SELECT", submit: "SEND THREE STORIES →",
       hint: "The AI only helps with believable lies. You choose what feels like you before sending.",
     },

@@ -19,6 +19,8 @@ const fallbackLies = (truth: string) => [
   `I secretly wish people knew that ${truth.toLowerCase().slice(0, 34)}.`,
 ];
 const responseText = (data: { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }) => data.output_text ?? data.output?.flatMap((item) => item.content ?? []).map((item) => item.text ?? "").join("") ?? "";
+const normalizeTheme = (value: string) => value.trim().replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").replace(/[.!?]+$/g, "").replace(/\s+/g, " ");
+const usableTheme = (value: string, exclude: string[] = []) => { const theme = normalizeTheme(value); const words = theme.split(" ").filter(Boolean); return theme.length >= 4 && words.length <= 8 && !/[—–\-:;|]/.test(theme) && !/\b(edition|confession|confessions|category|categories|theme|party game|two lies|one truth)\b/i.test(theme) && !exclude.some((item) => item.toLowerCase() === theme.toLowerCase()) ? theme : null; };
 
 export async function POST(request: Request) {
   let body: Body = {};
@@ -30,9 +32,9 @@ export async function POST(request: Request) {
   }
   try {
     const instruction = body.kind === "lies"
-      ? `Write five believable but clearly fictional alternative statements for a party game. The player's true statement is: "${(body.truth ?? "").slice(0, 180)}". Theme: ${(body.prompt ?? "anything goes").slice(0, 80)}. Return five short English statements as a JSON array of strings. Keep them safe, playful, non-defamatory, and non-explicit.`
-      : `Give one fresh, playful English theme for a two-lies-one-truth party game in the ${(Array.isArray(categories) ? categories.join(", ") : categories)} categories. Avoid: ${(body.exclude ?? []).join(", ") || "none"}. Return only a 2–8 word noun phrase.`;
-    const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` }, body: JSON.stringify({ model: process.env.OPENAI_MODEL ?? "gpt-5.4-nano", store: false, input: instruction, text: { format: body.kind === "lies" ? { type: "json_schema", name: "lie_options", strict: true, schema: { type: "object", properties: { lies: { type: "array", items: { type: "string" }, minItems: 5, maxItems: 5 } }, required: ["lies"], additionalProperties: false } } : { type: "text" } }, max_output_tokens: body.kind === "lies" ? 260 : 30 }) });
+      ? `Write five believable but clearly fictional alternative statements for a party game. The player's true statement is: "${(body.truth ?? "").slice(0, 180)}". Theme: ${(body.prompt ?? "anything goes").slice(0, 80)}. Make each lie sound like something a real person would casually type. Use contractions and everyday wording, vary the sentence openings, and do not make the grammar too polished. Do not wrap statements in quotation marks. Never use an em dash, en dash, or hyphen of any kind. No corporate, robotic, or repeated template language. Keep them safe, playful, non-defamatory, and non-explicit. Return five short English statements as a JSON object with a lies array.`
+      : `Create three short English topic phrases for a two-lies-one-truth game. The topic should invite one real personal story from the player. Selected subject areas: ${(Array.isArray(categories) ? categories.join(", ") : categories)}. Good style: a family tradition, your first job, a weird snack, a time you got lost. Do not write a title, question, instruction, or generic label. Avoid formats like Cozy Confessions: Family Life Edition, Family Life, or Tell your story. Use plain conversational lowercase wording, 2 to 8 words each. No punctuation, quotes, colon, semicolon, question mark, exclamation mark, em dash, en dash, or hyphen. Do not use words such as edition, confession, category, theme, or party game. Avoid: ${(body.exclude ?? []).join(", ") || "none"}. Return a JSON object with a themes array containing exactly three options.`;
+    const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` }, body: JSON.stringify({ model: process.env.OPENAI_MODEL ?? "gpt-5.4-nano", store: false, input: instruction, text: { format: { type: "json_schema", name: body.kind === "lies" ? "lie_options" : "theme_options", strict: true, schema: body.kind === "lies" ? { type: "object", properties: { lies: { type: "array", items: { type: "string" }, minItems: 5, maxItems: 5 } }, required: ["lies"], additionalProperties: false } : { type: "object", properties: { themes: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 3 } }, required: ["themes"], additionalProperties: false } } }, max_output_tokens: body.kind === "lies" ? 260 : 100 }) });
     if (!response.ok) { const detail = await response.text(); console.error("[suggest] OpenAI request failed", { status: response.status, model: process.env.OPENAI_MODEL ?? "gpt-5.4-nano", detail: detail.slice(0, 500) }); throw new Error(`OpenAI request failed (${response.status})`); }
     const data = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> };
     const text = responseText(data);
@@ -42,9 +44,10 @@ export async function POST(request: Request) {
       if (lies.length === 5) return Response.json({ lies, source: "ai" });
       throw new Error("Invalid lie options");
     }
-    const prompt = text.trim().replace(/[.!?]+$/, "").slice(0, 100);
+    const parsed = JSON.parse(text || "{}");
+    const prompt = Array.isArray(parsed.themes) ? parsed.themes.map((item: unknown) => typeof item === "string" ? usableTheme(item, body.exclude) : null).find((item: string | null): item is string => Boolean(item)) : null;
     if (!prompt) throw new Error("Invalid theme");
-    return Response.json({ prompt, source: "ai" });
+    return Response.json({ prompt: prompt.slice(0, 100), source: "ai" });
   } catch (error) {
     console.error("[suggest] Returning fallback", { kind: body.kind ?? "theme", hasKey: Boolean(apiKey), placeholder: Boolean(apiKey?.startsWith("REPLACE_")), model: process.env.OPENAI_MODEL ?? "gpt-5.4-nano", error: error instanceof Error ? error.message : String(error) });
     return Response.json(body.kind === "lies" ? { lies: fallbackLies(body.truth ?? "my secret"), source: "fallback" } : { prompt: fallbackTheme(categories, body.exclude), source: "fallback" });

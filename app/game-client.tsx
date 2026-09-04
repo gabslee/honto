@@ -224,8 +224,8 @@ export default function GameClient() {
         </section>
       )}
       {game.room.status === "finished" && <Finished players={game.players} leave={leave} />}
-      {reveal && <Reveal reveal={reveal} players={game.players} meId={game.meId} close={() => { setReveal(null); refresh(); }} groupSip={Boolean(game.room.groupSipEvery && reveal.roundNumber % game.room.groupSipEvery === 0)} />}
-      {reminderOpen && <ReminderModal close={() => setReminderOpen(false)} />}
+      {reveal && <Reveal reveal={reveal} players={game.players} meId={game.meId} close={() => { setReveal(null); refresh(); }} groupSipEvery={game.room.groupSipEvery && reveal.roundNumber % game.room.groupSipEvery === 0 ? game.room.groupSipEvery : null} />}
+      {reminderOpen && <ReminderModal close={() => setReminderOpen(false)} minutes={game.room.timerMinutes ?? 0} />}
     </main>
   );
 }
@@ -290,7 +290,11 @@ function ScoreRail({ players, meId }: { players: Player[]; meId: string }) {
 }
 
 function Writer({ prompt, setPrompt, newPrompt, suggestPrompt, suggestingPrompt, truthText, setTruthText, lieOptions, selectedLies, toggleLie, updateLie, generateLies, generatingLies, submit, busy }: { prompt: string; setPrompt: (v: string) => void; newPrompt: () => void; suggestPrompt: () => void; suggestingPrompt: boolean; truthText: string; setTruthText: (v: string) => void; lieOptions: string[]; selectedLies: number[]; toggleLie: (index: number) => void; updateLie: (index: number, value: string) => void; generateLies: () => void; generatingLies: boolean; submit: (e: FormEvent) => void; busy: boolean }) {
-  return <form className="play-card writer" onSubmit={submit}><span className="turn-badge">{t.writer.badge}</span><h2>{t.writer.title}</h2><div className="prompt-row"><input value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={100}/><button type="button" onClick={newPrompt}>{t.writer.another}</button><button type="button" onClick={suggestPrompt} disabled={suggestingPrompt}>{suggestingPrompt ? t.writer.aiLoading : t.writer.aiIdea}</button></div><p className="hint">{t.writer.hint}</p><label className="truth-editor"><span>{t.writer.truthLabel}</span><textarea value={truthText} onChange={(e) => setTruthText(e.target.value)} placeholder={t.writer.truthPlaceholder} maxLength={180}/></label><button type="button" className="ai-button" onClick={generateLies} disabled={generatingLies || !truthText.trim()}>{generatingLies ? t.writer.generating : t.writer.generate}</button>{lieOptions.length > 0 && <><p className="hint">{t.writer.chooseTwo}</p><div className="lie-options">{lieOptions.map((lie, index) => <label key={index} className={selectedLies.includes(index) ? "selected" : ""}><input type="checkbox" checked={selectedLies.includes(index)} onChange={() => toggleLie(index)} /><textarea value={lie} onChange={(e) => updateLie(index, e.target.value)} maxLength={180}/><b>{selectedLies.includes(index) ? t.writer.selected : t.writer.select}</b></label>)}</div><button className="primary-button" disabled={busy || selectedLies.length !== 2}>{t.writer.submit}</button></>}</form>;
+  return <form className="play-card writer" onSubmit={submit}><span className="turn-badge">{t.writer.badge}</span><h2>{t.writer.title}</h2><div className="prompt-row"><input value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={100}/><button type="button" onClick={newPrompt}><StarIcon />{t.writer.another}</button><button type="button" onClick={suggestPrompt} disabled={suggestingPrompt}><StarIcon />{suggestingPrompt ? t.writer.aiLoading : t.writer.aiIdea}</button></div><p className="hint">{t.writer.hint}</p><label className="truth-editor"><span>{t.writer.truthLabel}</span><textarea value={truthText} onChange={(e) => setTruthText(e.target.value)} placeholder={t.writer.truthPlaceholder} maxLength={180}/></label><button type="button" className="ai-button" onClick={generateLies} disabled={generatingLies || !truthText.trim()}>{generatingLies ? t.writer.generating : t.writer.generate}</button>{lieOptions.length > 0 && <><p className="hint">{t.writer.chooseTwo}</p><div className="lie-options">{lieOptions.map((lie, index) => <label key={index} className={selectedLies.includes(index) ? "selected" : ""}><input type="checkbox" checked={selectedLies.includes(index)} onChange={() => toggleLie(index)} /><textarea value={lie} onChange={(e) => updateLie(index, e.target.value)} maxLength={180}/><b>{selectedLies.includes(index) ? t.writer.selected : t.writer.select}</b></label>)}</div><button className="primary-button" disabled={busy || selectedLies.length !== 2}>{t.writer.submit}</button></>}</form>;
+}
+
+function StarIcon() {
+  return <svg className="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3.1-5.8 3.1 1.1-6.5-4.7-4.6 6.5-.9L12 2Z" /></svg>;
 }
 
 function Guesser({ round, onGuess, busy }: { round: ActiveRound; onGuess: (i: number) => void; busy: boolean }) {
@@ -302,11 +306,11 @@ function Waiting({ title, text }: { title: string; text: string }) {
   return <div className="play-card waiting"><div className="bobble">🤥</div><span className="turn-badge">{t.waiting.badge}</span><h2>{title}</h2><p>{text}</p><div className="typing"><i/><i/><i/></div></div>;
 }
 
-function ReminderModal({ close }: { close: () => void }) {
-  return <div className="modal-backdrop"><div className="reminder-card"><div className="reminder-icon">{t.reminder.icon}</div><span className="eyebrow">{t.reminder.title}</span><h2>{t.reminder.body}</h2><button className="primary-button" onClick={close}>{t.reminder.ok}</button></div></div>;
+function ReminderModal({ close, minutes }: { close: () => void; minutes: number }) {
+  return <div className="modal-backdrop"><div className="reminder-card"><div className="reminder-icon">{t.reminder.icon}</div><span className="eyebrow">{t.reminder.title}</span><h2>{`Everyone sips because the ${minutes}-minute reminder is up.`}</h2><button className="primary-button" onClick={close}>{t.reminder.ok}</button></div></div>;
 }
 
-function Reveal({ reveal, players, meId, close, groupSip }: { reveal: { correct: boolean; truthIndex: number; drinkerId: string; roundNumber: number; authorId: string; guesserId: string; statements: string[] }; players: Player[]; meId: string; close: () => void; groupSip: boolean }) {
+function Reveal({ reveal, players, meId, close, groupSipEvery }: { reveal: { correct: boolean; truthIndex: number; drinkerId: string; roundNumber: number; authorId: string; guesserId: string; statements: string[] }; players: Player[]; meId: string; close: () => void; groupSipEvery: number | null }) {
   const drinker = players.find((p) => p.id === reveal.drinkerId)?.name;
   const guesser = players.find((p) => p.id === reveal.guesserId)?.name ?? "That player";
   const isGuesser = meId === reveal.guesserId;
@@ -315,7 +319,7 @@ function Reveal({ reveal, players, meId, close, groupSip }: { reveal: { correct:
   const title = reveal.correct ? (isAuthor ? t.reveal.foundTruth : `${drinker} ${t.reveal.drinks}`) : (isGuesser ? t.reveal.wrong : t.reveal.bluffSuccess);
   const outcome = reveal.correct ? (isAuthor ? t.reveal.yourSip : t.reveal.drinks) : (isGuesser ? `${drinker}, ${t.reveal.yourTurn}` : t.reveal.theySip);
   const eyebrow = viewerFailed ? (isAuthor ? t.reveal.busted : t.reveal.wrong) : (reveal.correct ? t.reveal.correct : t.reveal.bluffSuccess);
-  return <div className="modal-backdrop"><div className={`reveal-card ${viewerFailed ? "wrong" : "correct"}`}><div className="result-mark">{viewerFailed ? "×" : "✓"}</div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2><p>{outcome}</p><p>{t.reveal.truthWas}</p><blockquote>“{reveal.statements[reveal.truthIndex]}”</blockquote>{groupSip && <div className="group-sip">{t.reveal.group}</div>}<button className="primary-button" onClick={close}>{t.reveal.next}</button></div></div>;
+  return <div className="modal-backdrop"><div className={`reveal-card ${viewerFailed ? "wrong" : "correct"}`}><div className="result-mark">{viewerFailed ? "×" : "✓"}</div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2><p>{outcome}</p><p>{t.reveal.truthWas}</p><blockquote>“{reveal.statements[reveal.truthIndex]}”</blockquote>{groupSipEvery && <div className="group-sip">Everyone sips because the house rule triggers every {groupSipEvery} rounds.</div>}<button className="primary-button" onClick={close}>{t.reveal.next}</button></div></div>;
 }
 
 function Finished({ players, leave }: { players: Player[]; leave: () => void }) {
