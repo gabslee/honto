@@ -145,3 +145,24 @@ h1 em,h2 em { color:var(--red); font-style:normal; position:relative; }
   .lie-options label { grid-template-columns:40px minmax(0,1fr); }
   .lie-options b { grid-column:2; border-left:0; border-top:3px dashed #17243d66; padding:10px; }
 }
+
+/* Sip levels are tactile beer buttons instead of a dropdown. */
+.mini-game-sips { align-items:flex-start; }
+.sip-picker { display:flex; gap:7px; flex:none; }
+.sip-choice { display:grid; place-items:center; gap:1px; min-width:52px; padding:5px 6px 6px; border:2px solid var(--ink); border-radius:11px; background:#fffdf8; box-shadow:3px 3px 0 var(--ink); color:var(--ink); cursor:pointer; transition:transform .15s, background .15s, box-shadow .15s; }
+.sip-choice:hover { transform:translateY(-2px) rotate(-2deg); box-shadow:4px 5px 0 var(--ink); }
+.sip-choice.active { background:var(--yellow); transform:translateY(-2px) rotate(2deg); box-shadow:4px 5px 0 var(--ink); }
+.sip-choice strong { font-size:15px; line-height:1; }
+.sip-choice small { font:9px Arial,sans-serif; text-transform:uppercase; letter-spacing:.04em; }
+.beer-icon { width:27px; height:27px; overflow:visible; }
+.beer-outline { fill:none; stroke:var(--ink); stroke-width:2.2; stroke-linejoin:round; }
+.beer-foam { fill:#d7dce6; stroke:var(--ink); stroke-width:1.7; stroke-linejoin:round; }
+.beer-liquid { fill:#d7dce6; }
+.beer-icon.active .beer-foam { fill:#fffdf8; }
+.beer-icon.active .beer-liquid { fill:#f4a51c; }
+@media (max-width:520px) {
+  .mini-game-sips { display:block; }
+  .mini-game-sips > span { display:block; margin-bottom:8px; }
+  .sip-picker { justify-content:space-between; }
+  .sip-choice { flex:1; }
+}

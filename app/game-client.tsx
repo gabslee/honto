@@ -431,7 +431,7 @@ function MiniGameModal({ miniGame, meId, act, busy }: { miniGame: { status: "ask
       <h2>{t.miniGame.ask}</h2>
       <p className="mini-game-copy">{t.miniGame.askHint}</p>
       <textarea className="mini-game-input" value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={180} placeholder={t.miniGame.questionPlaceholder} />
-      <label className="mini-game-sips"><span>{t.miniGame.sipsLabel}</span><select value={sips} onChange={(event) => setSips(Number(event.target.value))}>{[1,2,3].map((value) => <option key={value} value={value}>{value} {value === 1 ? t.common.sip : t.common.sips}</option>)}</select></label>
+      <div className="mini-game-sips"><span>{t.miniGame.sipsLabel}</span><div className="sip-picker" role="group" aria-label={t.miniGame.sipsLabel}>{[1,2,3].map((value) => <button type="button" key={value} className={`sip-choice ${sips === value ? "active" : ""}`} aria-pressed={sips === value} onClick={() => setSips(value)}><BeerIcon active={sips === value} /><strong>{value}</strong><small>{value === 1 ? t.common.sip : t.common.sips}</small></button>)}</div></div>
       <button className="primary-button" disabled={busy || question.trim().length < 3} onClick={submitQuestion}>{t.miniGame.sendQuestion}</button>
     </>}
     {miniGame.status === "ask" && !isMine && <><h2>{miniGame.askerName ?? "Your friend"} {t.miniGame.writing}</h2><p className="mini-game-wait">{t.miniGame.ready}</p></>}
@@ -442,6 +442,10 @@ function MiniGameModal({ miniGame, meId, act, busy }: { miniGame: { status: "ask
     {miniGame.status === "answer" && isMine && choice === "truth" && <><h2>{t.miniGame.yourTruth}</h2><p className="mini-game-question">{miniGame.question}</p><textarea className="mini-game-input" value={answer} onChange={(event) => setAnswer(event.target.value)} maxLength={300} placeholder={t.miniGame.answerPlaceholder} /><button className="primary-button" disabled={busy || !answer.trim()} onClick={submitTruth}>{t.miniGame.sendTruth}</button></>}
     {miniGame.status === "answer" && !isMine && <><h2>{miniGame.targetPlayerName ?? "Your friend"} {t.miniGame.choosing}</h2><p className="mini-game-question">{miniGame.question}</p><p className="mini-game-wait">{t.miniGame.waitingChoice}</p></>}
   </div></div>;
+}
+
+function BeerIcon({ active }: { active: boolean }) {
+  return <svg className={`beer-icon ${active ? "active" : ""}`} viewBox="0 0 32 32" aria-hidden="true"><path className="beer-foam" d="M6 8.5c0-1.4 1.1-2.5 2.5-2.5.7 0 1.3.3 1.8.7.5-1 1.5-1.7 2.7-1.7s2.3.7 2.8 1.8c.5-.5 1.2-.8 2-.8 1.5 0 2.7 1.2 2.7 2.7V11H6V8.5Z"/><path className="beer-liquid" d="M6 11h16v13H6z"/><path className="beer-outline" d="M6 10.5h16v14H6zM22 14h3.5a2.5 2.5 0 0 1 0 5H22"/></svg>;
 }
 
 function Reveal({ reveal, players, meId, close, groupSipEvery }: { reveal: { correct: boolean; truthIndex: number; drinkerId: string; roundNumber: number; authorId: string; guesserId: string; statements: string[] }; players: Player[]; meId: string; close: () => void; groupSipEvery: number | null }) {
