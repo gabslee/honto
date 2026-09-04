@@ -10,8 +10,8 @@ type ActiveRound = {
   guessedIndex: number | null; guesserId: string | null; result: string | null; truthIndex: number | null;
 };
 type GameState = {
-  room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; groupSipEvery: number | null; timerMinutes: number | null; writeTimerMinutes: number | null; guessTimerMinutes: number | null; themeCategory: string; exclusiveThemes: boolean; customTheme: string | null; startedAt: string | null; roundStartedAt: string | null; sessionPaused: boolean; pausedAt: string | null; pausedSeconds: number };
-  players: Player[]; activeRound: ActiveRound | null; lastReveal: { roundNumber: number; authorId: string; guesserId: string; truthIndex: number; guessedIndex: number | null; result: "correct" | "wrong" | "timeout"; statementOne: string; statementTwo: string; statementThree: string; timeoutStage?: "writing" | "guessing" | null; drinkerId: string } | null; meId: string;
+  room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; groupSipEvery: number | null; timerMinutes: number | null; writeTimerMinutes: number | null; guessTimerMinutes: number | null; themeCategory: string; exclusiveThemes: boolean; customTheme: string | null; miniGameEnabled: boolean; startedAt: string | null; roundStartedAt: string | null; sessionPaused: boolean; pausedAt: string | null; pausedSeconds: number };
+  players: Player[]; activeRound: ActiveRound | null; miniGame: { id: string; triggerRound: number; type: "question"; status: "ask" | "answer"; question: string | null; sips: number; choice: "truth" | "dare" | null; answer: string | null; assignedPlayerId: string; assignedPlayerName: string; askerName: string | null; targetPlayerName: string | null } | null; lastReveal: { roundNumber: number; authorId: string; guesserId: string; truthIndex: number; guessedIndex: number | null; result: "correct" | "wrong" | "timeout"; statementOne: string; statementTwo: string; statementThree: string; timeoutStage?: "writing" | "guessing" | null; drinkerId: string } | null; meId: string;
 };
 
 const t = getMessages();
@@ -300,6 +300,7 @@ export default function GameClient() {
       {reveal && <Reveal reveal={reveal} players={game.players} meId={game.meId} close={() => { setReveal(null); refresh(); }} groupSipEvery={game.room.groupSipEvery && reveal.roundNumber % game.room.groupSipEvery === 0 ? game.room.groupSipEvery : null} />}
       {reminderOpen && <ReminderModal close={closeReminder} minutes={game.room.timerMinutes ?? 0} />}
       {timeoutNotice && <TimeoutModal notice={timeoutNotice} players={game.players} close={() => { setTimeoutNotice(null); refresh(); }} />}
+      {game.miniGame && !reveal && !timeoutNotice && !reminderOpen && <MiniGameModal miniGame={game.miniGame} meId={game.meId} act={act} busy={busy} />}
     </main>
   );
 }
@@ -325,7 +326,7 @@ function Landing(props: { mode: "create" | "join"; setMode: (m: "create" | "join
 
 function Lobby({ game, me, busy, copied, copyInvite, act }: { game: GameState; me?: Player; busy: boolean; copied: boolean; copyInvite: () => void; act: (action: string, extras?: Record<string, unknown>) => Promise<any> }) {
   const host = Boolean(me?.isHost);
-  const configure = (extra: Record<string, unknown>) => act("configure", { roundCount: game.room.roundCount, groupSipEvery: game.room.groupSipEvery, reminderMinutes: game.room.timerMinutes, writeTimerMinutes: game.room.writeTimerMinutes, guessTimerMinutes: game.room.guessTimerMinutes, themeCategory: game.room.themeCategory, exclusiveThemes: game.room.exclusiveThemes, customTheme: game.room.customTheme, ...extra });
+  const configure = (extra: Record<string, unknown>) => act("configure", { roundCount: game.room.roundCount, groupSipEvery: game.room.groupSipEvery, reminderMinutes: game.room.timerMinutes, writeTimerMinutes: game.room.writeTimerMinutes, guessTimerMinutes: game.room.guessTimerMinutes, themeCategory: game.room.themeCategory, exclusiveThemes: game.room.exclusiveThemes, customTheme: game.room.customTheme, miniGameEnabled: game.room.miniGameEnabled, ...extra });
   const custom = (value: number | null, fallback: number) => value && ![1, 3, 5, 10, 15, 20, 30].includes(value) ? value : fallback;
   const selectedThemes = storedThemeKeys(game.room.themeCategory);
   const toggleTheme = (key: ThemeKey) => {
@@ -342,6 +343,7 @@ function Lobby({ game, me, busy, copied, copyInvite, act }: { game: GameState; m
         <Setting label={t.lobby.timer} value={game.room.timerMinutes ?? 0} options={[0,10,15,-1]} labels={[t.lobby.off,"10 min","15 min",t.lobby.custom]} customValue={custom(game.room.timerMinutes, 20)} min={1} max={180} disabled={!host} onChange={(timerMinutes) => configure({ reminderMinutes: timerMinutes || null })} />
         <ToggleSetting label={t.lobby.writingTimer} enabled={Boolean(game.room.writeTimerMinutes)} value={game.room.writeTimerMinutes ?? 5} options={[1,3,5]} customValue={custom(game.room.writeTimerMinutes, 7)} min={1} max={60} disabled={!host} onToggle={(enabled) => configure({ writeTimerMinutes: enabled ? game.room.writeTimerMinutes || 5 : null })} onChange={(writeTimerMinutes) => configure({ writeTimerMinutes })} />
         <ToggleSetting label={t.lobby.guessingTimer} enabled={Boolean(game.room.guessTimerMinutes)} value={game.room.guessTimerMinutes ?? 5} options={[1,3,5]} customValue={custom(game.room.guessTimerMinutes, 7)} min={1} max={60} disabled={!host} onToggle={(enabled) => configure({ guessTimerMinutes: enabled ? game.room.guessTimerMinutes || 5 : null })} onChange={(guessTimerMinutes) => configure({ guessTimerMinutes })} />
+        <ToggleSetting label={t.lobby.truthOrDare} enabled={game.room.miniGameEnabled} value={1} options={[]} disabled={!host} onToggle={(enabled) => configure({ miniGameEnabled: enabled })} onChange={() => undefined} />
         <div className="setting theme-setting"><label>{t.lobby.theme}</label><p className="setting-hint">{t.lobby.selectSubjects}</p><div className="subject-checks">{(["mixed", "family", "innocent", "life", "flirty", "spicy"] as ThemeKey[]).map((key) => <label className={`subject-check ${key === "spicy" ? "spicy-check" : ""} ${selectedThemes.includes(key) ? "selected" : ""}`} key={key}><input type="checkbox" checked={selectedThemes.includes(key)} disabled={!host} onChange={() => toggleTheme(key)} /><span>{t.lobby[key]}</span></label>)}</div></div>
         <ToggleSetting label={t.lobby.exclusiveThemes} enabled={game.room.exclusiveThemes} value={1} options={[]} disabled={!host} onToggle={(exclusiveThemes) => configure({ exclusiveThemes })} onChange={() => undefined} />
         {game.room.exclusiveThemes && <div className="setting custom-theme-setting"><label>{t.lobby.customTheme}</label><input className="custom-setting" type="text" defaultValue={game.room.customTheme ?? ""} disabled={!host} placeholder={t.lobby.customThemePlaceholder} onBlur={(event) => configure({ customTheme: event.target.value.trim().slice(0, 80) })} /></div>}
@@ -370,9 +372,9 @@ function Setting({ label, value, options, labels, suffix="", customValue, min=1,
   return <div className="setting"><label>{label}</label><div className="segmented">{options.map((option, index) => <button type="button" key={option} disabled={disabled} className={option === -1 ? (isCustom ? "active" : "") : value === option ? "active" : ""} onClick={() => onChange(option === -1 ? customValue ?? min : option)}>{labels?.[index] ?? `${option}${suffix}`}</button>)}</div>{isCustom && <CustomNumberInput value={customValue ?? min} min={min} max={max} disabled={disabled} onCommit={onChange} />}</div>;
 }
 
-function ToggleSetting({ label, enabled, value, options, customValue, min=1, max=60, disabled, onToggle, onChange }: { label: string; enabled: boolean; value: number; options: number[]; customValue?: number; min?: number; max?: number; disabled: boolean; onToggle: (enabled: boolean) => void; onChange: (value: number) => void }) {
+function ToggleSetting({ label, enabled, value, options, labels, customValue, min=1, max=60, disabled, onToggle, onChange }: { label: string; enabled: boolean; value: number; options: number[]; labels?: string[]; customValue?: number; min?: number; max?: number; disabled: boolean; onToggle: (enabled: boolean) => void; onChange: (value: number) => void }) {
   const isCustom = enabled && !options.includes(value);
-  return <div className="setting toggle-setting"><div className="toggle-setting-head"><label>{label}</label><button type="button" className={`toggle ${enabled ? "on" : ""}`} aria-pressed={enabled} disabled={disabled} onClick={() => onToggle(!enabled)}><span />{enabled ? t.lobby.enabled : t.lobby.off}</button></div>{enabled && options.length > 0 && <><div className="segmented">{options.map((option) => <button type="button" key={option} disabled={disabled} className={value === option ? "active" : ""} onClick={() => onChange(option)}>{option} min</button>)}<button type="button" disabled={disabled} className={isCustom ? "active" : ""} onClick={() => onChange(customValue ?? min)}>{t.lobby.custom}</button></div>{isCustom && <CustomNumberInput value={customValue ?? min} min={min} max={max} disabled={disabled} onCommit={onChange} />}</>}</div>;
+  return <div className="setting toggle-setting"><div className="toggle-setting-head"><label>{label}</label><button type="button" className={`toggle ${enabled ? "on" : ""}`} aria-pressed={enabled} disabled={disabled} onClick={() => onToggle(!enabled)}><span />{enabled ? t.lobby.enabled : t.lobby.off}</button></div>{enabled && options.length > 0 && <div className="segmented">{options.map((option, index) => <button type="button" key={option} disabled={disabled} className={value === option ? "active" : ""} onClick={() => onChange(option)}>{labels?.[index] ?? `${option} min`}</button>)}{options.length < 4 && <><button type="button" disabled={disabled} className={isCustom ? "active" : ""} onClick={() => onChange(customValue ?? min)}>{t.lobby.custom}</button>{isCustom && <CustomNumberInput value={customValue ?? min} min={min} max={max} disabled={disabled} onCommit={onChange} />}</>}</div>}</div>;
 }
 
 function ScoreRail({ players, meId }: { players: Player[]; meId: string }) {
@@ -407,6 +409,35 @@ function ReminderModal({ close, minutes }: { close: () => void; minutes: number 
 function TimeoutModal({ notice, players, close }: { notice: { playerId: string; roundNumber: number; stage: "writing" | "guessing" }; players: Player[]; close: () => void }) {
   const player = players.find((item) => item.id === notice.playerId)?.name ?? "A player";
   return <div className="modal-backdrop"><div className="reminder-card timeout-card"><div className="reminder-icon">⏰</div><span className="eyebrow">TIME'S UP!</span><h2>{`${player} ran out of time.`}</h2><p>{`${player} takes a sip and the game moves to the next round.`}</p><button className="primary-button" onClick={close}>{t.reveal.next}</button></div></div>;
+}
+
+function MiniGameModal({ miniGame, meId, act, busy }: { miniGame: { status: "ask" | "answer"; question: string | null; sips: number; assignedPlayerId: string; assignedPlayerName: string; askerName: string | null; targetPlayerName: string | null }; meId: string; act: (action: string, extras?: Record<string, unknown>) => Promise<any>; busy: boolean }) {
+  const [question, setQuestion] = useState("");
+  const [sips, setSips] = useState(1);
+  const [choice, setChoice] = useState<"truth" | "dare" | null>(null);
+  const [answer, setAnswer] = useState("");
+  const isMine = miniGame.assignedPlayerId === meId;
+  const submitQuestion = async () => { if (question.trim().length < 3) return; await act("submitMiniQuestion", { question, sips }); };
+  const submitTruth = async () => { if (answer.trim()) await act("answerMini", { miniChoice: "truth", miniAnswer: answer }); };
+  const chooseDare = async () => { await act("answerMini", { miniChoice: "dare" }); };
+  return <div className="modal-backdrop"><div className="reminder-card mini-game-card">
+    <div className="reminder-icon">{miniGame.status === "ask" ? "❓" : choice === "dare" ? "🥃" : "💬"}</div>
+    <span className="eyebrow">{t.miniGame.title}</span>
+    {miniGame.status === "ask" && isMine && <>
+      <h2>{t.miniGame.ask}</h2>
+      <p className="mini-game-copy">{t.miniGame.askHint}</p>
+      <textarea className="mini-game-input" value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={180} placeholder={t.miniGame.questionPlaceholder} />
+      <label className="mini-game-sips"><span>{t.miniGame.sipsLabel}</span><select value={sips} onChange={(event) => setSips(Number(event.target.value))}>{[1,2,3].map((value) => <option key={value} value={value}>{value} {value === 1 ? t.common.sip : t.common.sips}</option>)}</select></label>
+      <button className="primary-button" disabled={busy || question.trim().length < 3} onClick={submitQuestion}>{t.miniGame.sendQuestion}</button>
+    </>}
+    {miniGame.status === "ask" && !isMine && <><h2>{miniGame.askerName ?? "Your friend"} {t.miniGame.writing}</h2><p className="mini-game-wait">{t.miniGame.ready}</p></>}
+    {miniGame.status === "answer" && isMine && !choice && <>
+      <h2>{miniGame.askerName ?? "Your friend"} {t.miniGame.wantsToKnow}</h2><p className="mini-game-question">{miniGame.question}</p><p className="mini-game-copy">{t.miniGame.chooseHint}</p>
+      <div className="mini-game-actions"><button className="primary-button" disabled={busy} onClick={() => setChoice("truth")}>{t.miniGame.truth}</button><button className="primary-button dare-button" disabled={busy} onClick={chooseDare}>{t.miniGame.dare} · {t.miniGame.take} {miniGame.sips} {miniGame.sips === 1 ? t.common.sip.toUpperCase() : t.common.sips.toUpperCase()}</button></div>
+    </>}
+    {miniGame.status === "answer" && isMine && choice === "truth" && <><h2>{t.miniGame.yourTruth}</h2><p className="mini-game-question">{miniGame.question}</p><textarea className="mini-game-input" value={answer} onChange={(event) => setAnswer(event.target.value)} maxLength={300} placeholder={t.miniGame.answerPlaceholder} /><button className="primary-button" disabled={busy || !answer.trim()} onClick={submitTruth}>{t.miniGame.sendTruth}</button></>}
+    {miniGame.status === "answer" && !isMine && <><h2>{miniGame.targetPlayerName ?? "Your friend"} {t.miniGame.choosing}</h2><p className="mini-game-question">{miniGame.question}</p><p className="mini-game-wait">{t.miniGame.waitingChoice}</p></>}
+  </div></div>;
 }
 
 function Reveal({ reveal, players, meId, close, groupSipEvery }: { reveal: { correct: boolean; truthIndex: number; drinkerId: string; roundNumber: number; authorId: string; guesserId: string; statements: string[] }; players: Player[]; meId: string; close: () => void; groupSipEvery: number | null }) {
