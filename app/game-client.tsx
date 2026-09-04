@@ -10,7 +10,7 @@ type ActiveRound = {
   guessedIndex: number | null; guesserId: string | null; result: string | null; truthIndex: number | null;
 };
 type GameState = {
-  room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; groupSipEvery: number | null; timerMinutes: number | null; writeTimerMinutes: number | null; guessTimerMinutes: number | null; themeCategory: string; startedAt: string | null; roundStartedAt: string | null; sessionPaused: boolean; pausedAt: string | null; pausedSeconds: number };
+  room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; groupSipEvery: number | null; timerMinutes: number | null; writeTimerMinutes: number | null; guessTimerMinutes: number | null; themeCategory: string; exclusiveThemes: boolean; customTheme: string | null; startedAt: string | null; roundStartedAt: string | null; sessionPaused: boolean; pausedAt: string | null; pausedSeconds: number };
   players: Player[]; activeRound: ActiveRound | null; lastReveal: { roundNumber: number; authorId: string; guesserId: string; truthIndex: number; guessedIndex: number; result: "correct" | "wrong"; statementOne: string; statementTwo: string; statementThree: string; drinkerId: string } | null; meId: string;
 };
 
@@ -176,19 +176,24 @@ export default function GameClient() {
     await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1600);
   }
 
-  function newPrompt() {
+  function rotateLocalPrompt() {
     const list = game ? activeThemeKeys(game.room.themeCategory).flatMap((key) => themeCategories[key]) : PROMPTS;
     const next = (promptIndex + 1) % list.length; setPromptIndex(next); setPrompt(list[next]);
+  }
+
+  function newPrompt() {
+    if (game?.room.exclusiveThemes) { void suggestPrompt(); return; }
+    rotateLocalPrompt();
   }
 
   async function suggestPrompt() {
     setSuggestingPrompt(true);
     try {
-      const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "theme", category: activeThemeKeys(game?.room.themeCategory), exclude: [prompt] }) });
+      const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "theme", category: activeThemeKeys(game?.room.themeCategory), customTheme: game?.room.customTheme, fresh: Boolean(game?.room.exclusiveThemes), exclude: [prompt] }) });
       const data = await response.json() as { prompt?: string };
       if (response.ok && data.prompt) setPrompt(data.prompt);
-      else newPrompt();
-    } catch { newPrompt(); }
+      else rotateLocalPrompt();
+    } catch { rotateLocalPrompt(); }
     finally { setSuggestingPrompt(false); }
   }
 
@@ -231,7 +236,7 @@ export default function GameClient() {
       <header className="topbar">
         <button className="brand" onClick={leave} aria-label="Back to home"><span>HONTO</span><b>?!</b></button>
         <div className="room-pill"><span className="live-dot" /> {t.room} <strong>{game.room.code}</strong></div>
-        <div className="session-tools">{game.room.status !== "lobby" && <span className="session-clock">{game.room.sessionPaused ? t.paused : t.session} {formatClock(elapsedSeconds)}</span>}{me?.isHost && game.room.status === "playing" && <button className="tiny-button" onClick={() => act("pause")}>{game.room.sessionPaused ? t.resume : t.pause}</button>}<button className="tiny-button" onClick={leave}>{t.common.exit}</button></div>
+        <div className="session-tools">{game.room.status !== "lobby" && <div className="session-control"><span className="session-clock">{game.room.sessionPaused ? t.paused : t.session} {formatClock(elapsedSeconds)}</span>{me?.isHost && <button className="session-pause" type="button" aria-label={game.room.sessionPaused ? t.resume : t.pause} title={game.room.sessionPaused ? t.resume : t.pause} onClick={() => act("pause")}><PauseIcon paused={game.room.sessionPaused} /></button>}</div>}<button className="tiny-button" onClick={leave}>{t.common.exit}</button></div>
       </header>
       {error && <div className="toast error-toast" role="alert">{error}<button onClick={() => setError("")}>×</button></div>}
       {game.room.status === "lobby" && <Lobby game={game} me={me} busy={busy} copied={copied} copyInvite={copyInvite} act={act} />}
@@ -278,7 +283,7 @@ function Landing(props: { mode: "create" | "join"; setMode: (m: "create" | "join
 
 function Lobby({ game, me, busy, copied, copyInvite, act }: { game: GameState; me?: Player; busy: boolean; copied: boolean; copyInvite: () => void; act: (action: string, extras?: Record<string, unknown>) => Promise<any> }) {
   const host = Boolean(me?.isHost);
-  const configure = (extra: Record<string, unknown>) => act("configure", { roundCount: game.room.roundCount, groupSipEvery: game.room.groupSipEvery, reminderMinutes: game.room.timerMinutes, writeTimerMinutes: game.room.writeTimerMinutes, guessTimerMinutes: game.room.guessTimerMinutes, themeCategory: game.room.themeCategory, ...extra });
+  const configure = (extra: Record<string, unknown>) => act("configure", { roundCount: game.room.roundCount, groupSipEvery: game.room.groupSipEvery, reminderMinutes: game.room.timerMinutes, writeTimerMinutes: game.room.writeTimerMinutes, guessTimerMinutes: game.room.guessTimerMinutes, themeCategory: game.room.themeCategory, exclusiveThemes: game.room.exclusiveThemes, customTheme: game.room.customTheme, ...extra });
   const custom = (value: number | null, fallback: number) => value && ![1, 3, 5, 10, 15, 20, 30].includes(value) ? value : fallback;
   const selectedThemes = storedThemeKeys(game.room.themeCategory);
   const toggleTheme = (key: ThemeKey) => {
@@ -293,23 +298,39 @@ function Lobby({ game, me, busy, copied, copyInvite, act }: { game: GameState; m
         <Setting label={t.lobby.length} value={game.room.roundCount} options={[10,20,30,-1]} labels={["10 rounds","20 rounds","30 rounds",t.lobby.custom]} customValue={custom(game.room.roundCount, 42)} min={1} max={100} disabled={!host} onChange={(roundCount) => configure({ roundCount })} />
         <Setting label={t.lobby.everyoneSips} value={game.room.groupSipEvery ?? 0} options={[0,1,3,5,-1]} labels={[t.lobby.never,t.lobby.every1,t.lobby.every3,t.lobby.every5,t.lobby.custom]} customValue={custom(game.room.groupSipEvery, 7)} min={1} max={30} disabled={!host} onChange={(groupSipEvery) => configure({ groupSipEvery: groupSipEvery || null })} />
         <Setting label={t.lobby.timer} value={game.room.timerMinutes ?? 0} options={[0,10,15,-1]} labels={[t.lobby.off,"10 min","15 min",t.lobby.custom]} customValue={custom(game.room.timerMinutes, 20)} min={1} max={180} disabled={!host} onChange={(timerMinutes) => configure({ reminderMinutes: timerMinutes || null })} />
-        <ToggleSetting label={t.lobby.writingTimer} enabled={Boolean(game.room.writeTimerMinutes)} value={game.room.writeTimerMinutes ?? 5} options={[1,3,5,10]} customValue={custom(game.room.writeTimerMinutes, 7)} min={1} max={60} disabled={!host} onToggle={(enabled) => configure({ writeTimerMinutes: enabled ? game.room.writeTimerMinutes || 5 : null })} onChange={(writeTimerMinutes) => configure({ writeTimerMinutes })} />
+        <ToggleSetting label={t.lobby.writingTimer} enabled={Boolean(game.room.writeTimerMinutes)} value={game.room.writeTimerMinutes ?? 5} options={[1,3,5]} customValue={custom(game.room.writeTimerMinutes, 7)} min={1} max={60} disabled={!host} onToggle={(enabled) => configure({ writeTimerMinutes: enabled ? game.room.writeTimerMinutes || 5 : null })} onChange={(writeTimerMinutes) => configure({ writeTimerMinutes })} />
         <ToggleSetting label={t.lobby.guessingTimer} enabled={Boolean(game.room.guessTimerMinutes)} value={game.room.guessTimerMinutes ?? 5} options={[1,3,5]} customValue={custom(game.room.guessTimerMinutes, 7)} min={1} max={60} disabled={!host} onToggle={(enabled) => configure({ guessTimerMinutes: enabled ? game.room.guessTimerMinutes || 5 : null })} onChange={(guessTimerMinutes) => configure({ guessTimerMinutes })} />
         <div className="setting theme-setting"><label>{t.lobby.theme}</label><p className="setting-hint">{t.lobby.selectSubjects}</p><div className="subject-checks">{(["mixed", "family", "innocent", "life", "spicy", "wild"] as ThemeKey[]).map((key) => <label className={`subject-check ${selectedThemes.includes(key) ? "selected" : ""}`} key={key}><input type="checkbox" checked={selectedThemes.includes(key)} disabled={!host} onChange={() => toggleTheme(key)} /><span>{t.lobby[key]}</span></label>)}</div></div>
+        <ToggleSetting label={t.lobby.exclusiveThemes} enabled={game.room.exclusiveThemes} value={1} options={[]} disabled={!host} onToggle={(exclusiveThemes) => configure({ exclusiveThemes })} onChange={() => undefined} />
+        {game.room.exclusiveThemes && <div className="setting custom-theme-setting"><label>{t.lobby.customTheme}</label><input className="custom-setting" type="text" defaultValue={game.room.customTheme ?? ""} disabled={!host} placeholder={t.lobby.customThemePlaceholder} onBlur={(event) => configure({ customTheme: event.target.value.trim().slice(0, 80) })} /></div>}
         {host ? <button className="primary-button start-button" disabled={busy || game.players.length < 2} onClick={() => act("start")}>{game.players.length < 2 ? t.lobby.waiting : t.lobby.start}</button> : <div className="host-note">{t.lobby.hostNote}</div>}
       </div>
     </div>
   </section>;
 }
 
+function CustomNumberInput({ value, min, max, disabled, onCommit }: { value: number; min: number; max: number; disabled: boolean; onCommit: (value: number) => void }) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => { setDraft(String(value)); }, [value]);
+  const commit = () => {
+    if (!draft.trim()) { setDraft(String(min)); onCommit(min); return; }
+    const parsed = Number(draft);
+    if (!Number.isFinite(parsed)) { setDraft(String(value)); return; }
+    const next = Math.max(min, Math.min(max, Math.trunc(parsed)));
+    setDraft(String(next));
+    onCommit(next);
+  };
+  return <input className="custom-setting" type="number" inputMode="numeric" min={min} max={max} value={draft} disabled={disabled} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commit(); } }} />;
+}
+
 function Setting({ label, value, options, labels, suffix="", customValue, min=1, max=100, disabled, onChange }: { label: string; value: number; options: number[]; labels?: string[]; suffix?: string; customValue?: number; min?: number; max?: number; disabled: boolean; onChange: (v: number) => void }) {
   const isCustom = !options.filter((option) => option >= 0).includes(value);
-  return <div className="setting"><label>{label}</label><div className="segmented">{options.map((option, index) => <button type="button" key={option} disabled={disabled} className={option === -1 ? (isCustom ? "active" : "") : value === option ? "active" : ""} onClick={() => onChange(option === -1 ? customValue ?? min : option)}>{labels?.[index] ?? `${option}${suffix}`}</button>)}</div>{isCustom && <input className="custom-setting" type="number" min={min} max={max} value={customValue ?? min} disabled={disabled} onChange={(event) => onChange(Math.max(min, Math.min(max, Number(event.target.value) || min)))} />}</div>;
+  return <div className="setting"><label>{label}</label><div className="segmented">{options.map((option, index) => <button type="button" key={option} disabled={disabled} className={option === -1 ? (isCustom ? "active" : "") : value === option ? "active" : ""} onClick={() => onChange(option === -1 ? customValue ?? min : option)}>{labels?.[index] ?? `${option}${suffix}`}</button>)}</div>{isCustom && <CustomNumberInput value={customValue ?? min} min={min} max={max} disabled={disabled} onCommit={onChange} />}</div>;
 }
 
 function ToggleSetting({ label, enabled, value, options, customValue, min=1, max=60, disabled, onToggle, onChange }: { label: string; enabled: boolean; value: number; options: number[]; customValue?: number; min?: number; max?: number; disabled: boolean; onToggle: (enabled: boolean) => void; onChange: (value: number) => void }) {
   const isCustom = enabled && !options.includes(value);
-  return <div className="setting toggle-setting"><div className="toggle-setting-head"><label>{label}</label><button type="button" className={`toggle ${enabled ? "on" : ""}`} aria-pressed={enabled} disabled={disabled} onClick={() => onToggle(!enabled)}><span />{enabled ? t.lobby.enabled : t.lobby.off}</button></div>{enabled && <><div className="segmented">{options.map((option) => <button type="button" key={option} disabled={disabled} className={value === option ? "active" : ""} onClick={() => onChange(option)}>{option} min</button>)}<button type="button" disabled={disabled} className={isCustom ? "active" : ""} onClick={() => onChange(customValue ?? min)}>{t.lobby.custom}</button></div>{isCustom && <input className="custom-setting" type="number" min={min} max={max} value={customValue ?? min} disabled={disabled} onChange={(event) => onChange(Math.max(min, Math.min(max, Number(event.target.value) || min)))} />}</>}</div>;
+  return <div className="setting toggle-setting"><div className="toggle-setting-head"><label>{label}</label><button type="button" className={`toggle ${enabled ? "on" : ""}`} aria-pressed={enabled} disabled={disabled} onClick={() => onToggle(!enabled)}><span />{enabled ? t.lobby.enabled : t.lobby.off}</button></div>{enabled && options.length > 0 && <><div className="segmented">{options.map((option) => <button type="button" key={option} disabled={disabled} className={value === option ? "active" : ""} onClick={() => onChange(option)}>{option} min</button>)}<button type="button" disabled={disabled} className={isCustom ? "active" : ""} onClick={() => onChange(customValue ?? min)}>{t.lobby.custom}</button></div>{isCustom && <CustomNumberInput value={customValue ?? min} min={min} max={max} disabled={disabled} onCommit={onChange} />}</>}</div>;
 }
 
 function ScoreRail({ players, meId }: { players: Player[]; meId: string }) {
@@ -322,6 +343,10 @@ function Writer({ prompt, setPrompt, newPrompt, suggestPrompt, suggestingPrompt,
 
 function StarIcon() {
   return <svg className="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3.1-5.8 3.1 1.1-6.5-4.7-4.6 6.5-.9L12 2Z" /></svg>;
+}
+
+function PauseIcon({ paused }: { paused: boolean }) {
+  return paused ? <svg className="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7L8 5Z" /></svg> : <svg className="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z" /></svg>;
 }
 
 function Guesser({ round, onGuess, busy }: { round: ActiveRound; onGuess: (i: number) => void; busy: boolean }) {

@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 
-type Body = { action?: string; code?: string; name?: string; token?: string; roundCount?: number; groupSipEvery?: number | null; timerMinutes?: number | null; reminderMinutes?: number | null; writeTimerMinutes?: number | null; guessTimerMinutes?: number | null; themeCategory?: string; prompt?: string; statements?: string[]; truthIndex?: number; guessedIndex?: number };
+type Body = { action?: string; code?: string; name?: string; token?: string; roundCount?: number; groupSipEvery?: number | null; timerMinutes?: number | null; reminderMinutes?: number | null; writeTimerMinutes?: number | null; guessTimerMinutes?: number | null; themeCategory?: string; exclusiveThemes?: boolean; customTheme?: string | null; prompt?: string; statements?: string[]; truthIndex?: number; guessedIndex?: number };
 
 const WORDS = ["MOON", "MINT", "WAVE", "SAKE", "NEON", "MISO", "YUZU", "NORI", "KITSU", "MOMO", "SORA", "KUMA", "HOSHI", "RAMEN", "UMAMI"];
 const ROOM_IDLE_MS = 12 * 60 * 60 * 1000;
@@ -10,10 +10,12 @@ let schemaReady: Promise<void> | null = null;
 function ensureSchema() {
   if (!schemaReady) schemaReady = (async () => {
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured.");
-    await sql`CREATE TABLE IF NOT EXISTS rooms (id text PRIMARY KEY, code text UNIQUE NOT NULL, status text NOT NULL DEFAULT 'lobby', round_count integer NOT NULL DEFAULT 10, current_round integer NOT NULL DEFAULT 1, group_sip_every integer, timer_minutes integer, write_timer_minutes integer, guess_timer_minutes integer, theme_category text NOT NULL DEFAULT 'safe', session_paused boolean NOT NULL DEFAULT false, paused_at timestamptz, paused_seconds integer NOT NULL DEFAULT 0, round_started_at timestamptz, started_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
+    await sql`CREATE TABLE IF NOT EXISTS rooms (id text PRIMARY KEY, code text UNIQUE NOT NULL, status text NOT NULL DEFAULT 'lobby', round_count integer NOT NULL DEFAULT 10, current_round integer NOT NULL DEFAULT 1, group_sip_every integer, timer_minutes integer, write_timer_minutes integer, guess_timer_minutes integer, theme_category text NOT NULL DEFAULT 'safe', exclusive_themes boolean NOT NULL DEFAULT false, custom_theme text, session_paused boolean NOT NULL DEFAULT false, paused_at timestamptz, paused_seconds integer NOT NULL DEFAULT 0, round_started_at timestamptz, started_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS write_timer_minutes integer`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS guess_timer_minutes integer`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS theme_category text NOT NULL DEFAULT 'safe'`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS exclusive_themes boolean NOT NULL DEFAULT false`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS custom_theme text`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS session_paused boolean NOT NULL DEFAULT false`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS paused_at timestamptz`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS paused_seconds integer NOT NULL DEFAULT 0`;
@@ -44,7 +46,7 @@ async function state(roomCode: string, token: string) {
   const lastRows = await sql`SELECT r.round_number AS "roundNumber", r.author_id AS "authorId", r.guesser_id AS "guesserId", r.truth_index AS "truthIndex", r.guessed_index AS "guessedIndex", r.result, r.statement_one AS "statementOne", r.statement_two AS "statementTwo", r.statement_three AS "statementThree" FROM rounds r WHERE r.room_id = ${room.id} AND r.result IS NOT NULL ORDER BY r.round_number DESC LIMIT 1`;
   const last = lastRows[0] as any;
   const drinkerId = last ? (last.result === "correct" ? last.authorId : last.guesserId) : null;
-  return { room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, groupSipEvery: room.group_sip_every, timerMinutes: room.timer_minutes, writeTimerMinutes: room.write_timer_minutes, guessTimerMinutes: room.guess_timer_minutes, themeCategory: room.theme_category, startedAt: room.started_at, roundStartedAt: room.round_started_at, sessionPaused: room.session_paused, pausedAt: room.paused_at, pausedSeconds: room.paused_seconds }, players, activeRound: rounds[0] ?? null, lastReveal: last ? { ...last, drinkerId } : null, meId: meRows[0].id };
+  return { room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, groupSipEvery: room.group_sip_every, timerMinutes: room.timer_minutes, writeTimerMinutes: room.write_timer_minutes, guessTimerMinutes: room.guess_timer_minutes, themeCategory: room.theme_category, exclusiveThemes: Boolean(room.exclusive_themes), customTheme: room.custom_theme, startedAt: room.started_at, roundStartedAt: room.round_started_at, sessionPaused: room.session_paused, pausedAt: room.paused_at, pausedSeconds: room.paused_seconds }, players, activeRound: rounds[0] ?? null, lastReveal: last ? { ...last, drinkerId } : null, meId: meRows[0].id };
 }
 
 export default async function handler(req: any, res: any) {
@@ -92,7 +94,9 @@ export default async function handler(req: any, res: any) {
       const allowed = new Set(["mixed", "family", "innocent", "life", "spicy", "wild"]);
       const selected = (body.themeCategory ?? "").split(",").map((item) => item.trim()).filter((item) => allowed.has(item));
       const category = [...new Set(selected)].join(",") || "safe";
-      await sql`UPDATE rooms SET round_count = ${rounds}, group_sip_every = ${group}, timer_minutes = ${timer}, write_timer_minutes = ${writeTimer}, guess_timer_minutes = ${guessTimer}, theme_category = ${category}, updated_at = now() WHERE id = ${room.id}`;
+      const exclusiveThemes = body.exclusiveThemes === true;
+      const customTheme = typeof body.customTheme === "string" ? body.customTheme.trim().slice(0, 80) || null : null;
+      await sql`UPDATE rooms SET round_count = ${rounds}, group_sip_every = ${group}, timer_minutes = ${timer}, write_timer_minutes = ${writeTimer}, guess_timer_minutes = ${guessTimer}, theme_category = ${category}, exclusive_themes = ${exclusiveThemes}, custom_theme = ${customTheme}, updated_at = now() WHERE id = ${room.id}`;
     }
     if (body.action === "start") {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can start the game.");

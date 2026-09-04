@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import "./globals.css";
 import { getMessages } from "./i18n";
 
+export const viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
+
 export async function generateMetadata(): Promise<Metadata> {
   const t = getMessages();
   const requestHeaders = await headers();
