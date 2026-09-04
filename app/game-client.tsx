@@ -431,10 +431,15 @@ function TimeoutModal({ notice, players, close }: { notice: { playerId: string; 
   return <div className="modal-backdrop"><div className="reminder-card timeout-card"><div className="reminder-icon">⏰</div><span className="eyebrow">TIME'S UP!</span><h2>{`${player} ran out of time.`}</h2><p>{`${player} takes a sip and the game moves to the next round.`}</p><button className="primary-button" onClick={close}>{t.reveal.next}</button></div></div>;
 }
 
-function MiniGameModal({ miniGame, meId, act, busy, suggestQuestion, suggestingQuestion }: { miniGame: { status: "ask" | "answer"; question: string | null; sips: number; assignedPlayerId: string; assignedPlayerName: string; askerName: string | null; targetPlayerName: string | null }; meId: string; act: (action: string, extras?: Record<string, unknown>) => Promise<any>; busy: boolean; suggestQuestion: () => Promise<string>; suggestingQuestion: boolean }) {
+function MiniGameModal({ miniGame, meId, act, busy, suggestQuestion, suggestingQuestion }: { miniGame: { id: string; status: "ask" | "answer"; question: string | null; sips: number; assignedPlayerId: string; assignedPlayerName: string; askerName: string | null; targetPlayerName: string | null }; meId: string; act: (action: string, extras?: Record<string, unknown>) => Promise<any>; busy: boolean; suggestQuestion: () => Promise<string>; suggestingQuestion: boolean }) {
   const [question, setQuestion] = useState("");
   const [sips, setSips] = useState(1);
   const [choice, setChoice] = useState<"truth" | "dare" | null>(null);
+  useEffect(() => {
+    setQuestion("");
+    setSips(1);
+    setChoice(null);
+  }, [miniGame.id]);
   const isMine = miniGame.assignedPlayerId === meId;
   const submitQuestion = async () => { if (question.trim().length < 3) return; await act("submitMiniQuestion", { question, sips }); };
   const chooseTruth = async () => { const result = await act("answerMini", { miniChoice: "truth" }); if (result) setChoice("truth"); };
