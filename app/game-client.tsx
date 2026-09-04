@@ -15,7 +15,7 @@ type GameState = {
 };
 
 const t = getMessages();
-const PROMPTS = [...t.prompts];
+const PROMPTS: string[] = [...t.prompts];
 
 async function gameApi(body: Record<string, unknown>) {
   const response = await fetch("/api/game", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
