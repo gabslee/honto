@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 
-type Body = { action?: string; code?: string; name?: string; token?: string; roundCount?: number; groupSipEvery?: number | null; timerMinutes?: number | null; reminderMinutes?: number | null; writeTimerMinutes?: number | null; guessTimerMinutes?: number | null; themeCategory?: string; exclusiveThemes?: boolean; customTheme?: string | null; miniGameEnabled?: boolean; question?: string; sips?: number; miniChoice?: "truth" | "dare"; miniAnswer?: string; prompt?: string; statements?: string[]; truthIndex?: number; guessedIndex?: number };
+type Body = { action?: string; code?: string; name?: string; token?: string; roundCount?: number; groupSipEvery?: number | null; timerMinutes?: number | null; reminderMinutes?: number | null; writeTimerMinutes?: number | null; guessTimerMinutes?: number | null; themeCategory?: string; exclusiveThemes?: boolean; customTheme?: string | null; gameMode?: "honto" | "truth_sips"; miniGameEnabled?: boolean; question?: string; sips?: number; miniChoice?: "truth" | "dare"; miniAnswer?: string; prompt?: string; statements?: string[]; truthIndex?: number; guessedIndex?: number };
 
 const WORDS = ["MOON", "MINT", "WAVE", "SAKE", "NEON", "MISO", "YUZU", "NORI", "KITSU", "MOMO", "SORA", "KUMA", "HOSHI", "RAMEN", "UMAMI"];
 const ROOM_IDLE_MS = 12 * 60 * 60 * 1000;
@@ -10,12 +10,13 @@ let schemaReady: Promise<void> | null = null;
 function ensureSchema() {
   if (!schemaReady) schemaReady = (async () => {
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured.");
-    await sql`CREATE TABLE IF NOT EXISTS rooms (id text PRIMARY KEY, code text UNIQUE NOT NULL, status text NOT NULL DEFAULT 'lobby', round_count integer NOT NULL DEFAULT 10, current_round integer NOT NULL DEFAULT 1, group_sip_every integer, timer_minutes integer, write_timer_minutes integer, guess_timer_minutes integer, theme_category text NOT NULL DEFAULT 'safe', exclusive_themes boolean NOT NULL DEFAULT false, custom_theme text, mini_game_enabled boolean NOT NULL DEFAULT false, mini_game_next_round integer, session_paused boolean NOT NULL DEFAULT false, paused_at timestamptz, paused_seconds integer NOT NULL DEFAULT 0, round_started_at timestamptz, started_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
+    await sql`CREATE TABLE IF NOT EXISTS rooms (id text PRIMARY KEY, code text UNIQUE NOT NULL, status text NOT NULL DEFAULT 'lobby', round_count integer NOT NULL DEFAULT 10, current_round integer NOT NULL DEFAULT 1, group_sip_every integer, timer_minutes integer, write_timer_minutes integer, guess_timer_minutes integer, theme_category text NOT NULL DEFAULT 'safe', exclusive_themes boolean NOT NULL DEFAULT false, custom_theme text, game_mode text NOT NULL DEFAULT 'honto', mini_game_enabled boolean NOT NULL DEFAULT false, mini_game_next_round integer, session_paused boolean NOT NULL DEFAULT false, paused_at timestamptz, paused_seconds integer NOT NULL DEFAULT 0, round_started_at timestamptz, started_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS write_timer_minutes integer`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS guess_timer_minutes integer`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS theme_category text NOT NULL DEFAULT 'safe'`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS exclusive_themes boolean NOT NULL DEFAULT false`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS custom_theme text`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS game_mode text NOT NULL DEFAULT 'honto'`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS mini_game_enabled boolean NOT NULL DEFAULT false`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS mini_game_next_round integer`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS session_paused boolean NOT NULL DEFAULT false`;
@@ -70,7 +71,7 @@ async function state(roomCode: string, token: string) {
   const miniRows = await sql`SELECT m.id, m.trigger_round AS "triggerRound", m.type, m.status, m.question, m.sips, m.choice, m.answer, m.assigned_player_id AS "assignedPlayerId", a.name AS "askerName", p.name AS "assignedPlayerName", t.name AS "targetPlayerName" FROM mini_games m JOIN players p ON p.id = m.assigned_player_id LEFT JOIN players a ON a.id = m.asker_id LEFT JOIN players t ON t.id = m.target_player_id WHERE m.room_id = ${room.id} AND m.completed = false ORDER BY m.created_at ASC LIMIT 1`;
   const miniGame = miniRows[0] ?? null;
   const drinkerId = last ? (last.result === "correct" ? last.authorId : last.result === "timeout" && last.statementOne === "__TIMEOUT__" ? last.authorId : last.guesserId) : null;
-  return { room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, groupSipEvery: room.group_sip_every, timerMinutes: room.timer_minutes, writeTimerMinutes: room.write_timer_minutes, guessTimerMinutes: room.guess_timer_minutes, themeCategory: room.theme_category, exclusiveThemes: Boolean(room.exclusive_themes), customTheme: room.custom_theme, miniGameEnabled: Boolean(room.mini_game_enabled), startedAt: room.started_at, roundStartedAt: room.round_started_at, sessionPaused: room.session_paused, pausedAt: room.paused_at, pausedSeconds: room.paused_seconds }, players, activeRound: rounds[0] ?? null, miniGame, lastReveal: last ? { ...last, timeoutStage: last.result === "timeout" ? (last.statementOne === "__TIMEOUT__" ? "writing" : "guessing") : null, drinkerId } : null, meId: meRows[0].id };
+  return { room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, groupSipEvery: room.group_sip_every, timerMinutes: room.timer_minutes, writeTimerMinutes: room.write_timer_minutes, guessTimerMinutes: room.guess_timer_minutes, themeCategory: room.theme_category, exclusiveThemes: Boolean(room.exclusive_themes), customTheme: room.custom_theme, gameMode: room.game_mode === "truth_sips" ? "truth_sips" : "honto", miniGameEnabled: Boolean(room.mini_game_enabled), startedAt: room.started_at, roundStartedAt: room.round_started_at, sessionPaused: room.session_paused, pausedAt: room.paused_at, pausedSeconds: room.paused_seconds }, players, activeRound: rounds[0] ?? null, miniGame, lastReveal: last ? { ...last, timeoutStage: last.result === "timeout" ? (last.statementOne === "__TIMEOUT__" ? "writing" : "guessing") : null, drinkerId } : null, meId: meRows[0].id };
 }
 
 export default async function handler(req: any, res: any) {
@@ -120,15 +121,18 @@ export default async function handler(req: any, res: any) {
       const category = [...new Set(selected)].join(",") || "safe";
       const exclusiveThemes = body.exclusiveThemes === true;
       const customTheme = typeof body.customTheme === "string" ? body.customTheme.trim().slice(0, 80) || null : null;
-      const miniGameEnabled = body.miniGameEnabled === true;
-      await sql`UPDATE rooms SET round_count = ${rounds}, group_sip_every = ${group}, timer_minutes = ${timer}, write_timer_minutes = ${writeTimer}, guess_timer_minutes = ${guessTimer}, theme_category = ${category}, exclusive_themes = ${exclusiveThemes}, custom_theme = ${customTheme}, mini_game_enabled = ${miniGameEnabled}, mini_game_next_round = null, updated_at = now() WHERE id = ${room.id}`;
+      const gameMode = body.gameMode === "truth_sips" ? "truth_sips" : "honto";
+      const miniGameEnabled = gameMode === "truth_sips" || body.miniGameEnabled === true;
+      await sql`UPDATE rooms SET round_count = ${rounds}, group_sip_every = ${group}, timer_minutes = ${timer}, write_timer_minutes = ${writeTimer}, guess_timer_minutes = ${guessTimer}, theme_category = ${category}, exclusive_themes = ${exclusiveThemes}, custom_theme = ${customTheme}, game_mode = ${gameMode}, mini_game_enabled = ${miniGameEnabled}, mini_game_next_round = null, updated_at = now() WHERE id = ${room.id}`;
     }
     if (body.action === "start") {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can start the game.");
       const count = await sql`SELECT COUNT(*)::int AS total FROM players WHERE room_id = ${room.id}`;
       if ((count[0]?.total ?? 0) < 2) throw new Error("Wait for at least one more player.");
-      const firstMiniRound = Number(room.mini_game_enabled) ? 1 + miniGameGap() : null;
+      const gameMode = room.game_mode === "truth_sips" ? "truth_sips" : "honto";
+      const firstMiniRound = Number(room.mini_game_enabled) ? (gameMode === "truth_sips" ? 1 : 1 + miniGameGap()) : null;
       await sql`UPDATE rooms SET status = 'playing', current_round = 1, round_started_at = now(), started_at = now(), mini_game_next_round = ${firstMiniRound}, session_paused = false, paused_seconds = 0, updated_at = now() WHERE id = ${room.id}`;
+      if (gameMode === "truth_sips") await queueMiniGame({ ...room, mini_game_enabled: true, mini_game_next_round: 1 }, 1);
     }
     if (body.action === "pause") {
       if (!me.is_host || room.status !== "playing") throw new Error("Only the host can pause the session.");
@@ -182,11 +186,17 @@ export default async function handler(req: any, res: any) {
       if (mini.assigned_player_id !== me.id) throw new Error("It is the other player's mini game.");
       if (body.miniChoice !== "truth" && body.miniChoice !== "dare") throw new Error("Choose truth or dare.");
       const answer = typeof body.miniAnswer === "string" ? body.miniAnswer.trim().slice(0, 300) : "";
-      if (body.miniChoice === "truth" && answer.length < 1) throw new Error("Write your truth first.");
       await sql`UPDATE mini_games SET choice = ${body.miniChoice}, answer = ${body.miniChoice === "truth" ? answer : null}, status = 'done', completed = true, completed_at = now() WHERE id = ${mini.id} AND completed = false AND status = 'answer'`;
       if (body.miniChoice === "dare") await sql`UPDATE players SET sips = sips + ${Number(mini.sips) || 1} WHERE id = ${me.id}`;
-      const nextMiniRound = Number(room.current_round) + miniGameGap();
-      if (room.mini_game_enabled && room.status === "playing" && Number(room.current_round) < Number(room.round_count)) await sql`UPDATE rooms SET mini_game_next_round = ${nextMiniRound}, updated_at = now() WHERE id = ${room.id}`;
+      if (room.game_mode === "truth_sips") {
+        const nextRound = Number(room.current_round) + 1;
+        const finished = nextRound > Number(room.round_count);
+        await sql`UPDATE rooms SET current_round = ${finished ? room.current_round : nextRound}, status = ${finished ? "finished" : "playing"}, round_started_at = CASE WHEN ${finished} THEN round_started_at ELSE now() END, mini_game_next_round = ${finished ? null : nextRound}, updated_at = now() WHERE id = ${room.id}`;
+        if (!finished) await queueMiniGame({ ...room, mini_game_enabled: true, mini_game_next_round: nextRound }, nextRound);
+      } else {
+        const nextMiniRound = Number(room.current_round) + miniGameGap();
+        if (room.mini_game_enabled && room.status === "playing" && Number(room.current_round) < Number(room.round_count)) await sql`UPDATE rooms SET mini_game_next_round = ${nextMiniRound}, updated_at = now() WHERE id = ${room.id}`;
+      }
       return json(res, await state(roomCode, token));
     }
     if (body.action === "submit") {

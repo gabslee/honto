@@ -10,7 +10,7 @@ type ActiveRound = {
   guessedIndex: number | null; guesserId: string | null; result: string | null; truthIndex: number | null;
 };
 type GameState = {
-  room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; groupSipEvery: number | null; timerMinutes: number | null; writeTimerMinutes: number | null; guessTimerMinutes: number | null; themeCategory: string; exclusiveThemes: boolean; customTheme: string | null; miniGameEnabled: boolean; startedAt: string | null; roundStartedAt: string | null; sessionPaused: boolean; pausedAt: string | null; pausedSeconds: number };
+  room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; groupSipEvery: number | null; timerMinutes: number | null; writeTimerMinutes: number | null; guessTimerMinutes: number | null; themeCategory: string; exclusiveThemes: boolean; customTheme: string | null; gameMode: "honto" | "truth_sips"; miniGameEnabled: boolean; startedAt: string | null; roundStartedAt: string | null; sessionPaused: boolean; pausedAt: string | null; pausedSeconds: number };
   players: Player[]; activeRound: ActiveRound | null; miniGame: { id: string; triggerRound: number; type: "question"; status: "ask" | "answer"; question: string | null; sips: number; choice: "truth" | "dare" | null; answer: string | null; assignedPlayerId: string; assignedPlayerName: string; askerName: string | null; targetPlayerName: string | null } | null; lastReveal: { roundNumber: number; authorId: string; guesserId: string; truthIndex: number; guessedIndex: number | null; result: "correct" | "wrong" | "timeout"; statementOne: string; statementTwo: string; statementThree: string; timeoutStage?: "writing" | "guessing" | null; drinkerId: string } | null; meId: string;
 };
 
@@ -129,12 +129,12 @@ export default function GameClient() {
   const reminderRemainingSeconds = reminderTotalSeconds ? reminderTotalSeconds - (elapsedSeconds % reminderTotalSeconds) : null;
   const nextTimerSip = reminderZeroTick === reminderTick && reminderOpen ? 0 : reminderRemainingSeconds;
   const turnStartedAt = game?.activeRound?.createdAt ?? game?.room.roundStartedAt;
-  const turnLimit = game?.activeRound ? game.room.guessTimerMinutes : game?.room.writeTimerMinutes;
+  const turnLimit = game?.room.gameMode === "truth_sips" ? null : game?.activeRound ? game.room.guessTimerMinutes : game?.room.writeTimerMinutes;
   const turnElapsed = turnStartedAt ? Math.max(0, Math.floor((now - parseTime(turnStartedAt)) / 1000)) : 0;
   const turnRemaining = turnLimit ? Math.max(0, turnLimit * 60 - turnElapsed) : null;
 
   useEffect(() => {
-    if (!game || game.room.status !== "playing" || author?.id !== game.meId) return;
+    if (!game || game.room.status !== "playing" || game.room.gameMode === "truth_sips" || author?.id !== game.meId) return;
     const batchKey = `${game.room.currentRound}|${game.room.themeCategory}|${game.room.customTheme ?? ""}`;
     if (promptBatchRef.current === batchKey || promptPool.length > 0 || suggestingPrompt) return;
     promptBatchRef.current = batchKey;
@@ -142,7 +142,7 @@ export default function GameClient() {
   }, [game?.room.status, game?.room.currentRound, game?.room.themeCategory, game?.room.customTheme, author?.id, game?.meId, promptPool.length, suggestingPrompt]);
 
   useEffect(() => {
-    if (!game || game.room.status !== "playing" || game.miniGame || turnRemaining !== 0) return;
+    if (!game || game.room.status !== "playing" || game.room.gameMode === "truth_sips" || game.miniGame || turnRemaining !== 0) return;
     const stage = game.activeRound ? "guessing" : "writing";
     const canExpire = stage === "writing" ? author?.id === game.meId : game.activeRound?.authorId !== game.meId;
     if (!canExpire) return;
@@ -294,10 +294,12 @@ export default function GameClient() {
             {turnRemaining !== null && <span className={`timer ${turnRemaining < 30 ? "urgent" : ""} ${turnRemaining <= 10 ? "countdown-alert" : ""}`} aria-live="polite">⏱ {formatClock(turnRemaining)}{turnRemaining <= 10 ? " · TIME" : ""}</span>}
           </div>
           <ScoreRail players={game.players} meId={game.meId} />
-          {!game.activeRound && author?.id === game.meId && <Writer prompt={prompt} setPrompt={setPrompt} newPrompt={newPrompt} suggestPrompt={suggestPrompt} suggestingPrompt={suggestingPrompt} truthText={truthText} setTruthText={setTruthText} lieOptions={lieOptions} selectedLies={selectedLies} toggleLie={toggleLie} updateLie={updateLie} generateLies={generateLies} generatingLies={generatingLies} submit={submitStories} busy={busy} />}
-          {!game.activeRound && author?.id !== game.meId && <Waiting title={`${author?.name} ${t.waiting.writingSuffix}`} text={t.waiting.writingBody} />}
-          {game.activeRound && game.activeRound.authorId === game.meId && <Waiting title={t.waiting.sentTitle} text={t.waiting.sentBody} />}
-          {game.activeRound && game.activeRound.authorId !== game.meId && <Guesser round={game.activeRound} onGuess={guess} busy={busy} />}
+          {game.room.gameMode === "truth_sips" ? <Waiting title={game.miniGame ? "Truth or Sips is ready" : "Getting the next question ready…"} text="Write a question, answer it out loud, or take the sips. The round count stays the same." /> : <>
+            {!game.activeRound && author?.id === game.meId && <Writer prompt={prompt} setPrompt={setPrompt} newPrompt={newPrompt} suggestPrompt={suggestPrompt} suggestingPrompt={suggestingPrompt} truthText={truthText} setTruthText={setTruthText} lieOptions={lieOptions} selectedLies={selectedLies} toggleLie={toggleLie} updateLie={updateLie} generateLies={generateLies} generatingLies={generatingLies} submit={submitStories} busy={busy} />}
+            {!game.activeRound && author?.id !== game.meId && <Waiting title={`${author?.name} ${t.waiting.writingSuffix}`} text={t.waiting.writingBody} />}
+            {game.activeRound && game.activeRound.authorId === game.meId && <Waiting title={t.waiting.sentTitle} text={t.waiting.sentBody} />}
+            {game.activeRound && game.activeRound.authorId !== game.meId && <Guesser round={game.activeRound} onGuess={guess} busy={busy} />}
+          </>}
         </section>
       )}
       {game.room.status === "finished" && <Finished players={game.players} leave={leave} />}
@@ -330,7 +332,7 @@ function Landing(props: { mode: "create" | "join"; setMode: (m: "create" | "join
 
 function Lobby({ game, me, busy, copied, copyInvite, act }: { game: GameState; me?: Player; busy: boolean; copied: boolean; copyInvite: () => void; act: (action: string, extras?: Record<string, unknown>) => Promise<any> }) {
   const host = Boolean(me?.isHost);
-  const configure = (extra: Record<string, unknown>) => act("configure", { roundCount: game.room.roundCount, groupSipEvery: game.room.groupSipEvery, reminderMinutes: game.room.timerMinutes, writeTimerMinutes: game.room.writeTimerMinutes, guessTimerMinutes: game.room.guessTimerMinutes, themeCategory: game.room.themeCategory, exclusiveThemes: game.room.exclusiveThemes, customTheme: game.room.customTheme, miniGameEnabled: game.room.miniGameEnabled, ...extra });
+  const configure = (extra: Record<string, unknown>) => act("configure", { roundCount: game.room.roundCount, groupSipEvery: game.room.groupSipEvery, reminderMinutes: game.room.timerMinutes, writeTimerMinutes: game.room.writeTimerMinutes, guessTimerMinutes: game.room.guessTimerMinutes, themeCategory: game.room.themeCategory, exclusiveThemes: game.room.exclusiveThemes, customTheme: game.room.customTheme, gameMode: game.room.gameMode, miniGameEnabled: game.room.miniGameEnabled, ...extra });
   const custom = (value: number | null, fallback: number) => value && ![1, 3, 5, 10, 15, 20, 30].includes(value) ? value : fallback;
   const selectedThemes = storedThemeKeys(game.room.themeCategory);
   const toggleTheme = (key: ThemeKey) => {
@@ -343,11 +345,12 @@ function Lobby({ game, me, busy, copied, copyInvite, act }: { game: GameState; m
       <div className="panel people-panel"><div className="panel-title"><h2>{t.lobby.atTable}</h2><span>{game.players.length}/8</span></div><div className="people-list">{game.players.map((player, index) => <div className="person" key={player.id}><span className={`avatar avatar-${index % 4}`}>{player.name[0]?.toUpperCase()}</span><div><strong>{player.name}</strong><small>{player.id === game.meId ? t.common.you : player.isHost ? t.lobby.host : t.lobby.ready}</small></div>{player.isHost ? <b className="crown">♛</b> : <i>✓</i>}</div>)}</div><button className="invite-button" onClick={copyInvite}>{copied ? t.lobby.copied : t.lobby.copy}</button></div>
       <div className="panel settings-panel"><div className="panel-title"><h2>{t.lobby.rules}</h2><span className="sticker">{t.lobby.yourCall}</span></div>
         <Setting label={t.lobby.length} value={game.room.roundCount} options={[10,20,30,-1]} labels={["10 rounds","20 rounds","30 rounds",t.lobby.custom]} customValue={custom(game.room.roundCount, 42)} min={1} max={100} disabled={!host} onChange={(roundCount) => configure({ roundCount })} />
+        <Setting label={t.lobby.gameMode} value={game.room.gameMode === "truth_sips" ? 1 : 0} options={[0,1]} labels={[t.lobby.modeHonto,t.lobby.modeTruthSips]} disabled={!host} onChange={(value) => configure({ gameMode: value === 1 ? "truth_sips" : "honto" })} />
         <Setting label={t.lobby.everyoneSips} value={game.room.groupSipEvery ?? 0} options={[0,1,3,5,-1]} labels={[t.lobby.never,t.lobby.every1,t.lobby.every3,t.lobby.every5,t.lobby.custom]} customValue={custom(game.room.groupSipEvery, 7)} min={1} max={30} disabled={!host} onChange={(groupSipEvery) => configure({ groupSipEvery: groupSipEvery || null })} />
         <Setting label={t.lobby.timer} value={game.room.timerMinutes ?? 0} options={[0,10,15,-1]} labels={[t.lobby.off,"10 min","15 min",t.lobby.custom]} customValue={custom(game.room.timerMinutes, 20)} min={1} max={180} disabled={!host} onChange={(timerMinutes) => configure({ reminderMinutes: timerMinutes || null })} />
         <ToggleSetting label={t.lobby.writingTimer} enabled={Boolean(game.room.writeTimerMinutes)} value={game.room.writeTimerMinutes ?? 5} options={[1,3,5]} customValue={custom(game.room.writeTimerMinutes, 7)} min={1} max={60} disabled={!host} onToggle={(enabled) => configure({ writeTimerMinutes: enabled ? game.room.writeTimerMinutes || 5 : null })} onChange={(writeTimerMinutes) => configure({ writeTimerMinutes })} />
         <ToggleSetting label={t.lobby.guessingTimer} enabled={Boolean(game.room.guessTimerMinutes)} value={game.room.guessTimerMinutes ?? 5} options={[1,3,5]} customValue={custom(game.room.guessTimerMinutes, 7)} min={1} max={60} disabled={!host} onToggle={(enabled) => configure({ guessTimerMinutes: enabled ? game.room.guessTimerMinutes || 5 : null })} onChange={(guessTimerMinutes) => configure({ guessTimerMinutes })} />
-        <ToggleSetting label={t.lobby.truthOrDare} enabled={game.room.miniGameEnabled} value={1} options={[]} disabled={!host} onToggle={(enabled) => configure({ miniGameEnabled: enabled })} onChange={() => undefined} />
+        {game.room.gameMode === "honto" && <ToggleSetting label={t.lobby.truthOrDare} enabled={game.room.miniGameEnabled} value={1} options={[]} disabled={!host} onToggle={(enabled) => configure({ miniGameEnabled: enabled })} onChange={() => undefined} />}
         <div className="setting theme-setting"><label>{t.lobby.theme}</label><p className="setting-hint">{t.lobby.selectSubjects}</p><div className="subject-checks">{(["mixed", "family", "innocent", "life", "flirty", "spicy"] as ThemeKey[]).map((key) => <label className={`subject-check ${key === "spicy" ? "spicy-check" : ""} ${selectedThemes.includes(key) ? "selected" : ""}`} key={key}><input type="checkbox" checked={selectedThemes.includes(key)} disabled={!host} onChange={() => toggleTheme(key)} /><span>{t.lobby[key]}</span></label>)}</div></div>
         <ToggleSetting label={t.lobby.exclusiveThemes} enabled={game.room.exclusiveThemes} value={1} options={[]} disabled={!host} onToggle={(exclusiveThemes) => configure({ exclusiveThemes })} onChange={() => undefined} />
         {game.room.exclusiveThemes && <div className="setting custom-theme-setting"><label>{t.lobby.customTheme}</label><input className="custom-setting" type="text" defaultValue={game.room.customTheme ?? ""} disabled={!host} placeholder={t.lobby.customThemePlaceholder} onBlur={(event) => configure({ customTheme: event.target.value.trim().slice(0, 80) })} /></div>}
@@ -419,10 +422,9 @@ function MiniGameModal({ miniGame, meId, act, busy }: { miniGame: { status: "ask
   const [question, setQuestion] = useState("");
   const [sips, setSips] = useState(1);
   const [choice, setChoice] = useState<"truth" | "dare" | null>(null);
-  const [answer, setAnswer] = useState("");
   const isMine = miniGame.assignedPlayerId === meId;
   const submitQuestion = async () => { if (question.trim().length < 3) return; await act("submitMiniQuestion", { question, sips }); };
-  const submitTruth = async () => { if (answer.trim()) await act("answerMini", { miniChoice: "truth", miniAnswer: answer }); };
+  const chooseTruth = async () => { const result = await act("answerMini", { miniChoice: "truth" }); if (result) setChoice("truth"); };
   const chooseDare = async () => { await act("answerMini", { miniChoice: "dare" }); };
   return <div className="modal-backdrop"><div className="reminder-card mini-game-card">
     <div className="reminder-icon">{miniGame.status === "ask" ? "❓" : choice === "dare" ? "🥃" : "💬"}</div>
@@ -437,9 +439,8 @@ function MiniGameModal({ miniGame, meId, act, busy }: { miniGame: { status: "ask
     {miniGame.status === "ask" && !isMine && <><h2>{miniGame.askerName ?? "Your friend"} {t.miniGame.writing}</h2><p className="mini-game-wait">{t.miniGame.ready}</p></>}
     {miniGame.status === "answer" && isMine && !choice && <>
       <h2>{miniGame.askerName ?? "Your friend"} {t.miniGame.wantsToKnow}</h2><p className="mini-game-question">{miniGame.question}</p><p className="mini-game-copy">{t.miniGame.chooseHint}</p>
-      <div className="mini-game-actions"><button className="primary-button" disabled={busy} onClick={() => setChoice("truth")}>{t.miniGame.truth}</button><button className="primary-button dare-button" disabled={busy} onClick={chooseDare}>{t.miniGame.dare} · {t.miniGame.take} {miniGame.sips} {miniGame.sips === 1 ? t.common.sip.toUpperCase() : t.common.sips.toUpperCase()}</button></div>
+      <div className="mini-game-actions"><button className="primary-button" disabled={busy} onClick={chooseTruth}>{t.miniGame.truth}</button><button className="primary-button dare-button" disabled={busy} onClick={chooseDare}>{t.miniGame.dare} · {t.miniGame.take} {miniGame.sips} {miniGame.sips === 1 ? t.common.sip.toUpperCase() : t.common.sips.toUpperCase()}</button></div>
     </>}
-    {miniGame.status === "answer" && isMine && choice === "truth" && <><h2>{t.miniGame.yourTruth}</h2><p className="mini-game-question">{miniGame.question}</p><textarea className="mini-game-input" value={answer} onChange={(event) => setAnswer(event.target.value)} maxLength={300} placeholder={t.miniGame.answerPlaceholder} /><button className="primary-button" disabled={busy || !answer.trim()} onClick={submitTruth}>{t.miniGame.sendTruth}</button></>}
     {miniGame.status === "answer" && !isMine && <><h2>{miniGame.targetPlayerName ?? "Your friend"} {t.miniGame.choosing}</h2><p className="mini-game-question">{miniGame.question}</p><p className="mini-game-wait">{t.miniGame.waitingChoice}</p></>}
   </div></div>;
 }
