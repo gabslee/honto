@@ -140,6 +140,8 @@ export default async function handler(req: any, res: any) {
     }
     if (body.action === "timeout") {
       if (room.status !== "playing") throw new Error("The game is not in progress.");
+      const pendingMini = await sql`SELECT id FROM mini_games WHERE room_id = ${room.id} AND completed = false LIMIT 1`;
+      if (pendingMini[0]) return json(res, await state(roomCode, token));
       const players = await sql`SELECT id FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
       const authorId = players[(Number(room.current_round) - 1) % players.length]?.id;
       const currentRounds = await sql`SELECT * FROM rounds WHERE room_id = ${room.id} AND round_number = ${room.current_round}`;
@@ -188,6 +190,8 @@ export default async function handler(req: any, res: any) {
     }
     if (body.action === "submit") {
       if (room.status !== "playing") throw new Error("The game is not in progress.");
+      const pendingMini = await sql`SELECT id FROM mini_games WHERE room_id = ${room.id} AND completed = false LIMIT 1`;
+      if (pendingMini[0]) throw new Error("Finish the Truth or Dare mini game first.");
       const players = await sql`SELECT id FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
       if (players[(Number(room.current_round) - 1) % players.length]?.id !== me.id) throw new Error("It is not your turn yet.");
       const existing = await sql`SELECT id FROM rounds WHERE room_id = ${room.id} AND round_number = ${room.current_round}`;
@@ -198,6 +202,8 @@ export default async function handler(req: any, res: any) {
       await sql`INSERT INTO rounds (id, room_id, round_number, author_id, prompt, statement_one, statement_two, statement_three, truth_index) VALUES (${id()}, ${room.id}, ${room.current_round}, ${me.id}, ${(body.prompt ?? "Anything goes").slice(0, 100)}, ${statements[0]}, ${statements[1]}, ${statements[2]}, ${body.truthIndex})`;
     }
     if (body.action === "guess") {
+      const pendingMini = await sql`SELECT id FROM mini_games WHERE room_id = ${room.id} AND completed = false LIMIT 1`;
+      if (pendingMini[0]) throw new Error("Finish the Truth or Dare mini game first.");
       const rounds = await sql`SELECT * FROM rounds WHERE room_id = ${room.id} AND round_number = ${room.current_round}`; const round: any = rounds[0];
       if (!round || round.result) throw new Error("There is no guess available.");
       if (round.author_id === me.id) throw new Error("You cannot guess your own story.");

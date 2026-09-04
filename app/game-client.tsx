@@ -142,7 +142,7 @@ export default function GameClient() {
   }, [game?.room.status, game?.room.currentRound, game?.room.themeCategory, game?.room.customTheme, author?.id, game?.meId, promptPool.length, suggestingPrompt]);
 
   useEffect(() => {
-    if (!game || game.room.status !== "playing" || turnRemaining !== 0) return;
+    if (!game || game.room.status !== "playing" || game.miniGame || turnRemaining !== 0) return;
     const stage = game.activeRound ? "guessing" : "writing";
     const canExpire = stage === "writing" ? author?.id === game.meId : game.activeRound?.authorId !== game.meId;
     if (!canExpire) return;
