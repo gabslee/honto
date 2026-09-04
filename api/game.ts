@@ -9,10 +9,10 @@ let schemaReady: Promise<void> | null = null;
 function ensureSchema() {
   if (!schemaReady) schemaReady = (async () => {
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured.");
-    await sql`CREATE TABLE IF NOT EXISTS rooms (id text PRIMARY KEY, code text UNIQUE NOT NULL, status text NOT NULL DEFAULT 'lobby', round_count integer NOT NULL DEFAULT 10, current_round integer NOT NULL DEFAULT 1, group_sip_every integer, timer_minutes integer, write_timer_minutes integer, guess_timer_minutes integer, theme_category text NOT NULL DEFAULT 'mixed', session_paused boolean NOT NULL DEFAULT false, paused_at timestamptz, paused_seconds integer NOT NULL DEFAULT 0, round_started_at timestamptz, started_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
+    await sql`CREATE TABLE IF NOT EXISTS rooms (id text PRIMARY KEY, code text UNIQUE NOT NULL, status text NOT NULL DEFAULT 'lobby', round_count integer NOT NULL DEFAULT 10, current_round integer NOT NULL DEFAULT 1, group_sip_every integer, timer_minutes integer, write_timer_minutes integer, guess_timer_minutes integer, theme_category text NOT NULL DEFAULT 'safe', session_paused boolean NOT NULL DEFAULT false, paused_at timestamptz, paused_seconds integer NOT NULL DEFAULT 0, round_started_at timestamptz, started_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS write_timer_minutes integer`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS guess_timer_minutes integer`;
-    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS theme_category text NOT NULL DEFAULT 'mixed'`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS theme_category text NOT NULL DEFAULT 'safe'`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS session_paused boolean NOT NULL DEFAULT false`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS paused_at timestamptz`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS paused_seconds integer NOT NULL DEFAULT 0`;
@@ -84,7 +84,9 @@ export default async function handler(req: any, res: any) {
       const timer = Number.isInteger(body.reminderMinutes ?? body.timerMinutes) && (body.reminderMinutes ?? body.timerMinutes ?? 0) >= 1 && (body.reminderMinutes ?? body.timerMinutes ?? 0) <= 180 ? (body.reminderMinutes ?? body.timerMinutes) : null;
       const writeTimer = Number.isInteger(body.writeTimerMinutes) && (body.writeTimerMinutes ?? 0) >= 1 && (body.writeTimerMinutes ?? 0) <= 60 ? body.writeTimerMinutes : null;
       const guessTimer = Number.isInteger(body.guessTimerMinutes) && (body.guessTimerMinutes ?? 0) >= 1 && (body.guessTimerMinutes ?? 0) <= 60 ? body.guessTimerMinutes : null;
-      const category = ["mixed", "family", "life", "spicy", "wild"].includes(body.themeCategory ?? "") ? body.themeCategory : "mixed";
+      const allowed = new Set(["mixed", "family", "innocent", "life", "spicy", "wild"]);
+      const selected = (body.themeCategory ?? "").split(",").map((item) => item.trim()).filter((item) => allowed.has(item));
+      const category = [...new Set(selected)].join(",") || "safe";
       await sql`UPDATE rooms SET round_count = ${rounds}, group_sip_every = ${group}, timer_minutes = ${timer}, write_timer_minutes = ${writeTimer}, guess_timer_minutes = ${guessTimer}, theme_category = ${category}, updated_at = now() WHERE id = ${room.id}`;
     }
     if (body.action === "start") {

@@ -10,12 +10,24 @@ type ActiveRound = {
   guessedIndex: number | null; guesserId: string | null; result: string | null; truthIndex: number | null;
 };
 type GameState = {
-  room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; groupSipEvery: number | null; timerMinutes: number | null; writeTimerMinutes: number | null; guessTimerMinutes: number | null; themeCategory: keyof typeof themeCategories; startedAt: string | null; roundStartedAt: string | null; sessionPaused: boolean; pausedAt: string | null; pausedSeconds: number };
+  room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; groupSipEvery: number | null; timerMinutes: number | null; writeTimerMinutes: number | null; guessTimerMinutes: number | null; themeCategory: string; startedAt: string | null; roundStartedAt: string | null; sessionPaused: boolean; pausedAt: string | null; pausedSeconds: number };
   players: Player[]; activeRound: ActiveRound | null; lastReveal: { roundNumber: number; authorId: string; guesserId: string; truthIndex: number; guessedIndex: number; result: "correct" | "wrong"; statementOne: string; statementTwo: string; statementThree: string; drinkerId: string } | null; meId: string;
 };
 
 const t = getMessages();
 const PROMPTS: string[] = [...t.prompts];
+const THEME_KEYS = ["mixed", "family", "innocent", "life", "spicy", "wild"] as const;
+type ThemeKey = (typeof THEME_KEYS)[number];
+
+function storedThemeKeys(value: string | null | undefined): ThemeKey[] {
+  if (!value || value === "safe") return [];
+  return value.split(",").filter((key): key is ThemeKey => THEME_KEYS.includes(key as ThemeKey));
+}
+
+function activeThemeKeys(value: string | null | undefined): ThemeKey[] {
+  const selected = storedThemeKeys(value);
+  return selected.length ? selected : ["mixed", "family", "innocent", "life"];
+}
 
 async function gameApi(body: Record<string, unknown>) {
   const response = await fetch("/api/game", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -138,14 +150,14 @@ export default function GameClient() {
   }
 
   function newPrompt() {
-    const list = game?.room.themeCategory ? [...themeCategories[game.room.themeCategory]] : PROMPTS;
+    const list = game ? activeThemeKeys(game.room.themeCategory).flatMap((key) => themeCategories[key]) : PROMPTS;
     const next = (promptIndex + 1) % list.length; setPromptIndex(next); setPrompt(list[next]);
   }
 
   async function suggestPrompt() {
     setSuggestingPrompt(true);
     try {
-      const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "theme", category: game?.room.themeCategory ?? "mixed", exclude: [prompt] }) });
+      const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "theme", category: activeThemeKeys(game?.room.themeCategory), exclude: [prompt] }) });
       const data = await response.json() as { prompt?: string };
       if (response.ok && data.prompt) setPrompt(data.prompt);
       else newPrompt();
@@ -157,7 +169,7 @@ export default function GameClient() {
     if (!truthText.trim()) { setError("Write your truth first."); return; }
     setGeneratingLies(true); setError("");
     try {
-      const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "lies", truth: truthText, prompt, category: game?.room.themeCategory ?? "mixed" }) });
+      const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "lies", truth: truthText, prompt, category: activeThemeKeys(game?.room.themeCategory) }) });
       const data = await response.json() as { lies?: string[] };
       if (!response.ok || !data.lies?.length) throw new Error("We couldn't generate lie ideas.");
       setLieOptions(data.lies); setSelectedLies([]);
@@ -241,6 +253,11 @@ function Lobby({ game, me, busy, copied, copyInvite, act }: { game: GameState; m
   const host = Boolean(me?.isHost);
   const configure = (extra: Record<string, unknown>) => act("configure", { roundCount: game.room.roundCount, groupSipEvery: game.room.groupSipEvery, reminderMinutes: game.room.timerMinutes, writeTimerMinutes: game.room.writeTimerMinutes, guessTimerMinutes: game.room.guessTimerMinutes, themeCategory: game.room.themeCategory, ...extra });
   const custom = (value: number | null, fallback: number) => value && ![1, 3, 5, 10, 15, 20, 30].includes(value) ? value : fallback;
+  const selectedThemes = storedThemeKeys(game.room.themeCategory);
+  const toggleTheme = (key: ThemeKey) => {
+    const next = selectedThemes.includes(key) ? selectedThemes.filter((item) => item !== key) : [...selectedThemes, key];
+    configure({ themeCategory: next.length ? next.join(",") : "safe" });
+  };
   return <section className="lobby">
     <div className="lobby-head"><span className="eyebrow">{t.lobby.kicker}</span><h1>{t.lobby.titleStart} <em>{t.lobby.titleEmphasis}</em> {t.lobby.titleEnd}</h1><p>{t.lobby.subtitle}</p></div>
     <div className="lobby-grid">
@@ -249,9 +266,9 @@ function Lobby({ game, me, busy, copied, copyInvite, act }: { game: GameState; m
         <Setting label={t.lobby.length} value={game.room.roundCount} options={[10,20,30,-1]} labels={["10 rounds","20 rounds","30 rounds",t.lobby.custom]} customValue={custom(game.room.roundCount, 42)} min={1} max={100} disabled={!host} onChange={(roundCount) => configure({ roundCount })} />
         <Setting label={t.lobby.everyoneSips} value={game.room.groupSipEvery ?? 0} options={[0,1,3,5,-1]} labels={[t.lobby.never,t.lobby.every1,t.lobby.every3,t.lobby.every5,t.lobby.custom]} customValue={custom(game.room.groupSipEvery, 7)} min={1} max={30} disabled={!host} onChange={(groupSipEvery) => configure({ groupSipEvery: groupSipEvery || null })} />
         <Setting label={t.lobby.timer} value={game.room.timerMinutes ?? 0} options={[0,10,15,-1]} labels={[t.lobby.off,"10 min","15 min",t.lobby.custom]} customValue={custom(game.room.timerMinutes, 20)} min={1} max={180} disabled={!host} onChange={(timerMinutes) => configure({ reminderMinutes: timerMinutes || null })} />
-        <Setting label={t.lobby.writingTimer} value={game.room.writeTimerMinutes ?? 0} options={[0,1,3,5,10,-1]} labels={[t.lobby.off,"1 min","3 min","5 min","10 min",t.lobby.custom]} customValue={custom(game.room.writeTimerMinutes, 7)} min={1} max={60} disabled={!host} onChange={(writeTimerMinutes) => configure({ writeTimerMinutes: writeTimerMinutes || null })} />
-        <Setting label={t.lobby.guessingTimer} value={game.room.guessTimerMinutes ?? 0} options={[0,1,3,5,10,-1]} labels={[t.lobby.off,"1 min","3 min","5 min","10 min",t.lobby.custom]} customValue={custom(game.room.guessTimerMinutes, 7)} min={1} max={60} disabled={!host} onChange={(guessTimerMinutes) => configure({ guessTimerMinutes: guessTimerMinutes || null })} />
-        <div className="setting"><label>{t.lobby.theme}</label><select className="theme-select" disabled={!host} value={game.room.themeCategory} onChange={(event) => configure({ themeCategory: event.target.value })}><option value="mixed">{t.lobby.mixed}</option><option value="family">{t.lobby.family}</option><option value="life">{t.lobby.life}</option><option value="spicy">{t.lobby.spicy}</option><option value="wild">{t.lobby.wild}</option></select></div>
+        <ToggleSetting label={t.lobby.writingTimer} enabled={Boolean(game.room.writeTimerMinutes)} value={game.room.writeTimerMinutes ?? 5} options={[1,3,5,10]} customValue={custom(game.room.writeTimerMinutes, 7)} min={1} max={60} disabled={!host} onToggle={(enabled) => configure({ writeTimerMinutes: enabled ? game.room.writeTimerMinutes || 5 : null })} onChange={(writeTimerMinutes) => configure({ writeTimerMinutes })} />
+        <ToggleSetting label={t.lobby.guessingTimer} enabled={Boolean(game.room.guessTimerMinutes)} value={game.room.guessTimerMinutes ?? 5} options={[1,3,5]} customValue={custom(game.room.guessTimerMinutes, 7)} min={1} max={60} disabled={!host} onToggle={(enabled) => configure({ guessTimerMinutes: enabled ? game.room.guessTimerMinutes || 5 : null })} onChange={(guessTimerMinutes) => configure({ guessTimerMinutes })} />
+        <div className="setting theme-setting"><label>{t.lobby.theme}</label><p className="setting-hint">{t.lobby.selectSubjects}</p><div className="subject-checks">{(["mixed", "family", "innocent", "life", "spicy", "wild"] as ThemeKey[]).map((key) => <label className={`subject-check ${selectedThemes.includes(key) ? "selected" : ""}`} key={key}><input type="checkbox" checked={selectedThemes.includes(key)} disabled={!host} onChange={() => toggleTheme(key)} /><span>{t.lobby[key]}</span></label>)}</div></div>
         {host ? <button className="primary-button start-button" disabled={busy || game.players.length < 2} onClick={() => act("start")}>{game.players.length < 2 ? t.lobby.waiting : t.lobby.start}</button> : <div className="host-note">{t.lobby.hostNote}</div>}
       </div>
     </div>
@@ -261,6 +278,11 @@ function Lobby({ game, me, busy, copied, copyInvite, act }: { game: GameState; m
 function Setting({ label, value, options, labels, suffix="", customValue, min=1, max=100, disabled, onChange }: { label: string; value: number; options: number[]; labels?: string[]; suffix?: string; customValue?: number; min?: number; max?: number; disabled: boolean; onChange: (v: number) => void }) {
   const isCustom = !options.filter((option) => option >= 0).includes(value);
   return <div className="setting"><label>{label}</label><div className="segmented">{options.map((option, index) => <button type="button" key={option} disabled={disabled} className={option === -1 ? (isCustom ? "active" : "") : value === option ? "active" : ""} onClick={() => onChange(option === -1 ? customValue ?? min : option)}>{labels?.[index] ?? `${option}${suffix}`}</button>)}</div>{isCustom && <input className="custom-setting" type="number" min={min} max={max} value={customValue ?? min} disabled={disabled} onChange={(event) => onChange(Math.max(min, Math.min(max, Number(event.target.value) || min)))} />}</div>;
+}
+
+function ToggleSetting({ label, enabled, value, options, customValue, min=1, max=60, disabled, onToggle, onChange }: { label: string; enabled: boolean; value: number; options: number[]; customValue?: number; min?: number; max?: number; disabled: boolean; onToggle: (enabled: boolean) => void; onChange: (value: number) => void }) {
+  const isCustom = enabled && !options.includes(value);
+  return <div className="setting toggle-setting"><div className="toggle-setting-head"><label>{label}</label><button type="button" className={`toggle ${enabled ? "on" : ""}`} aria-pressed={enabled} disabled={disabled} onClick={() => onToggle(!enabled)}><span />{enabled ? t.lobby.enabled : t.lobby.off}</button></div>{enabled && <><div className="segmented">{options.map((option) => <button type="button" key={option} disabled={disabled} className={value === option ? "active" : ""} onClick={() => onChange(option)}>{option} min</button>)}<button type="button" disabled={disabled} className={isCustom ? "active" : ""} onClick={() => onChange(customValue ?? min)}>{t.lobby.custom}</button></div>{isCustom && <input className="custom-setting" type="number" min={min} max={max} value={customValue ?? min} disabled={disabled} onChange={(event) => onChange(Math.max(min, Math.min(max, Number(event.target.value) || min)))} />}</>}</div>;
 }
 
 function ScoreRail({ players, meId }: { players: Player[]; meId: string }) {
