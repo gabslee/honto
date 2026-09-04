@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getMessages, themeCategories } from "./i18n";
 
 type Player = { id: string; name: string; isHost: number; sips: number; joinedAt: string };
@@ -16,6 +16,7 @@ type GameState = {
 
 const t = getMessages();
 const PROMPTS: string[] = [...t.prompts];
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const THEME_KEYS = ["mixed", "family", "innocent", "life", "spicy", "wild"] as const;
 type ThemeKey = (typeof THEME_KEYS)[number];
 
@@ -27,6 +28,10 @@ function storedThemeKeys(value: string | null | undefined): ThemeKey[] {
 function activeThemeKeys(value: string | null | undefined): ThemeKey[] {
   const selected = storedThemeKeys(value);
   return selected.length ? selected : ["mixed", "family", "innocent", "life"];
+}
+
+function timestamp(value: string | null | undefined) {
+  return value ? new Date(value.includes("Z") ? value : `${value}Z`).getTime() : 0;
 }
 
 async function gameApi(body: Record<string, unknown>) {
@@ -57,12 +62,20 @@ export default function GameClient() {
   const [reminderOpen, setReminderOpen] = useState(false);
   const [dismissedReminder, setDismissedReminder] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
+  const hydratedRef = useRef(false);
 
   useEffect(() => {
+    const room = new URLSearchParams(location.search).get("room")?.toUpperCase() ?? "";
     const saved = localStorage.getItem("honto-session");
-    if (saved) { try { setSession(JSON.parse(saved)); } catch { localStorage.removeItem("honto-session"); } }
-    const room = new URLSearchParams(location.search).get("room");
-    if (room) { setJoinCode(room.toUpperCase()); setMode("join"); }
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as { code?: string; token?: string; savedAt?: number };
+        const fresh = Boolean(parsed.savedAt && Date.now() - parsed.savedAt < SESSION_TTL_MS);
+        if (room && fresh && parsed.code === room && parsed.token) setSession({ code: parsed.code, token: parsed.token });
+        else localStorage.removeItem("honto-session");
+      } catch { localStorage.removeItem("honto-session"); }
+    }
+    if (room) { setJoinCode(room); setMode("join"); }
   }, []);
 
   const refresh = useCallback(async (quiet = false) => {
@@ -70,10 +83,24 @@ export default function GameClient() {
     try {
       const response = await fetch(`/api/game?code=${encodeURIComponent(session.code)}&token=${encodeURIComponent(session.token)}`, { cache: "no-store" });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? t.errors.refresh);
+      if (!response.ok) throw new Error(response.status === 404 ? "ROOM_NOT_FOUND" : response.status === 401 ? "SESSION_INVALID" : (data.error ?? t.errors.refresh));
+      if (!hydratedRef.current) {
+        if (data.room?.startedAt && data.room?.timerMinutes) {
+          const started = timestamp(data.room.startedAt);
+          const pausedNow = data.room.sessionPaused && data.room.pausedAt ? Math.floor((Date.now() - timestamp(data.room.pausedAt)) / 1000) : 0;
+          const elapsed = Math.max(0, Math.floor((Date.now() - started) / 1000) - (data.room.pausedSeconds ?? 0) - pausedNow);
+          setDismissedReminder(Math.floor((elapsed / 60) / data.room.timerMinutes));
+        }
+        hydratedRef.current = true;
+      }
       setGame(data);
       if (!quiet) setError("");
-    } catch (cause) { if (!quiet) setError(cause instanceof Error ? cause.message : t.errors.connection); }
+    } catch (cause) {
+      if (cause instanceof Error && (cause.message === "ROOM_NOT_FOUND" || cause.message === "SESSION_INVALID")) {
+        localStorage.removeItem("honto-session"); hydratedRef.current = false; setSession(null); setGame(null); setError(t.errors.sessionExpired); return;
+      }
+      if (!quiet) setError(cause instanceof Error ? cause.message : t.errors.connection);
+    }
   }, [session]);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -122,7 +149,7 @@ export default function GameClient() {
     try {
       const data = await gameApi({ action: mode, name, code: joinCode });
       const next = { code: data.code, token: data.token };
-      localStorage.setItem("honto-session", JSON.stringify(next)); setSession(next);
+      localStorage.setItem("honto-session", JSON.stringify({ ...next, savedAt: Date.now() })); hydratedRef.current = false; setSession(next);
       history.replaceState(null, "", `?room=${data.code}`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t.errors.enter); }
     finally { setBusy(false); }
@@ -140,7 +167,7 @@ export default function GameClient() {
   }
 
   function leave() {
-    localStorage.removeItem("honto-session"); setSession(null); setGame(null); setReveal(null); setReminderOpen(false); setLieOptions([]); setSelectedLies([]); setTruthText("");
+    localStorage.removeItem("honto-session"); hydratedRef.current = false; setSession(null); setGame(null); setReveal(null); setReminderOpen(false); setLieOptions([]); setSelectedLies([]); setTruthText("");
     history.replaceState(null, "", location.pathname);
   }
 

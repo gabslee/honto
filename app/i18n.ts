@@ -23,6 +23,7 @@ export const messages = {
       refresh: "We couldn't refresh the room.",
       connection: "Connection error.",
       enter: "We couldn't enter the room.",
+      sessionExpired: "This room session is no longer available. Start or join a new game.",
     },
     prompts: themeCategories.mixed,
     common: { back: "Back", exit: "Exit", you: "you", sip: "sip", sips: "sips" },

@@ -3,6 +3,7 @@ import { neon } from "@neondatabase/serverless";
 type Body = { action?: string; code?: string; name?: string; token?: string; roundCount?: number; groupSipEvery?: number | null; timerMinutes?: number | null; reminderMinutes?: number | null; writeTimerMinutes?: number | null; guessTimerMinutes?: number | null; themeCategory?: string; prompt?: string; statements?: string[]; truthIndex?: number; guessedIndex?: number };
 
 const WORDS = ["MOON", "MINT", "WAVE", "SAKE", "NEON", "MISO", "YUZU", "NORI", "KITSU", "MOMO", "SORA", "KUMA", "HOSHI", "RAMEN", "UMAMI"];
+const ROOM_IDLE_MS = 12 * 60 * 60 * 1000;
 const sql = neon(process.env.DATABASE_URL ?? "");
 let schemaReady: Promise<void> | null = null;
 
@@ -26,12 +27,16 @@ function ensureSchema() {
 const id = () => crypto.randomUUID();
 const code = () => `${WORDS[Math.floor(Math.random() * WORDS.length)]}-${Math.floor(10 + Math.random() * 90)}`;
 const cleanName = (value?: string) => value?.trim().replace(/\s+/g, " ").slice(0, 24) ?? "";
-const json = (res: any, body: unknown, status = 200) => res.status(status).json(body);
+const json = (res: any, body: unknown, status = 200) => { res.setHeader?.("Cache-Control", "no-store, max-age=0"); return res.status(status).json(body); };
 
 async function state(roomCode: string, token: string) {
   const rooms = await sql`SELECT * FROM rooms WHERE code = ${roomCode}`;
   const room: any = rooms[0];
   if (!room) return null;
+  if (room.status !== "finished" && room.updated_at && Date.now() - new Date(room.updated_at).getTime() > ROOM_IDLE_MS) {
+    await sql`UPDATE rooms SET status = 'finished', session_paused = false, updated_at = now() WHERE id = ${room.id}`;
+    room.status = "finished";
+  }
   const meRows = await sql`SELECT id FROM players WHERE room_id = ${room.id} AND token = ${token}`;
   if (!meRows[0]) throw new Error("Your session is not valid for this room.");
   const players = await sql`SELECT id, name, is_host AS "isHost", sips, joined_at AS "joinedAt" FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
