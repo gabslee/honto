@@ -139,7 +139,10 @@ export default function GameClient() {
     const batchKey = `${game.room.currentRound}|${game.room.themeCategory}|${game.room.customTheme ?? ""}`;
     if (promptBatchRef.current === batchKey || promptPool.length > 0 || suggestingPrompt) return;
     promptBatchRef.current = batchKey;
-    void suggestPrompt();
+    const localThemes = activeThemeKeys(game.room.themeCategory).flatMap((key) => themeCategories[key]);
+    const initialPrompt = localThemes[0] ?? PROMPTS[0];
+    setPrompt(initialPrompt);
+    void suggestPrompt(initialPrompt);
   }, [game?.room.status, game?.room.currentRound, game?.room.themeCategory, game?.room.customTheme, author?.id, game?.meId, promptPool.length, suggestingPrompt]);
 
   useEffect(() => {
@@ -219,11 +222,11 @@ export default function GameClient() {
     void suggestPrompt();
   }
 
-  async function suggestPrompt() {
+  async function suggestPrompt(basePrompt = prompt) {
     setSuggestingPrompt(true);
     try {
       const categories = activeThemeKeys(game?.room.themeCategory);
-      const excluded = [prompt, ...promptPool];
+      const excluded = [basePrompt, ...promptPool];
       const responses = await Promise.all(categories.map(async (category) => {
         const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "theme", count: 20, category: [category], customTheme: game?.room.customTheme, fresh: true, exclude: excluded }) });
         const data = await response.json() as { prompt?: string; prompts?: string[] };
