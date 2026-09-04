@@ -311,9 +311,11 @@ function Reveal({ reveal, players, meId, close, groupSip }: { reveal: { correct:
   const guesser = players.find((p) => p.id === reveal.guesserId)?.name ?? "That player";
   const isGuesser = meId === reveal.guesserId;
   const isAuthor = meId === reveal.authorId;
+  const viewerFailed = (reveal.correct && isAuthor) || (!reveal.correct && isGuesser);
   const title = reveal.correct ? (isAuthor ? t.reveal.foundTruth : `${drinker} ${t.reveal.drinks}`) : (isGuesser ? t.reveal.wrong : t.reveal.bluffSuccess);
-  const outcome = reveal.correct ? (isAuthor ? t.reveal.yourSip : t.reveal.drinks) : (isGuesser ? `${drinker}, ${t.reveal.yourTurn}` : `${guesser} ${t.reveal.guessedWrong} ${t.reveal.theySip}`);
-  return <div className="modal-backdrop"><div className={`reveal-card ${reveal.correct ? "correct" : "wrong"}`}><div className="result-mark">{reveal.correct ? "✓" : "×"}</div><span className="eyebrow">{reveal.correct ? t.reveal.correct : (isGuesser ? t.reveal.wrong : t.reveal.bluffSuccess)}</span><h2>{title}</h2><p>{outcome}</p><p>{t.reveal.truthWas}</p><blockquote>“{reveal.statements[reveal.truthIndex]}”</blockquote>{groupSip && <div className="group-sip">{t.reveal.group}</div>}<button className="primary-button" onClick={close}>{t.reveal.next}</button></div></div>;
+  const outcome = reveal.correct ? (isAuthor ? t.reveal.yourSip : t.reveal.drinks) : (isGuesser ? `${drinker}, ${t.reveal.yourTurn}` : t.reveal.theySip);
+  const eyebrow = viewerFailed ? (isAuthor ? t.reveal.busted : t.reveal.wrong) : (reveal.correct ? t.reveal.correct : t.reveal.bluffSuccess);
+  return <div className="modal-backdrop"><div className={`reveal-card ${viewerFailed ? "wrong" : "correct"}`}><div className="result-mark">{viewerFailed ? "×" : "✓"}</div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2><p>{outcome}</p><p>{t.reveal.truthWas}</p><blockquote>“{reveal.statements[reveal.truthIndex]}”</blockquote>{groupSip && <div className="group-sip">{t.reveal.group}</div>}<button className="primary-button" onClick={close}>{t.reveal.next}</button></div></div>;
 }
 
 function Finished({ players, leave }: { players: Player[]; leave: () => void }) {
