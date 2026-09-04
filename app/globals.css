@@ -127,3 +127,21 @@ h1 em,h2 em { color:var(--red); font-style:normal; position:relative; }
   .session-tools { grid-column:auto; width:auto; justify-content:flex-end; padding-top:0; }
   .session-clock { max-width:112px; }
 }
+
+/* Make lie choices feel like playful game cards instead of plain form rows. */
+.lie-options { gap:14px; margin:18px 0 26px; }
+.lie-options label { position:relative; grid-template-columns:46px minmax(0,1fr) 84px; border:3px solid var(--ink); border-radius:16px; background:#fffdf8; box-shadow:5px 5px 0 var(--ink); transition:transform .15s, box-shadow .15s, background .15s; }
+.lie-options label:nth-child(2n) { transform:rotate(-.7deg); }
+.lie-options label:nth-child(3n) { transform:rotate(.7deg); }
+.lie-options label:hover { transform:translateY(-3px) rotate(-1deg); box-shadow:7px 8px 0 var(--ink); }
+.lie-options label.selected { background:var(--yellow); box-shadow:6px 7px 0 var(--ink); transform:rotate(-1deg) translateY(-1px); }
+.lie-options input { appearance:none; position:relative; width:28px; height:28px; margin:auto; border:3px solid var(--ink); border-radius:9px; background:white; cursor:pointer; transform:rotate(5deg); }
+.lie-options input:checked { background:var(--red); transform:rotate(-7deg) scale(1.05); }
+.lie-options input:checked::after { content:"✓"; position:absolute; inset:0; display:grid; place-items:center; color:white; font-size:20px; font-weight:1000; line-height:1; }
+.lie-options textarea { min-height:82px; border-left:3px dashed #17243d66; padding:14px 13px; font-size:15px; line-height:1.35; background:transparent; }
+.lie-options b { min-height:100%; border-left:3px dashed #17243d66; background:#f4ede2; color:var(--ink); font-size:10px; letter-spacing:.08em; }
+.lie-options label.selected b { background:var(--pink); }
+@media (max-width:800px) {
+  .lie-options label { grid-template-columns:40px minmax(0,1fr); }
+  .lie-options b { grid-column:2; border-left:0; border-top:3px dashed #17243d66; padding:10px; }
+}
