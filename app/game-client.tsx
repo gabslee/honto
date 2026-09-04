@@ -52,6 +52,7 @@ export default function GameClient() {
   const [copied, setCopied] = useState(false);
   const [promptIndex, setPromptIndex] = useState(0);
   const [prompt, setPrompt] = useState(PROMPTS[0]);
+  const [promptPool, setPromptPool] = useState<string[]>([]);
   const [suggestingPrompt, setSuggestingPrompt] = useState(false);
   const [truthText, setTruthText] = useState("");
   const [lieOptions, setLieOptions] = useState<string[]>([]);
@@ -182,16 +183,22 @@ export default function GameClient() {
   }
 
   function newPrompt() {
-    if (game?.room.exclusiveThemes) { void suggestPrompt(); return; }
-    rotateLocalPrompt();
+    if (promptPool.length) {
+      const [next, ...remaining] = promptPool;
+      setPromptPool(remaining);
+      setPrompt(next);
+      return;
+    }
+    void suggestPrompt();
   }
 
   async function suggestPrompt() {
     setSuggestingPrompt(true);
     try {
-      const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "theme", category: activeThemeKeys(game?.room.themeCategory), customTheme: game?.room.customTheme, fresh: Boolean(game?.room.exclusiveThemes), exclude: [prompt] }) });
-      const data = await response.json() as { prompt?: string };
-      if (response.ok && data.prompt) setPrompt(data.prompt);
+      const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "theme", count: 20, category: activeThemeKeys(game?.room.themeCategory), customTheme: game?.room.customTheme, fresh: true, exclude: [prompt] }) });
+      const data = await response.json() as { prompt?: string; prompts?: string[] };
+      const prompts = (data.prompts?.length ? data.prompts : data.prompt ? [data.prompt] : []).filter((item) => item !== prompt);
+      if (response.ok && prompts.length) { setPrompt(prompts[0]); setPromptPool(prompts.slice(1)); }
       else rotateLocalPrompt();
     } catch { rotateLocalPrompt(); }
     finally { setSuggestingPrompt(false); }
@@ -338,7 +345,7 @@ function ScoreRail({ players, meId }: { players: Player[]; meId: string }) {
 }
 
 function Writer({ prompt, setPrompt, newPrompt, suggestPrompt, suggestingPrompt, truthText, setTruthText, lieOptions, selectedLies, toggleLie, updateLie, generateLies, generatingLies, submit, busy }: { prompt: string; setPrompt: (v: string) => void; newPrompt: () => void; suggestPrompt: () => void; suggestingPrompt: boolean; truthText: string; setTruthText: (v: string) => void; lieOptions: string[]; selectedLies: number[]; toggleLie: (index: number) => void; updateLie: (index: number, value: string) => void; generateLies: () => void; generatingLies: boolean; submit: (e: FormEvent) => void; busy: boolean }) {
-  return <form className="play-card writer" onSubmit={submit}><span className="turn-badge">{t.writer.badge}</span><h2>{t.writer.title}</h2><div className="prompt-row"><input value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={100}/><button type="button" onClick={newPrompt}><StarIcon />{t.writer.another}</button><button type="button" onClick={suggestPrompt} disabled={suggestingPrompt}><StarIcon />{suggestingPrompt ? t.writer.aiLoading : t.writer.aiIdea}</button></div><p className="hint">{t.writer.hint}</p><label className="truth-editor"><span>{t.writer.truthLabel}</span><textarea value={truthText} onChange={(e) => setTruthText(e.target.value)} placeholder={t.writer.truthPlaceholder} maxLength={180}/></label><button type="button" className="ai-button" onClick={generateLies} disabled={generatingLies || !truthText.trim()}>{generatingLies ? t.writer.generating : t.writer.generate}</button>{lieOptions.length > 0 && <><p className="hint">{t.writer.chooseTwo}</p><div className="lie-options">{lieOptions.map((lie, index) => <label key={index} className={selectedLies.includes(index) ? "selected" : ""}><input type="checkbox" checked={selectedLies.includes(index)} onChange={() => toggleLie(index)} /><textarea value={lie} onChange={(e) => updateLie(index, e.target.value)} maxLength={180}/><b>{selectedLies.includes(index) ? t.writer.selected : t.writer.select}</b></label>)}</div><button className="primary-button" disabled={busy || selectedLies.length !== 2}>{t.writer.submit}</button></>}</form>;
+  return <form className="play-card writer" onSubmit={submit}><span className="turn-badge">{t.writer.badge}</span><h2>{t.writer.title}</h2><div className="prompt-row"><input value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={100}/><button type="button" onClick={newPrompt} disabled={suggestingPrompt}><StarIcon />{suggestingPrompt ? t.writer.aiLoading : t.writer.another}</button></div><p className="hint">{t.writer.hint}</p><label className="truth-editor"><span>{t.writer.truthLabel}</span><textarea value={truthText} onChange={(e) => setTruthText(e.target.value)} placeholder={t.writer.truthPlaceholder} maxLength={180}/></label><button type="button" className="ai-button" onClick={generateLies} disabled={generatingLies || !truthText.trim()}>{generatingLies ? t.writer.generating : t.writer.generate}</button>{lieOptions.length > 0 && <><p className="hint">{t.writer.chooseTwo}</p><div className="lie-options">{lieOptions.map((lie, index) => <label key={index} className={selectedLies.includes(index) ? "selected" : ""}><input type="checkbox" checked={selectedLies.includes(index)} onChange={() => toggleLie(index)} /><textarea value={lie} onChange={(e) => updateLie(index, e.target.value)} maxLength={180}/><b>{selectedLies.includes(index) ? t.writer.selected : t.writer.select}</b></label>)}</div><button className="primary-button" disabled={busy || selectedLies.length !== 2}>{t.writer.submit}</button></>}</form>;
 }
 
 function StarIcon() {

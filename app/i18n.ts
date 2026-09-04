@@ -1,8 +1,10 @@
+import { themeCategories as improvedThemeCategories } from "./theme-data";
+
 export const supportedLocales = ["en"] as const;
 export type Locale = (typeof supportedLocales)[number];
 export const defaultLocale: Locale = "en";
 
-export const themeCategories = {
+const legacyThemeCategories = {
   mixed: ["a tiny victory", "your most-used emoji", "a strange coincidence", "a bad haircut", "a lucky escape", "a comfort food", "a childhood nickname", "a hidden talent", "a memorable purchase", "a song you secretly love", "a weird habit", "an awkward elevator ride", "a time you got lost", "a surprising compliment", "a weekend ritual", "a questionable fashion choice", "a random act of kindness", "a silly argument", "a thing you collect", "a moment you felt brave"],
   family: ["a family tradition", "a grandparent's story", "your first family trip", "a sibling rivalry", "a family recipe", "a childhood rule", "a family pet", "a holiday memory", "a relative's catchphrase", "your family superpower", "a family celebration", "a chore you hated", "a family inside joke", "your first school day", "a family heirloom", "a funny parent moment", "a childhood fear", "a family road trip", "a nickname at home", "a lesson from a relative"],
   innocent: ["a silly mistake", "your favorite snack", "a tiny superstition", "a cartoon you loved", "a funny school memory", "a harmless prank", "a silly nickname", "a rainy-day activity", "a game-night habit", "a weird food combo", "a small fear", "a lucky number", "a song you know by heart", "a funny typo", "a talent show moment", "a gift you remember", "a favorite smell", "a minor embarrassment", "a cozy routine", "a thing that always cheers you up"],
@@ -10,6 +12,8 @@ export const themeCategories = {
   spicy: ["a memorable crush", "your worst first date", "a flirt gone wrong", "a celebrity crush", "a dating app story", "a secret romantic gesture", "a kiss you remember", "your boldest DM", "a relationship green flag", "a relationship red flag", "an almost-romance", "a romantic misunderstanding", "a date you would repeat", "a dating dealbreaker", "a crush from school", "a romantic plot twist", "a jealousy moment", "a love song that fits you", "a dating disaster", "your ideal date"],
   wild: ["a party that got chaotic", "a ridiculous dare", "a night you barely planned", "a harmless conspiracy", "a spontaneous trip", "a rule you broke", "a risky fashion choice", "a terrible idea that worked", "a story nobody believes", "a moment you lost control", "a bizarre coincidence", "a mysterious message", "a time you improvised", "a strange encounter", "an accidental adventure", "a secret alter ego", "a wild misunderstanding", "a thing you did on a bet", "a story for future you", "your most chaotic friend"],
 } as const;
+
+export const themeCategories = improvedThemeCategories;
 
 export const messages = {
   en: {
