@@ -18,6 +18,7 @@ const fallbackLies = (truth: string) => [
   `I learned the hard way that ${truth.toLowerCase().slice(0, 38)}.`,
   `I secretly wish people knew that ${truth.toLowerCase().slice(0, 34)}.`,
 ];
+const responseText = (data: { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }) => data.output_text ?? data.output?.flatMap((item) => item.content ?? []).map((item) => item.text ?? "").join("") ?? "";
 
 export async function POST(request: Request) {
   let body: Body = {};
@@ -33,14 +34,15 @@ export async function POST(request: Request) {
       : `Give one fresh, playful English theme for a two-lies-one-truth party game in the ${(Array.isArray(categories) ? categories.join(", ") : categories)} categories. Avoid: ${(body.exclude ?? []).join(", ") || "none"}. Return only a 2–8 word noun phrase.`;
     const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` }, body: JSON.stringify({ model: process.env.OPENAI_MODEL ?? "gpt-5.4-nano", store: false, input: instruction, text: { format: body.kind === "lies" ? { type: "json_schema", name: "lie_options", strict: true, schema: { type: "object", properties: { lies: { type: "array", items: { type: "string" }, minItems: 5, maxItems: 5 } }, required: ["lies"], additionalProperties: false } } : { type: "text" } }, max_output_tokens: body.kind === "lies" ? 260 : 30 }) });
     if (!response.ok) { const detail = await response.text(); console.error("[suggest] OpenAI request failed", { status: response.status, model: process.env.OPENAI_MODEL ?? "gpt-5.4-nano", detail: detail.slice(0, 500) }); throw new Error(`OpenAI request failed (${response.status})`); }
-    const data = await response.json() as { output_text?: string };
+    const data = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> };
+    const text = responseText(data);
     if (body.kind === "lies") {
-      const parsed = JSON.parse(data.output_text ?? "{}");
+      const parsed = JSON.parse(text || "{}");
       const lies = Array.isArray(parsed.lies) ? parsed.lies.filter((item: unknown): item is string => typeof item === "string").map((item: string) => item.trim().slice(0, 180)).filter(Boolean).slice(0, 5) : [];
       if (lies.length === 5) return Response.json({ lies, source: "ai" });
       throw new Error("Invalid lie options");
     }
-    const prompt = data.output_text?.trim().replace(/[.!?]+$/, "").slice(0, 100);
+    const prompt = text.trim().replace(/[.!?]+$/, "").slice(0, 100);
     if (!prompt) throw new Error("Invalid theme");
     return Response.json({ prompt, source: "ai" });
   } catch (error) {
