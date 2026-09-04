@@ -56,7 +56,7 @@ export const messages = {
       rules: "Tonight's rules", yourCall: "YOUR CALL", length: "Game length", roundsSuffix: " rounds", custom: "Custom",
       everyoneSips: "Everyone sips", never: "Never", every1: "Every round", every3: "Every 3 rounds", every5: "Every 5 rounds", everyCustom: "Custom rounds",
       timer: "Sip reminder", timerHint: "Everyone drinks when the reminder appears", timerMinutes: "minutes", timerCustom: "Custom minutes",
-      writingTimer: "Writing timer", guessingTimer: "Guessing timer", enabled: "Enabled", theme: "Theme categories", mixed: "General", family: "Family", life: "Life stories", spicy: "Spicy", wild: "Wild", innocent: "Innocent & silly", selectSubjects: "Select any subjects you want in this game. Leave all unchecked for safe general themes.", exclusiveThemes: "Fresh themes", customTheme: "Your own subject", customThemePlaceholder: "e.g. our worst travel stories",
+      writingTimer: "Writing timer", guessingTimer: "Guessing timer", enabled: "Enabled", theme: "Theme categories", mixed: "General", family: "Family", life: "Life stories", flirty: "Flirty", spicy: "Spicy · 18+", wild: "Wild", innocent: "Innocent & silly", selectSubjects: "Select any subjects you want in this game. Leave all unchecked for safe general themes.", exclusiveThemes: "Fresh themes", customTheme: "Your own subject", customThemePlaceholder: "e.g. our worst travel stories",
       off: "Off", waiting: "WAITING FOR +1 PLAYER…", start: "START THE GAME →", pause: "PAUSE SESSION", resume: "RESUME SESSION",
       hostNote: "The host chooses the rules and starts the game.",
     },

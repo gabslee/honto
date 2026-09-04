@@ -91,7 +91,7 @@ export default async function handler(req: any, res: any) {
       const timer = Number.isInteger(body.reminderMinutes ?? body.timerMinutes) && (body.reminderMinutes ?? body.timerMinutes ?? 0) >= 1 && (body.reminderMinutes ?? body.timerMinutes ?? 0) <= 180 ? (body.reminderMinutes ?? body.timerMinutes) : null;
       const writeTimer = Number.isInteger(body.writeTimerMinutes) && (body.writeTimerMinutes ?? 0) >= 1 && (body.writeTimerMinutes ?? 0) <= 60 ? body.writeTimerMinutes : null;
       const guessTimer = Number.isInteger(body.guessTimerMinutes) && (body.guessTimerMinutes ?? 0) >= 1 && (body.guessTimerMinutes ?? 0) <= 60 ? body.guessTimerMinutes : null;
-      const allowed = new Set(["mixed", "family", "innocent", "life", "spicy", "wild"]);
+      const allowed = new Set(["mixed", "family", "innocent", "life", "flirty", "spicy"]);
       const selected = (body.themeCategory ?? "").split(",").map((item) => item.trim()).filter((item) => allowed.has(item));
       const category = [...new Set(selected)].join(",") || "safe";
       const exclusiveThemes = body.exclusiveThemes === true;
