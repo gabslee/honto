@@ -38,6 +38,7 @@ function ensureSchema() {
 
 const id = () => crypto.randomUUID();
 const code = () => `${WORDS[Math.floor(Math.random() * WORDS.length)]}-${Math.floor(10 + Math.random() * 90)}`;
+const miniGameGap = () => 5 + Math.floor(Math.random() * 4);
 const cleanName = (value?: string) => value?.trim().replace(/\s+/g, " ").slice(0, 24) ?? "";
 const json = (res: any, body: unknown, status = 200) => { res.setHeader?.("Cache-Control", "no-store, max-age=0"); return res.status(status).json(body); };
 
@@ -126,7 +127,7 @@ export default async function handler(req: any, res: any) {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can start the game.");
       const count = await sql`SELECT COUNT(*)::int AS total FROM players WHERE room_id = ${room.id}`;
       if ((count[0]?.total ?? 0) < 2) throw new Error("Wait for at least one more player.");
-      const firstMiniRound = Number(room.mini_game_enabled) ? 1 + (Math.random() < 0.5 ? 1 : 2) : null;
+      const firstMiniRound = Number(room.mini_game_enabled) ? 1 + miniGameGap() : null;
       await sql`UPDATE rooms SET status = 'playing', current_round = 1, round_started_at = now(), started_at = now(), mini_game_next_round = ${firstMiniRound}, session_paused = false, paused_seconds = 0, updated_at = now() WHERE id = ${room.id}`;
     }
     if (body.action === "pause") {
@@ -184,7 +185,7 @@ export default async function handler(req: any, res: any) {
       if (body.miniChoice === "truth" && answer.length < 1) throw new Error("Write your truth first.");
       await sql`UPDATE mini_games SET choice = ${body.miniChoice}, answer = ${body.miniChoice === "truth" ? answer : null}, status = 'done', completed = true, completed_at = now() WHERE id = ${mini.id} AND completed = false AND status = 'answer'`;
       if (body.miniChoice === "dare") await sql`UPDATE players SET sips = sips + ${Number(mini.sips) || 1} WHERE id = ${me.id}`;
-      const nextMiniRound = Number(room.current_round) + (Math.random() < 0.5 ? 1 : 2);
+      const nextMiniRound = Number(room.current_round) + miniGameGap();
       if (room.mini_game_enabled && room.status === "playing" && Number(room.current_round) < Number(room.round_count)) await sql`UPDATE rooms SET mini_game_next_round = ${nextMiniRound}, updated_at = now() WHERE id = ${room.id}`;
       return json(res, await state(roomCode, token));
     }
