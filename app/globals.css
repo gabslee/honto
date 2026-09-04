@@ -113,3 +113,16 @@ h1 em,h2 em { color:var(--red); font-style:normal; position:relative; }
   .session-control { min-width:0; }
   .session-clock { max-width:none; }
 }
+
+/* Keep pause inside the green session chip, including on narrow screens. */
+.session-clock { display:inline-flex; align-items:center; gap:5px; }
+.session-clock .session-pause { width:20px; height:20px; padding:0; border:0; border-left:2px solid var(--ink); border-radius:0; background:transparent; box-shadow:none; }
+.session-clock .session-pause .pause-icon { width:12px; height:12px; }
+.countdown-alert { animation: countdown-pulse .8s ease-in-out infinite alternate; }
+.timeout-card { background:var(--pink); }
+@keyframes countdown-pulse { from { transform:scale(1); } to { transform:scale(1.07) rotate(-1deg); } }
+@media (max-width:800px) {
+  .topbar { grid-template-columns:auto minmax(0,1fr) auto; }
+  .session-tools { grid-column:auto; width:auto; justify-content:flex-end; padding-top:0; }
+  .session-clock { max-width:112px; }
+}

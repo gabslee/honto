@@ -45,8 +45,8 @@ async function state(roomCode: string, token: string) {
   const rounds = await sql`SELECT r.id, r.round_number AS "roundNumber", r.author_id AS "authorId", p.name AS "authorName", r.prompt, r.statement_one AS "statementOne", r.statement_two AS "statementTwo", r.statement_three AS "statementThree", r.guessed_index AS "guessedIndex", r.guesser_id AS "guesserId", r.result, r.created_at AS "createdAt", CASE WHEN r.result IS NOT NULL THEN r.truth_index ELSE NULL END AS "truthIndex" FROM rounds r JOIN players p ON p.id = r.author_id WHERE r.room_id = ${room.id} AND r.round_number = ${room.current_round} LIMIT 1`;
   const lastRows = await sql`SELECT r.round_number AS "roundNumber", r.author_id AS "authorId", r.guesser_id AS "guesserId", r.truth_index AS "truthIndex", r.guessed_index AS "guessedIndex", r.result, r.statement_one AS "statementOne", r.statement_two AS "statementTwo", r.statement_three AS "statementThree" FROM rounds r WHERE r.room_id = ${room.id} AND r.result IS NOT NULL ORDER BY r.round_number DESC LIMIT 1`;
   const last = lastRows[0] as any;
-  const drinkerId = last ? (last.result === "correct" ? last.authorId : last.guesserId) : null;
-  return { room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, groupSipEvery: room.group_sip_every, timerMinutes: room.timer_minutes, writeTimerMinutes: room.write_timer_minutes, guessTimerMinutes: room.guess_timer_minutes, themeCategory: room.theme_category, exclusiveThemes: Boolean(room.exclusive_themes), customTheme: room.custom_theme, startedAt: room.started_at, roundStartedAt: room.round_started_at, sessionPaused: room.session_paused, pausedAt: room.paused_at, pausedSeconds: room.paused_seconds }, players, activeRound: rounds[0] ?? null, lastReveal: last ? { ...last, drinkerId } : null, meId: meRows[0].id };
+  const drinkerId = last ? (last.result === "correct" ? last.authorId : last.result === "timeout" && last.statementOne === "__TIMEOUT__" ? last.authorId : last.guesserId) : null;
+  return { room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, groupSipEvery: room.group_sip_every, timerMinutes: room.timer_minutes, writeTimerMinutes: room.write_timer_minutes, guessTimerMinutes: room.guess_timer_minutes, themeCategory: room.theme_category, exclusiveThemes: Boolean(room.exclusive_themes), customTheme: room.custom_theme, startedAt: room.started_at, roundStartedAt: room.round_started_at, sessionPaused: room.session_paused, pausedAt: room.paused_at, pausedSeconds: room.paused_seconds }, players, activeRound: rounds[0] ?? null, lastReveal: last ? { ...last, timeoutStage: last.result === "timeout" ? (last.statementOne === "__TIMEOUT__" ? "writing" : "guessing") : null, drinkerId } : null, meId: meRows[0].id };
 }
 
 export default async function handler(req: any, res: any) {
@@ -112,6 +112,27 @@ export default async function handler(req: any, res: any) {
       } else {
         await sql`UPDATE rooms SET session_paused = true, paused_at = now(), updated_at = now() WHERE id = ${room.id}`;
       }
+    }
+    if (body.action === "timeout") {
+      if (room.status !== "playing") throw new Error("The game is not in progress.");
+      const players = await sql`SELECT id FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
+      const authorId = players[(Number(room.current_round) - 1) % players.length]?.id;
+      const currentRounds = await sql`SELECT * FROM rounds WHERE room_id = ${room.id} AND round_number = ${room.current_round}`;
+      const current: any = currentRounds[0];
+      const writePhase = !current;
+      const timedOutId = writePhase ? authorId : (players.find((player: any) => player.id !== current.author_id)?.id ?? authorId);
+      if (!timedOutId) throw new Error("There is no player to time out.");
+      if (writePhase) {
+        const inserted = await sql`INSERT INTO rounds (id, room_id, round_number, author_id, prompt, statement_one, statement_two, statement_three, truth_index, guesser_id, result, revealed_at) VALUES (${id()}, ${room.id}, ${room.current_round}, ${authorId}, '__TIMEOUT__', '__TIMEOUT__', '__TIMEOUT__', '__TIMEOUT__', 0, ${timedOutId}, 'timeout', now()) ON CONFLICT (room_id, round_number) DO NOTHING RETURNING id`;
+        if (!inserted[0]) return json(res, await state(roomCode, token));
+      } else {
+        const updated = await sql`UPDATE rounds SET guesser_id = ${timedOutId}, result = 'timeout', revealed_at = now() WHERE id = ${current.id} AND result IS NULL RETURNING id`;
+        if (!updated[0]) return json(res, await state(roomCode, token));
+      }
+      const nextRound = Number(room.current_round) + 1; const finished = nextRound > Number(room.round_count);
+      await sql`UPDATE players SET sips = sips + 1 WHERE id = ${timedOutId}`;
+      await sql`UPDATE rooms SET current_round = ${finished ? room.current_round : nextRound}, status = ${finished ? "finished" : "playing"}, round_started_at = CASE WHEN ${finished} THEN round_started_at ELSE now() END, updated_at = now() WHERE id = ${room.id}`;
+      return json(res, { ...(await state(roomCode, token)), timeout: { playerId: timedOutId, roundNumber: room.current_round, stage: writePhase ? "writing" : "guessing" } });
     }
     if (body.action === "submit") {
       if (room.status !== "playing") throw new Error("The game is not in progress.");

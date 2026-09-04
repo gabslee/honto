@@ -11,7 +11,7 @@ type ActiveRound = {
 };
 type GameState = {
   room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; groupSipEvery: number | null; timerMinutes: number | null; writeTimerMinutes: number | null; guessTimerMinutes: number | null; themeCategory: string; exclusiveThemes: boolean; customTheme: string | null; startedAt: string | null; roundStartedAt: string | null; sessionPaused: boolean; pausedAt: string | null; pausedSeconds: number };
-  players: Player[]; activeRound: ActiveRound | null; lastReveal: { roundNumber: number; authorId: string; guesserId: string; truthIndex: number; guessedIndex: number; result: "correct" | "wrong"; statementOne: string; statementTwo: string; statementThree: string; drinkerId: string } | null; meId: string;
+  players: Player[]; activeRound: ActiveRound | null; lastReveal: { roundNumber: number; authorId: string; guesserId: string; truthIndex: number; guessedIndex: number | null; result: "correct" | "wrong" | "timeout"; statementOne: string; statementTwo: string; statementThree: string; timeoutStage?: "writing" | "guessing" | null; drinkerId: string } | null; meId: string;
 };
 
 const t = getMessages();
@@ -62,10 +62,12 @@ export default function GameClient() {
   const [seenRevealRound, setSeenRevealRound] = useState<number | null>(null);
   const [reminderOpen, setReminderOpen] = useState(false);
   const [reminderZeroTick, setReminderZeroTick] = useState<number | null>(null);
+  const [timeoutNotice, setTimeoutNotice] = useState<{ playerId: string; roundNumber: number; stage: "writing" | "guessing" } | null>(null);
   const [dismissedReminder, setDismissedReminder] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
   const hydratedRef = useRef(false);
   const promptBatchRef = useRef("");
+  const timeoutSentRef = useRef("");
 
   useEffect(() => {
     const room = new URLSearchParams(location.search).get("room")?.toUpperCase() ?? "";
@@ -140,10 +142,22 @@ export default function GameClient() {
   }, [game?.room.status, game?.room.currentRound, game?.room.themeCategory, game?.room.customTheme, author?.id, game?.meId, promptPool.length, suggestingPrompt]);
 
   useEffect(() => {
+    if (!game || game.room.status !== "playing" || turnRemaining !== 0) return;
+    const stage = game.activeRound ? "guessing" : "writing";
+    const canExpire = stage === "writing" ? author?.id === game.meId : game.activeRound?.authorId !== game.meId;
+    if (!canExpire) return;
+    const key = `${game.room.currentRound}:${stage}`;
+    if (timeoutSentRef.current === key) return;
+    timeoutSentRef.current = key;
+    void act("timeout");
+  }, [game?.room.status, game?.room.currentRound, game?.activeRound?.id, game?.activeRound?.authorId, game?.meId, author?.id, turnRemaining]);
+
+  useEffect(() => {
     if (!game || (game.room.status !== "playing" && game.room.status !== "finished")) return;
     if (game.lastReveal && game.lastReveal.roundNumber !== seenRevealRound && (game.lastReveal.roundNumber < game.room.currentRound || game.room.status === "finished")) {
       const result = game.lastReveal;
-      setReveal({ correct: result.result === "correct", truthIndex: result.truthIndex, drinkerId: result.drinkerId, roundNumber: result.roundNumber, authorId: result.authorId, guesserId: result.guesserId, statements: [result.statementOne, result.statementTwo, result.statementThree] });
+      if (result.result === "timeout") setTimeoutNotice({ playerId: result.drinkerId, roundNumber: result.roundNumber, stage: result.timeoutStage ?? "guessing" });
+      else setReveal({ correct: result.result === "correct", truthIndex: result.truthIndex, drinkerId: result.drinkerId, roundNumber: result.roundNumber, authorId: result.authorId, guesserId: result.guesserId, statements: [result.statementOne, result.statementTwo, result.statementThree] });
       setSeenRevealRound(result.roundNumber);
     }
   }, [game, seenRevealRound]);
@@ -263,7 +277,7 @@ export default function GameClient() {
       <header className="topbar">
         <button className="brand" onClick={leave} aria-label="Back to home"><span>HONTO</span><b>?!</b></button>
         <div className="room-pill"><span className="live-dot" /> {t.room} <strong>{game.room.code}</strong></div>
-        <div className="session-tools">{game.room.status !== "lobby" && <div className="session-control"><span className="session-clock">{game.room.sessionPaused ? t.paused : t.session} {formatClock(elapsedSeconds)}</span>{me?.isHost && <button className="session-pause" type="button" aria-label={game.room.sessionPaused ? t.resume : t.pause} title={game.room.sessionPaused ? t.resume : t.pause} onClick={() => act("pause")}><PauseIcon paused={game.room.sessionPaused} /></button>}</div>}<button className="tiny-button" onClick={leave}>{t.common.exit}</button></div>
+        <div className="session-tools">{game.room.status !== "lobby" && <div className="session-control"><div className="session-clock"><span>{game.room.sessionPaused ? t.paused : t.session} {formatClock(elapsedSeconds)}</span>{me?.isHost && <button className="session-pause" type="button" aria-label={game.room.sessionPaused ? t.resume : t.pause} title={game.room.sessionPaused ? t.resume : t.pause} onClick={() => act("pause")}><PauseIcon paused={game.room.sessionPaused} /></button>}</div></div>}<button className="tiny-button" onClick={leave}>{t.common.exit}</button></div>
       </header>
       {error && <div className="toast error-toast" role="alert">{error}<button onClick={() => setError("")}>×</button></div>}
       {game.room.status === "lobby" && <Lobby game={game} me={me} busy={busy} copied={copied} copyInvite={copyInvite} act={act} />}
@@ -273,7 +287,7 @@ export default function GameClient() {
             <span>{t.round} <b>{game.room.currentRound}</b>/{game.room.roundCount}</span>
             <div className="progress"><i style={{ width: `${(game.room.currentRound / game.room.roundCount) * 100}%` }} /></div>
             {nextTimerSip !== null && <span className={`timer ${nextTimerSip === 0 ? "urgent" : ""}`}>{t.groupSipIn} {formatClock(nextTimerSip)}</span>}
-            {turnRemaining !== null && <span className={`timer ${turnRemaining < 30 ? "urgent" : ""}`}>⏱ {formatClock(turnRemaining)}</span>}
+            {turnRemaining !== null && <span className={`timer ${turnRemaining < 30 ? "urgent" : ""} ${turnRemaining <= 10 ? "countdown-alert" : ""}`} aria-live="polite">⏱ {formatClock(turnRemaining)}{turnRemaining <= 10 ? " · TIME" : ""}</span>}
           </div>
           <ScoreRail players={game.players} meId={game.meId} />
           {!game.activeRound && author?.id === game.meId && <Writer prompt={prompt} setPrompt={setPrompt} newPrompt={newPrompt} suggestPrompt={suggestPrompt} suggestingPrompt={suggestingPrompt} truthText={truthText} setTruthText={setTruthText} lieOptions={lieOptions} selectedLies={selectedLies} toggleLie={toggleLie} updateLie={updateLie} generateLies={generateLies} generatingLies={generatingLies} submit={submitStories} busy={busy} />}
@@ -285,6 +299,7 @@ export default function GameClient() {
       {game.room.status === "finished" && <Finished players={game.players} leave={leave} />}
       {reveal && <Reveal reveal={reveal} players={game.players} meId={game.meId} close={() => { setReveal(null); refresh(); }} groupSipEvery={game.room.groupSipEvery && reveal.roundNumber % game.room.groupSipEvery === 0 ? game.room.groupSipEvery : null} />}
       {reminderOpen && <ReminderModal close={closeReminder} minutes={game.room.timerMinutes ?? 0} />}
+      {timeoutNotice && <TimeoutModal notice={timeoutNotice} players={game.players} close={() => { setTimeoutNotice(null); refresh(); }} />}
     </main>
   );
 }
@@ -387,6 +402,11 @@ function Waiting({ title, text }: { title: string; text: string }) {
 
 function ReminderModal({ close, minutes }: { close: () => void; minutes: number }) {
   return <div className="modal-backdrop"><div className="reminder-card"><div className="reminder-icon">{t.reminder.icon}</div><span className="eyebrow">{t.reminder.title}</span><h2>{`Everyone sips because the ${minutes}-minute reminder is up.`}</h2><button className="primary-button" onClick={close}>{t.reminder.ok}</button></div></div>;
+}
+
+function TimeoutModal({ notice, players, close }: { notice: { playerId: string; roundNumber: number; stage: "writing" | "guessing" }; players: Player[]; close: () => void }) {
+  const player = players.find((item) => item.id === notice.playerId)?.name ?? "A player";
+  return <div className="modal-backdrop"><div className="reminder-card timeout-card"><div className="reminder-icon">⏰</div><span className="eyebrow">TIME'S UP!</span><h2>{`${player} ran out of time.`}</h2><p>{`${player} takes a sip and the game moves to the next round.`}</p><button className="primary-button" onClick={close}>{t.reveal.next}</button></div></div>;
 }
 
 function Reveal({ reveal, players, meId, close, groupSipEvery }: { reveal: { correct: boolean; truthIndex: number; drinkerId: string; roundNumber: number; authorId: string; guesserId: string; statements: string[] }; players: Player[]; meId: string; close: () => void; groupSipEvery: number | null }) {
