@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import GameClient from "./game-client";
+import { getMessages } from "./i18n";
+
+const t = getMessages();
 
 export const metadata: Metadata = {
-  title: "HONTO?! — Duas mentiras. Uma verdade.",
-  description: "O party game online para descobrir quem conhece quem de verdade.",
+  title: t.meta.title,
+  description: t.meta.description,
 };
 
 export default function Home() {

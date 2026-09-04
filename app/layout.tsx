@@ -1,17 +1,19 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
+import { getMessages } from "./i18n";
 
 export async function generateMetadata(): Promise<Metadata> {
+  const t = getMessages();
   const requestHeaders = await headers();
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const socialImage = `${protocol}://${host}/og.png`;
   return {
-    title: "HONTO?! — Duas mentiras. Uma verdade.",
-    description: "Um party game online para dois ou mais amigos.",
-    openGraph: { title: "HONTO?!", description: "Duas mentiras. Uma verdade. Quem vai beber?", images: [socialImage] },
-    twitter: { card: "summary_large_image", title: "HONTO?!", description: "Duas mentiras. Uma verdade.", images: [socialImage] },
+    title: t.meta.title,
+    description: t.meta.description,
+    openGraph: { title: "HONTO?!", description: t.meta.socialDescription, images: [socialImage] },
+    twitter: { card: "summary_large_image", title: "HONTO?!", description: t.meta.socialDescription, images: [socialImage] },
   };
 }
 
@@ -21,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );
