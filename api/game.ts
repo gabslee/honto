@@ -151,6 +151,7 @@ export default async function handler(req: any, res: any) {
     }
     if (body.action === "timeout") {
       if (room.status !== "playing") throw new Error("The game is not in progress.");
+      if (room.session_paused) return json(res, await state(roomCode, token));
       const pendingMini = await sql`SELECT id FROM mini_games WHERE room_id = ${room.id} AND completed = false LIMIT 1`;
       if (pendingMini[0]) return json(res, await state(roomCode, token));
       const players = await sql`SELECT id FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
