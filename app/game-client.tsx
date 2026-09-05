@@ -263,7 +263,7 @@ export default function GameClient() {
     setSuggestingMiniQuestion(true); setError("");
     try {
       const categories = category === "session" || category === "custom" ? activeThemeKeys(game.room.themeCategory) : [category];
-      const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "question", category: categories, customTheme: category === "custom" || category === "session" ? game.room.customTheme : null, questionHint: hint.trim().slice(0, 160) }) });
+      const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "question", count: 3, category: categories, customTheme: category === "custom" || category === "session" ? game.room.customTheme : null, questionHint: hint.trim().slice(0, 160) }) });
       const data = await response.json() as { questions?: string[]; question?: string };
       const questions = data.questions?.filter((item): item is string => Boolean(item?.trim())).map((item) => item.trim()) ?? (data.question?.trim() ? [data.question.trim()] : []);
       if (!response.ok || questions.length < 3) throw new Error("We couldn't think of three questions.");
