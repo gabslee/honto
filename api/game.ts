@@ -140,6 +140,10 @@ export default async function handler(req: any, res: any) {
       if (!me.is_host || room.status !== "playing") throw new Error("Only the host can pause the session.");
       if (room.session_paused) {
         const extra = room.paused_at ? Math.max(0, Math.floor((Date.now() - new Date(room.paused_at).getTime()) / 1000)) : 0;
+        if (extra > 0) {
+          await sql`UPDATE rooms SET round_started_at = round_started_at + (${extra} * interval '1 second') WHERE id = ${room.id} AND round_started_at IS NOT NULL`;
+          await sql`UPDATE rounds SET created_at = created_at + (${extra} * interval '1 second') WHERE room_id = ${room.id} AND round_number = ${room.current_round} AND result IS NULL`;
+        }
         await sql`UPDATE rooms SET session_paused = false, paused_at = null, paused_seconds = paused_seconds + ${extra}, updated_at = now() WHERE id = ${room.id}`;
       } else {
         await sql`UPDATE rooms SET session_paused = true, paused_at = now(), updated_at = now() WHERE id = ${room.id}`;

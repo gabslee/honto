@@ -131,8 +131,9 @@ export default function GameClient() {
   const reminderRemainingSeconds = reminderTotalSeconds ? reminderTotalSeconds - (elapsedSeconds % reminderTotalSeconds) : null;
   const nextTimerSip = reminderZeroTick === reminderTick && reminderOpen ? 0 : reminderRemainingSeconds;
   const turnStartedAt = game?.activeRound?.createdAt ?? game?.room.roundStartedAt;
-  const turnLimit = game?.room.gameMode === "truth_sips" ? null : game?.activeRound ? game.room.guessTimerMinutes : game?.room.writeTimerMinutes;
-  const turnElapsed = turnStartedAt ? Math.max(0, Math.floor((now - parseTime(turnStartedAt)) / 1000)) : 0;
+  const turnLimit = game?.miniGame || game?.room.gameMode === "truth_sips" ? null : game?.activeRound ? game.room.guessTimerMinutes : game?.room.writeTimerMinutes;
+  const livePauseSeconds = game?.room.sessionPaused && game.room.pausedAt ? Math.floor((now - parseTime(game.room.pausedAt)) / 1000) : 0;
+  const turnElapsed = turnStartedAt ? Math.max(0, Math.floor((now - parseTime(turnStartedAt)) / 1000) - livePauseSeconds) : 0;
   const turnRemaining = turnLimit ? Math.max(0, turnLimit * 60 - turnElapsed) : null;
 
   useEffect(() => {
@@ -147,7 +148,7 @@ export default function GameClient() {
   }, [game?.room.status, game?.room.currentRound, game?.room.themeCategory, game?.room.customTheme, author?.id, game?.meId, promptPool.length, suggestingPrompt]);
 
   useEffect(() => {
-    if (!game || game.room.status !== "playing" || game.room.gameMode === "truth_sips" || game.miniGame || turnRemaining !== 0) return;
+    if (!game || game.room.status !== "playing" || game.room.sessionPaused || game.room.gameMode === "truth_sips" || game.miniGame || turnRemaining !== 0) return;
     const stage = game.activeRound ? "guessing" : "writing";
     const canExpire = stage === "writing" ? author?.id === game.meId : game.activeRound?.authorId !== game.meId;
     if (!canExpire) return;
