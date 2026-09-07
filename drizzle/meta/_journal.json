@@ -15,6 +15,13 @@
       "when": 1788472119368,
       "tag": "0001_watery_maelstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788807940000,
+      "tag": "0002_shared_deck",
+      "breakpoints": true
     }
   ]
 }

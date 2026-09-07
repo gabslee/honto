@@ -1,29 +1,48 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { themeCategories } from "./i18n";
 
+type ThemeKey = "mixed" | "family" | "innocent" | "life" | "flirty" | "spicy";
 type Player = { id: string; name: string; isHost: number; sips: number; joinedAt: string };
-type ActiveRound = {
-  id: string; roundNumber: number; authorId: string; authorName: string; prompt: string;
-  statementOne: string; statementTwo: string; statementThree: string;
-  guessedIndex: number | null; guesserId: string | null; result: string | null; truthIndex: number | null;
+type Card = {
+  id: string; cardNumber: number; type: "hidden" | "honto" | "question" | "preference" | "estimate" | "rps" | "both";
+  status: "hidden" | "ready" | "guess" | "choose" | "complete";
+  actorId: string; actorName: string; targetId: string; targetName: string;
+  payload: { prompt?: string; statements?: string[]; question?: string; sips?: number; options?: Array<number | string>; wrongGuesses?: number[]; hasChosen?: boolean; tieCount?: number };
+  secret?: { truthIndex?: number; preferenceIndex?: number; correctNumber?: number };
+  result: { correct?: boolean; guessedIndex?: number; choice?: "answer" | "skip"; drinkerId?: string | null; sips?: number; correctNumber?: number; wrongGuesses?: number[]; firstTry?: boolean; actorChoice?: RpsChoice; targetChoice?: RpsChoice; bothDrink?: boolean };
 };
 type GameState = {
-  room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; groupSipEvery: number | null; timerMinutes: number | null; startedAt: string | null };
-  players: Player[]; activeRound: ActiveRound | null; meId: string;
+  room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; themeCategory: string; customTheme: string | null; startedAt: string | null };
+  players: Player[]; activeCard: Card | null; lastCard: Card | null; meId: string;
 };
 
-const PROMPTS = [
-  "sua vida amorosa", "uma viagem que deu errado", "uma vergonha de infância",
-  "algo que você já fez escondido", "um encontro inesquecível", "uma habilidade inútil",
-  "uma festa que saiu do controle", "um medo completamente irracional", "uma mensagem enviada por engano",
-  "uma decisão impulsiva", "uma celebridade que você já encontrou", "um segredo de família inofensivo",
-];
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const THEME_KEYS: ThemeKey[] = ["mixed", "family", "innocent", "life", "flirty", "spicy"];
+const THEME_LABELS: Record<ThemeKey, string> = { mixed: "General", family: "Family", innocent: "Innocent & silly", life: "Life stories", flirty: "Flirty", spicy: "Spicy · 18+" };
+const CARD_META = {
+  honto: { icon: "🤥", label: "TWO LIES, ONE TRUTH", color: "yellow" },
+  question: { icon: "❓", label: "QUESTION OR SIPS", color: "mint" },
+  preference: { icon: "🧠", label: "READ MY MIND", color: "blue" },
+  estimate: { icon: "🎯", label: "NUMBER ESTIMATE", color: "pink" },
+  rps: { icon: "✊", label: "ROCK PAPER SCISSORS", color: "blue" },
+  both: { icon: "🍻", label: "BOTH DRINK", color: "yellow" },
+} as const;
+type RpsChoice = "rock" | "paper" | "scissors";
 
+function storedThemes(value?: string | null): ThemeKey[] {
+  if (!value || value === "safe") return [];
+  return value.split(",").filter((key): key is ThemeKey => THEME_KEYS.includes(key as ThemeKey));
+}
+function activeThemes(value?: string | null) {
+  const selected = storedThemes(value);
+  return selected.length ? selected : ["mixed", "family", "innocent", "life"] as ThemeKey[];
+}
 async function gameApi(body: Record<string, unknown>) {
   const response = await fetch("/api/game", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? "Algo deu errado.");
+  if (!response.ok) throw new Error(data.error ?? "Something went wrong.");
   return data;
 }
 
@@ -36,18 +55,17 @@ export default function GameClient() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [promptIndex, setPromptIndex] = useState(0);
-  const [prompt, setPrompt] = useState(PROMPTS[0]);
-  const [statements, setStatements] = useState(["", "", ""]);
-  const [truthIndex, setTruthIndex] = useState<number | null>(null);
-  const [reveal, setReveal] = useState<{ correct: boolean; truthIndex: number; drinkerId: string; roundNumber: number; statements: string[] } | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [dismissedReveal, setDismissedReveal] = useState<string | null>(null);
 
   useEffect(() => {
+    const room = new URLSearchParams(location.search).get("room")?.toUpperCase() ?? "";
     const saved = localStorage.getItem("honto-session");
-    if (saved) { try { setSession(JSON.parse(saved)); } catch { localStorage.removeItem("honto-session"); } }
-    const room = new URLSearchParams(location.search).get("room");
-    if (room) { setJoinCode(room.toUpperCase()); setMode("join"); }
+    if (saved) try {
+      const parsed = JSON.parse(saved) as { code?: string; token?: string; savedAt?: number };
+      if (parsed.code && parsed.token && parsed.savedAt && Date.now() - parsed.savedAt < SESSION_TTL_MS && (!room || room === parsed.code)) setSession({ code: parsed.code, token: parsed.token });
+      else localStorage.removeItem("honto-session");
+    } catch { localStorage.removeItem("honto-session"); }
+    if (room) { setJoinCode(room); setMode("join"); }
   }, []);
 
   const refresh = useCallback(async (quiet = false) => {
@@ -55,172 +73,172 @@ export default function GameClient() {
     try {
       const response = await fetch(`/api/game?code=${encodeURIComponent(session.code)}&token=${encodeURIComponent(session.token)}`, { cache: "no-store" });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Não foi possível atualizar a sala.");
+      if (!response.ok) throw new Error(data.error ?? "This room is no longer available.");
       setGame(data);
       if (!quiet) setError("");
-    } catch (cause) { if (!quiet) setError(cause instanceof Error ? cause.message : "Erro de conexão."); }
+    } catch (cause) { if (!quiet) setError(cause instanceof Error ? cause.message : "Connection error."); }
   }, [session]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {
     if (!session) return;
-    const timer = window.setInterval(() => refresh(true), 2200);
+    const timer = window.setInterval(() => void refresh(true), 1800);
     return () => window.clearInterval(timer);
   }, [session, refresh]);
-  useEffect(() => {
-    if (!game?.room.startedAt) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [game?.room.startedAt]);
-
-  const me = game?.players.find((player) => player.id === game.meId);
-  const author = game ? game.players[(game.room.currentRound - 1) % game.players.length] : null;
-  const elapsedMinutes = game?.room.startedAt ? Math.floor((now - new Date(`${game.room.startedAt}Z`).getTime()) / 60000) : 0;
-  const nextTimerSip = game?.room.timerMinutes ? game.room.timerMinutes - (elapsedMinutes % game.room.timerMinutes) : null;
 
   async function enter(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
       const data = await gameApi({ action: mode, name, code: joinCode });
       const next = { code: data.code, token: data.token };
-      localStorage.setItem("honto-session", JSON.stringify(next)); setSession(next);
-      history.replaceState(null, "", `?room=${data.code}`);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Não foi possível entrar."); }
+      localStorage.setItem("honto-session", JSON.stringify({ ...next, savedAt: Date.now() }));
+      history.replaceState({}, "", `?room=${encodeURIComponent(data.code)}`); setSession(next);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "We couldn't enter the room."); }
     finally { setBusy(false); }
   }
 
   async function act(action: string, extras: Record<string, unknown> = {}) {
-    if (!session) return;
+    if (!session) return null;
     setBusy(true); setError("");
-    try {
-      const data = await gameApi({ action, ...session, ...extras });
-      if (data.room) setGame(data);
-      return data;
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Algo deu errado."); }
+    try { const data = await gameApi({ action, ...session, ...extras }); setGame(data); return data; }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Something went wrong."); return null; }
     finally { setBusy(false); }
   }
 
   function leave() {
-    localStorage.removeItem("honto-session"); setSession(null); setGame(null); setReveal(null);
-    history.replaceState(null, "", location.pathname);
+    localStorage.removeItem("honto-session"); history.replaceState({}, "", location.pathname);
+    setSession(null); setGame(null); setDismissedReveal(null);
   }
 
-  async function copyInvite() {
-    const url = `${location.origin}${location.pathname}?room=${session?.code}`;
-    await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1600);
-  }
+  if (!session) return <Landing name={name} setName={setName} joinCode={joinCode} setJoinCode={setJoinCode} mode={mode} setMode={setMode} enter={enter} busy={busy} error={error} />;
+  if (!game) return <main className="loading"><div className="stamp">HONTO?!</div><p>Shuffling the deck…</p>{error && <p className="form-error">{error}</p>}</main>;
 
-  function newPrompt() {
-    const next = (promptIndex + 1) % PROMPTS.length; setPromptIndex(next); setPrompt(PROMPTS[next]);
-  }
+  const host = game.players.find((player) => player.id === game.meId)?.isHost;
+  const reveal = game.lastCard && game.lastCard.id !== dismissedReveal ? game.lastCard : null;
+  const copyInvite = async () => { await navigator.clipboard.writeText(`${location.origin}${location.pathname}?room=${game.room.code}`); setCopied(true); window.setTimeout(() => setCopied(false), 1600); };
 
-  async function submitStories(event: FormEvent) {
-    event.preventDefault();
-    const result = await act("submit", { prompt, statements, truthIndex });
-    if (result) { setStatements(["", "", ""]); setTruthIndex(null); newPrompt(); }
-  }
-
-  async function guess(index: number) {
-    if (!game?.activeRound) return;
-    const currentStatements = [game.activeRound.statementOne, game.activeRound.statementTwo, game.activeRound.statementThree];
-    const data = await act("guess", { guessedIndex: index });
-    if (data?.reveal) setReveal({ ...data.reveal, statements: currentStatements });
-  }
-
-  if (!session) return <Landing mode={mode} setMode={setMode} name={name} setName={setName} code={joinCode} setCode={setJoinCode} enter={enter} busy={busy} error={error} />;
-  if (!game) return <main className="loading"><div className="stamp">本当?!</div><p>Montando a mesa…</p><button className="text-button" onClick={leave}>Voltar</button></main>;
-
-  return (
-    <main className="app-shell">
-      <header className="topbar">
-        <button className="brand" onClick={leave} aria-label="Voltar ao início"><span>HONTO</span><b>?!</b></button>
-        <div className="room-pill"><span className="live-dot" /> SALA <strong>{game.room.code}</strong></div>
-        <button className="tiny-button" onClick={leave}>Sair</button>
-      </header>
-      {error && <div className="toast error-toast" role="alert">{error}<button onClick={() => setError("")}>×</button></div>}
-      {game.room.status === "lobby" && <Lobby game={game} me={me} busy={busy} copied={copied} copyInvite={copyInvite} act={act} />}
-      {game.room.status === "playing" && (
-        <section className="game-stage">
-          <div className="round-strip">
-            <span>RODADA <b>{game.room.currentRound}</b>/{game.room.roundCount}</span>
-            <div className="progress"><i style={{ width: `${(game.room.currentRound / game.room.roundCount) * 100}%` }} /></div>
-            {nextTimerSip && <span className="timer">🥂 geral em {nextTimerSip} min</span>}
-          </div>
-          <ScoreRail players={game.players} meId={game.meId} />
-          {!game.activeRound && author?.id === game.meId && <Writer prompt={prompt} setPrompt={setPrompt} newPrompt={newPrompt} statements={statements} setStatements={setStatements} truthIndex={truthIndex} setTruthIndex={setTruthIndex} submit={submitStories} busy={busy} />}
-          {!game.activeRound && author?.id !== game.meId && <Waiting title={`${author?.name} está aprontando…`} text="Preparando duas mentiras bem convincentes e uma verdade." />}
-          {game.activeRound && game.activeRound.authorId === game.meId && <Waiting title="Histórias enviadas!" text="Agora segura a expressão e espera o palpite." />}
-          {game.activeRound && game.activeRound.authorId !== game.meId && <Guesser round={game.activeRound} onGuess={guess} busy={busy} />}
-        </section>
-      )}
-      {game.room.status === "finished" && <Finished players={game.players} leave={leave} />}
-      {reveal && <Reveal reveal={reveal} players={game.players} close={() => { setReveal(null); refresh(); }} groupSip={Boolean(game.room.groupSipEvery && reveal.roundNumber % game.room.groupSipEvery === 0)} />}
-    </main>
-  );
-}
-
-function Landing(props: { mode: "create" | "join"; setMode: (m: "create" | "join") => void; name: string; setName: (v: string) => void; code: string; setCode: (v: string) => void; enter: (e: FormEvent) => void; busy: boolean; error: string }) {
-  return <main className="landing">
-    <div className="doodle doodle-one">嘘</div><div className="doodle doodle-two">本当</div>
-    <nav><div className="logo"><span>HONTO</span><b>?!</b></div><span className="microcopy">TWO LIES. ONE TRUTH.</span></nav>
-    <section className="hero">
-      <div className="hero-copy"><div className="eyebrow">PARTY GAME ONLINE ・ 2–8 PESSOAS</div><h1>Você conhece<br/><em>mesmo</em> essa pessoa?</h1><p>Conte duas mentiras, esconda uma verdade e descubra quem vai pagar a rodada.</p><div className="rule-cards"><span><b>①</b> CONTE</span><span><b>②</b> BLEFE</span><span><b>③</b> BRINDE</span></div></div>
-      <form className="entry-card" onSubmit={props.enter}>
-        <div className="card-tabs"><button type="button" className={props.mode === "create" ? "active" : ""} onClick={() => props.setMode("create")}>Criar sala</button><button type="button" className={props.mode === "join" ? "active" : ""} onClick={() => props.setMode("join")}>Entrar</button></div>
-        <label>COMO TE CHAMAM?<input autoFocus value={props.name} onChange={(e) => props.setName(e.target.value)} placeholder="Seu nome ou apelido" maxLength={24}/></label>
-        {props.mode === "join" && <label>CÓDIGO DA SALA<input value={props.code} onChange={(e) => props.setCode(e.target.value.toUpperCase())} placeholder="YUZU-42" maxLength={12}/></label>}
-        {props.error && <p className="form-error">{props.error}</p>}
-        <button className="primary-button" disabled={props.busy}>{props.busy ? "Só um segundo…" : props.mode === "create" ? "CRIAR A MESA →" : "ENTRAR NA RODADA →"}</button>
-        <small>Sem cadastro. Traga uma bebida — com ou sem álcool.</small>
-      </form>
-    </section>
-    <footer>本当？ <span>HONTO?</span> QUER DIZER “É VERDADE?” EM JAPONÊS.</footer>
+  return <main className="app-shell">
+    <header className="topbar"><button className="brand" onClick={leave}><span>HONTO?</span><b>!</b></button><div className="room-pill"><span className="live-dot"/>ROOM <strong>{game.room.code}</strong></div><div className="session-tools"><button className="tiny-button" onClick={leave}>EXIT</button></div></header>
+    {error && <div className="toast error-toast">{error}<button onClick={() => setError("")}>×</button></div>}
+    {game.room.status === "lobby" && <Lobby game={game} host={Boolean(host)} busy={busy} copied={copied} copyInvite={copyInvite} act={act} />}
+    {game.room.status === "playing" && <GameTable game={game} busy={busy} act={act} />}
+    {game.room.status === "finished" && <Finished players={game.players} leave={leave} />}
+    {reveal && <Reveal card={reveal} players={game.players} meId={game.meId} close={() => setDismissedReveal(reveal.id)} />}
   </main>;
 }
 
-function Lobby({ game, me, busy, copied, copyInvite, act }: { game: GameState; me?: Player; busy: boolean; copied: boolean; copyInvite: () => void; act: (action: string, extras?: Record<string, unknown>) => Promise<any> }) {
-  const host = Boolean(me?.isHost);
-  return <section className="lobby">
-    <div className="lobby-head"><span className="eyebrow">AQUECENDO OS COPOS</span><h1>A mesa está <em>quase</em> pronta.</h1><p>Chame alguém com coragem para mentir olhando na sua cara.</p></div>
-    <div className="lobby-grid">
-      <div className="panel people-panel"><div className="panel-title"><h2>Na mesa</h2><span>{game.players.length}/8</span></div><div className="people-list">{game.players.map((player, index) => <div className="person" key={player.id}><span className={`avatar avatar-${index % 4}`}>{player.name[0]?.toUpperCase()}</span><div><strong>{player.name}</strong><small>{player.id === game.meId ? "você" : player.isHost ? "anfitrião" : "pronto para blefar"}</small></div>{player.isHost ? <b className="crown">♛</b> : <i>✓</i>}</div>)}</div><button className="invite-button" onClick={copyInvite}>{copied ? "LINK COPIADO! ✓" : "COPIAR LINK DO CONVITE"}</button></div>
-      <div className="panel settings-panel"><div className="panel-title"><h2>Regras da noite</h2><span className="sticker">VOCÊS MANDAM</span></div>
-        <Setting label="Tamanho da partida" value={game.room.roundCount} options={[10,20,30]} suffix=" rodadas" disabled={!host} onChange={(roundCount) => act("configure", { roundCount, groupSipEvery: game.room.groupSipEvery, timerMinutes: game.room.timerMinutes })}/>
-        <Setting label="Todo mundo brinda" value={game.room.groupSipEvery ?? 0} options={[0,3,5]} labels={["Nunca","A cada 3","A cada 5"]} disabled={!host} onChange={(groupSipEvery) => act("configure", { roundCount: game.room.roundCount, groupSipEvery: groupSipEvery || null, timerMinutes: game.room.timerMinutes })}/>
-        <Setting label="Lembrete por tempo" value={game.room.timerMinutes ?? 0} options={[0,10,15]} labels={["Desligado","10 min","15 min"]} disabled={!host} onChange={(timerMinutes) => act("configure", { roundCount: game.room.roundCount, groupSipEvery: game.room.groupSipEvery, timerMinutes: timerMinutes || null })}/>
-        {host ? <button className="primary-button start-button" disabled={busy || game.players.length < 2} onClick={() => act("start")}>{game.players.length < 2 ? "ESPERANDO +1 PESSOA…" : "COMEÇAR O JOGO →"}</button> : <div className="host-note">O anfitrião escolhe as regras e começa.</div>}
-      </div>
-    </div>
-  </section>;
+function Landing(props: { name: string; setName: (value: string) => void; joinCode: string; setJoinCode: (value: string) => void; mode: "create" | "join"; setMode: (value: "create" | "join") => void; enter: (event: FormEvent) => void; busy: boolean; error: string }) {
+  return <main className="landing"><nav><div className="logo"><span>HONTO?</span><b>!</b></div><span className="microcopy">A SHARED DECK FOR TWO</span></nav><section className="hero"><div className="hero-copy"><span className="eyebrow">ONLINE PARTY GAME · 2 PLAYERS</span><h1>Draw a card.<br/><em>Read each other.</em></h1><p>Bluff, ask, read their mind, estimate, or battle. Every card decides who takes the next sip.</p><div className="rule-cards"><span><b>1</b>BLUFF</span><span><b>2</b>ASK</span><span><b>3</b>READ</span><span><b>4</b>ESTIMATE</span><span><b>5</b>RPS</span><span><b>6</b>BOTH</span></div></div><form className="entry-card" onSubmit={props.enter}><div className="card-tabs"><button type="button" className={props.mode === "create" ? "active" : ""} onClick={() => props.setMode("create")}>Create room</button><button type="button" className={props.mode === "join" ? "active" : ""} onClick={() => props.setMode("join")}>Join room</button></div><label>WHAT SHOULD WE CALL YOU?<input value={props.name} onChange={(event) => props.setName(event.target.value)} maxLength={24} placeholder="Your name or nickname" required /></label>{props.mode === "join" && <label>ROOM CODE<input value={props.joinCode} onChange={(event) => props.setJoinCode(event.target.value.toUpperCase())} maxLength={16} placeholder="MOON-42" required /></label>}{props.error && <p className="form-error">{props.error}</p>}<button className="primary-button" disabled={props.busy}>{props.busy ? "ONE SECOND…" : props.mode === "create" ? "CREATE THE DECK →" : "JOIN THE GAME →"}</button><small>No account needed. Alcoholic or non-alcoholic drinks both count.</small></form></section><footer>HONTO MEANS “IS IT TRUE?” IN JAPANESE.</footer></main>;
 }
 
-function Setting({ label, value, options, labels, suffix="", disabled, onChange }: { label: string; value: number; options: number[]; labels?: string[]; suffix?: string; disabled: boolean; onChange: (v: number) => void }) {
-  return <div className="setting"><label>{label}</label><div className="segmented">{options.map((option, index) => <button key={option} disabled={disabled} className={value === option ? "active" : ""} onClick={() => onChange(option)}>{labels?.[index] ?? `${option}${suffix}`}</button>)}</div></div>;
+function Lobby({ game, host, busy, copied, copyInvite, act }: { game: GameState; host: boolean; busy: boolean; copied: boolean; copyInvite: () => void; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
+  const selected = storedThemes(game.room.themeCategory);
+  const configure = (extra: Record<string, unknown>) => act("configure", { roundCount: game.room.roundCount, themeCategory: game.room.themeCategory, customTheme: game.room.customTheme, ...extra });
+  const toggleTheme = (key: ThemeKey) => { const next = selected.includes(key) ? selected.filter((item) => item !== key) : [...selected, key]; void configure({ themeCategory: next.join(",") }); };
+  return <section className="lobby"><div className="lobby-head"><span className="eyebrow">SHUFFLING THE CARDS</span><h1>Your deck is <em>almost</em> ready.</h1><p>Invite one person. This table has exactly two seats.</p></div><div className="lobby-grid"><div className="panel"><div className="panel-title"><h2>At the table</h2><span>{game.players.length}/2</span></div><div className="people-list">{game.players.map((player, index) => <div className="person" key={player.id}><span className={`avatar avatar-${index}`}>{player.name[0]}</span><div><strong>{player.name}</strong><small>{player.isHost ? "host" : "ready to play"}</small></div><i>●</i></div>)}</div><button className="invite-button" onClick={copyInvite}>{copied ? "LINK COPIED! ✓" : "COPY INVITE LINK"}</button></div><div className="panel"><div className="panel-title"><h2>The deck</h2><span className="sticker">6 CARD TYPES</span></div><div className="setting"><label>Number of cards</label><div className="segmented">{[8, 12, 16, 24].map((count) => <button key={count} disabled={!host} className={game.room.roundCount === count ? "active" : ""} onClick={() => configure({ roundCount: count })}>{count}</button>)}</div></div><div className="setting"><label>Theme categories</label><p className="setting-hint">These guide AI ideas for stories and questions.</p><div className="subject-checks">{THEME_KEYS.map((key) => <label className={`subject-check ${key === "spicy" ? "spicy-check" : ""} ${selected.includes(key) ? "selected" : ""}`} key={key}><input type="checkbox" checked={selected.includes(key)} disabled={!host} onChange={() => toggleTheme(key)} /><span>{THEME_LABELS[key]}</span></label>)}</div></div><div className="setting"><label>Optional custom subject</label><input className="custom-setting" defaultValue={game.room.customTheme ?? ""} disabled={!host} placeholder="e.g. our travel stories" onBlur={(event) => configure({ customTheme: event.target.value })}/></div>{host ? <button className="primary-button start-button" disabled={busy || game.players.length !== 2} onClick={() => act("start")}>{game.players.length === 2 ? "SHUFFLE & START →" : "WAITING FOR PLAYER TWO…"}</button> : <div className="host-note">The host is choosing the deck.</div>}</div></div></section>;
 }
 
-function ScoreRail({ players, meId }: { players: Player[]; meId: string }) {
-  return <aside className="score-rail">{players.map((p, i) => <div key={p.id}><span className={`avatar avatar-${i % 4}`}>{p.name[0]}</span><strong>{p.name}{p.id === meId ? " · você" : ""}</strong><small>{p.sips} {p.sips === 1 ? "gole" : "goles"}</small></div>)}</aside>;
+function GameTable({ game, busy, act }: { game: GameState; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
+  const card = game.activeCard;
+  let content;
+  if (!card) content = <Waiting title="Finding the next card…" text="The shared deck is syncing."/>;
+  else if (card.status === "hidden") content = <DrawCard key={card.id} card={card} meId={game.meId} busy={busy} draw={() => act("drawCard")}/>;
+  else if (card.type === "honto") content = <HontoCard key={card.id} card={card} meId={game.meId} game={game} busy={busy} act={act}/>;
+  else if (card.type === "question") content = <QuestionCard key={card.id} card={card} meId={game.meId} game={game} busy={busy} act={act}/>;
+  else if (card.type === "preference") content = <PreferenceCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
+  else if (card.type === "estimate") content = <EstimateCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
+  else if (card.type === "rps") content = <RpsCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
+  else content = <BothDrinkCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
+  return <section className="game-stage"><div className="round-strip"><span>CARD</span><b>{game.room.currentRound}/{game.room.roundCount}</b><div className="progress"><i style={{ width: `${(game.room.currentRound / game.room.roundCount) * 100}%` }}/></div><span>{game.room.roundCount - game.room.currentRound} LEFT IN THE DECK</span></div><ScoreRail players={game.players} meId={game.meId}/>{content}</section>;
 }
 
-function Writer({ prompt, setPrompt, newPrompt, statements, setStatements, truthIndex, setTruthIndex, submit, busy }: { prompt: string; setPrompt: (v: string) => void; newPrompt: () => void; statements: string[]; setStatements: (v: string[]) => void; truthIndex: number | null; setTruthIndex: (v: number) => void; submit: (e: FormEvent) => void; busy: boolean }) {
-  return <form className="play-card writer" onSubmit={submit}><span className="turn-badge">SUA VEZ DE CONTAR</span><h2>Duas mentiras e uma verdade sobre…</h2><div className="prompt-row"><input value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={100}/><button type="button" onClick={newPrompt}>✨ outra ideia</button></div><p className="hint">Escreva de um jeito parecido para não entregar o jogo. Só você verá qual é a verdade.</p><div className="story-inputs">{statements.map((statement, index) => <label key={index} className={truthIndex === index ? "is-truth" : ""}><span>{index + 1}</span><textarea value={statement} onChange={(e) => { const next = [...statements]; next[index] = e.target.value; setStatements(next); }} placeholder={index === 0 ? "Eu já…" : index === 1 ? "Uma vez eu…" : "Ninguém sabe, mas eu…"} maxLength={180}/><button type="button" onClick={() => setTruthIndex(index)}>{truthIndex === index ? "✓ VERDADE" : "MARCAR VERDADE"}</button></label>)}</div><button className="primary-button" disabled={busy}>ENVIAR AS TRÊS →</button></form>;
+function DrawCard({ card, meId, busy, draw }: { card: Card; meId: string; busy: boolean; draw: () => Promise<unknown> }) {
+  const mine = card.actorId === meId;
+  const cardFace = <><span className="playing-card-corner top">本当<small>?!</small></span><span className="playing-card-mark">!</span><span className="playing-card-center"><i>本当</i><strong>HONTO?!</strong><small>{mine ? "DRAW" : "WAIT"}</small></span><span className="playing-card-corner bottom">本当<small>?!</small></span></>;
+  return <div className="play-card deck-draw"><span className="turn-badge">CARD {card.cardNumber}</span><h2>{mine ? "Your turn to draw." : `${card.actorName} is drawing the next card…`}</h2><p className="hint">{mine ? "Tap the card to reveal what comes next." : "The card will turn over on both screens."}</p><div className="draw-card-zone">{mine ? <button className="honto-playing-card" aria-label="Draw the next Honto card" disabled={busy} onClick={draw}>{cardFace}</button> : <div className="honto-playing-card waiting-card" aria-hidden="true">{cardFace}</div>}</div></div>;
 }
 
-function Guesser({ round, onGuess, busy }: { round: ActiveRound; onGuess: (i: number) => void; busy: boolean }) {
-  const stories = [round.statementOne, round.statementTwo, round.statementThree];
-  return <div className="play-card guesser"><span className="turn-badge pink">AGORA É COM VOCÊ</span><h2>Qual é a verdade de <em>{round.authorName}</em>?</h2><p className="prompt-caption">TEMA: {round.prompt.toUpperCase()}</p><div className="story-cards">{stories.map((story, index) => <button disabled={busy} onClick={() => onGuess(index)} key={index}><span>0{index + 1}</span><p>{story}</p><b>ISSO É VERDADE</b></button>)}</div><small>Escolheu, escolheu. Não dá para voltar.</small></div>;
+function HontoCard({ card, meId, game, busy, act }: { card: Card; meId: string; game: GameState; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
+  if (card.status === "ready") return card.actorId === meId ? <HontoComposer card={card} game={game} busy={busy} act={act}/> : <Waiting title={`${card.actorName} is preparing a bluff…`} text="Two lies and one carefully hidden truth are on the way."/>;
+  if (card.status === "guess") return card.targetId === meId ? <div className="play-card guesser"><CardBadge type="honto"/><h2>Which one is <em>{card.actorName}</em>&apos;s truth?</h2><p className="prompt-caption">THEME: {card.payload.prompt?.toUpperCase()}</p><div className="story-cards">{card.payload.statements?.map((story, index) => <button disabled={busy} onClick={() => act("guessHonto", { guessedIndex: index })} key={index}><span>0{index + 1}</span><p>{story}</p><b>THIS IS TRUE</b></button>)}</div><small><SipMug/> Your guess decides who faces the 1–3 sip wheel.</small></div> : <Waiting title="Your stories are on the table." text={`${card.targetName} is trying to find the truth.`}/>;
+  return null;
 }
 
-function Waiting({ title, text }: { title: string; text: string }) {
-  return <div className="play-card waiting"><div className="bobble">🤥</div><span className="turn-badge">AGUARDE UM POUQUINHO</span><h2>{title}</h2><p>{text}</p><div className="typing"><i/><i/><i/></div></div>;
+function HontoComposer({ card, game, busy, act }: { card: Card; game: GameState; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
+  const localPrompts = activeThemes(game.room.themeCategory).flatMap((key) => themeCategories[key]);
+  const [prompt, setPrompt] = useState<string>(localPrompts[Math.floor(Math.random() * localPrompts.length)] ?? "a story your friend does not know");
+  const [truth, setTruth] = useState(""); const [lies, setLies] = useState<string[]>([]); const [selected, setSelected] = useState<number[]>([]); const [generating, setGenerating] = useState(false);
+  const generate = async () => { setGenerating(true); try { const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "lies", truth, prompt, category: activeThemes(game.room.themeCategory) }) }); const data = await response.json(); if (!response.ok || !Array.isArray(data.lies)) throw new Error("No ideas available."); setLies(data.lies); setSelected([]); } finally { setGenerating(false); } };
+  const submit = async (event: FormEvent) => { event.preventDefault(); const chosen = selected.map((index) => lies[index]).filter(Boolean); if (chosen.length !== 2) return; const entries = [{ text: truth.trim(), truth: true }, ...chosen.map((text) => ({ text: text.trim(), truth: false }))].sort(() => Math.random() - .5); await act("submitHonto", { prompt, statements: entries.map((entry) => entry.text), truthIndex: entries.findIndex((entry) => entry.truth) }); };
+  return <form className="play-card writer" onSubmit={submit}><CardBadge type="honto"/><h2>Start with one truth about…</h2><div className="prompt-row"><textarea className="prompt-input" value={prompt} onChange={(event) => setPrompt(event.target.value)} maxLength={140}/><button type="button" onClick={() => setPrompt(localPrompts[Math.floor(Math.random() * localPrompts.length)])}>ANOTHER IDEA</button></div><label className="truth-editor"><span>YOUR TRUTH</span><textarea value={truth} onChange={(event) => setTruth(event.target.value)} maxLength={180} placeholder="Type one true story about yourself…"/></label><button type="button" className="ai-button" onClick={generate} disabled={generating || !truth.trim()}>{generating ? "WRITING LIES…" : "GENERATE 5 LIES ✦"}</button>{lies.length > 0 && <><p className="hint">Choose two. You can edit them before sending.</p><div className="lie-options">{lies.map((lie, index) => <label key={index} className={selected.includes(index) ? "selected" : ""}><input type="checkbox" checked={selected.includes(index)} onChange={() => setSelected((current) => current.includes(index) ? current.filter((item) => item !== index) : current.length < 2 ? [...current, index] : current)}/><textarea value={lie} maxLength={180} onChange={(event) => setLies((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}/><b>{selected.includes(index) ? "SELECTED" : "SELECT"}</b></label>)}</div><button className="primary-button" disabled={busy || selected.length !== 2}>SEND THREE STORIES →</button></>}</form>;
 }
 
-function Reveal({ reveal, players, close, groupSip }: { reveal: { correct: boolean; truthIndex: number; drinkerId: string; roundNumber: number; statements: string[] }; players: Player[]; close: () => void; groupSip: boolean }) {
-  const drinker = players.find((p) => p.id === reveal.drinkerId)?.name;
-  return <div className="modal-backdrop"><div className={`reveal-card ${reveal.correct ? "correct" : "wrong"}`}><div className="result-mark">{reveal.correct ? "✓" : "×"}</div><span className="eyebrow">{reveal.correct ? "NA MOSCA!" : "CAIU NO BLEFE!"}</span><h2>{reveal.correct ? `${drinker} bebe.` : `${drinker}, é sua vez de beber.`}</h2><p>A verdade era:</p><blockquote>“{reveal.statements[reveal.truthIndex]}”</blockquote>{groupSip && <div className="group-sip">🥂 E a regra da sala mandou: todo mundo brinda!</div>}<button className="primary-button" onClick={close}>PRÓXIMA RODADA →</button></div></div>;
+function QuestionCard({ card, meId, game, busy, act }: { card: Card; meId: string; game: GameState; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
+  const [question, setQuestion] = useState(""); const [sips, setSips] = useState(1); const [ideas, setIdeas] = useState<string[]>([]); const [generating, setGenerating] = useState(false);
+  const generate = async () => { setGenerating(true); try { const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "question", count: 3, category: activeThemes(game.room.themeCategory), customTheme: game.room.customTheme }) }); const data = await response.json(); if (!response.ok || !Array.isArray(data.questions)) throw new Error("No questions available."); setIdeas(data.questions.slice(0, 3)); } finally { setGenerating(false); } };
+  if (card.status === "ready") return card.actorId === meId ? <div className="play-card question-card"><CardBadge type="question"/><h2>Ask <em>{card.targetName}</em> anything.</h2><p className="hint">If they answer out loud, you drink. If they skip, they drink.</p><textarea className="mini-game-input" value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={220} placeholder="Write your question…"/><button className="ai-button" onClick={generate} disabled={generating}>{generating ? "THINKING…" : "GET 3 AI QUESTIONS ✦"}</button>{ideas.length > 0 && <div className="question-option-list"><span>CHOOSE ONE</span>{ideas.map((idea) => <button key={idea} onClick={() => setQuestion(idea)}>{idea}</button>)}</div>}<SipPicker value={sips} onChange={setSips}/><button className="primary-button" disabled={busy || question.trim().length < 3} onClick={() => act("submitQuestion", { question, sips })}>SEND QUESTION →</button></div> : <Waiting title={`${card.actorName} is choosing a question…`} text="Answer honestly or take the sips."/>;
+  if (card.status === "choose") return card.targetId === meId ? <div className="play-card question-card"><CardBadge type="question"/><h2>{card.actorName} wants to know…</h2><blockquote className="big-question">{card.payload.question}</blockquote><p className="hint"><SipMug/> Answer out loud and {card.actorName} takes {card.payload.sips} {card.payload.sips === 1 ? "sip" : "sips"}. Skip and you take them.</p><div className="mini-game-actions"><button className="primary-button" disabled={busy} onClick={() => act("answerQuestion", { choice: "answer" })}>I&apos;LL ANSWER</button><button className="primary-button dare-button" disabled={busy} onClick={() => act("answerQuestion", { choice: "skip" })}><SipMug/> TAKE {card.payload.sips} SIPS</button></div></div> : <Waiting title={`${card.targetName} is deciding…`} text={card.payload.question ?? "The question is on the table."}/>;
+  return null;
+}
+
+function PreferenceCard({ card, meId, busy, act }: { card: Card; meId: string; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
+  const options = (card.payload.options ?? []).filter((option): option is string => typeof option === "string");
+  const choiceButtons = (action: "choosePreference" | "guessPreference") => <div className="preference-options">{options.map((option, index) => <button key={option} aria-label={`Option ${index + 1}: ${option}`} disabled={busy} onClick={() => act(action, { preferenceIndex: index })}><span className="preference-number">0{index + 1}</span><p className="preference-label">{option}</p><small>CHOOSE THIS</small></button>)}</div>;
+  if (card.status === "ready") return card.actorId === meId ? <div className="play-card preference-card"><CardBadge type="preference"/><h2>What would <em>you</em> choose?</h2><blockquote className="big-question">{card.payload.question}</blockquote><p className="hint">Choose secretly. {card.targetName} will try to read your mind.</p>{choiceButtons("choosePreference")}</div> : <Waiting title={`${card.actorName} is choosing secretly…`} text={card.payload.question ?? "Three options are on the table."}/>;
+  if (card.status === "guess") return card.targetId === meId ? <div className="play-card preference-card"><CardBadge type="preference"/><h2>Read <em>{card.actorName}</em>&apos;s mind.</h2><blockquote className="big-question">{card.payload.question}</blockquote><p className="hint"><SipMug/> Guess correctly and {card.actorName} faces the sip wheel. Miss and you face it.</p>{choiceButtons("guessPreference")}</div> : <Waiting title={`${card.targetName} is trying to read your mind…`} text={card.payload.question ?? "Your choice is locked."}/>;
+  return null;
+}
+
+function EstimateCard({ card, meId, busy, act }: { card: Card; meId: string; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
+  const [answer, setAnswer] = useState("");
+  if (card.status === "ready") return card.actorId === meId ? <div className="play-card estimate-card"><CardBadge type="estimate"/><h2>Give the real number.</h2><blockquote className="big-question">{card.payload.question}</blockquote><p className="hint">Your answer stays secret. We will mix it with four believable options.</p><input className="number-answer" type="number" min="0" max="1000000" step="1" inputMode="numeric" value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Your exact answer"/><button className="primary-button" disabled={busy || answer === ""} onClick={() => act("submitEstimate", { correctNumber: Number(answer) })}>LOCK MY ANSWER →</button></div> : <Waiting title={`${card.actorName} is locking in the real number…`} text={card.payload.question ?? "A numeric question is coming."}/>;
+  const wrong = card.payload.wrongGuesses ?? [];
+  const options = (card.payload.options ?? []).filter((option): option is number => typeof option === "number");
+  if (card.status === "guess") return card.targetId === meId ? <div className="play-card estimate-card"><CardBadge type="estimate"/><h2>How well do you know <em>{card.actorName}</em>?</h2><blockquote className="big-question">{card.payload.question}</blockquote><p className="hint"><SipMug/> A wrong guess costs one sip. Keep guessing until you find it.</p><div className="estimate-options">{options.map((option) => <button key={option} className={wrong.includes(option) ? "eliminated" : ""} disabled={busy || wrong.includes(option)} onClick={() => act("guessEstimate", { estimate: option })}><strong>{option.toLocaleString()}</strong>{wrong.includes(option) && <small><SipMug/> WRONG · 1 SIP</small>}</button>)}</div><p className="attempt-count">{wrong.length ? <><SipMug/> {wrong.length} wrong {wrong.length === 1 ? "guess" : "guesses"} · {wrong.length} {wrong.length === 1 ? "sip" : "sips"}</> : "First try: if you nail it, they drink."}</p></div> : <Waiting title={`${card.targetName} is estimating…`} text={`${wrong.length} wrong ${wrong.length === 1 ? "guess" : "guesses"} so far.`}/>;
+  return null;
+}
+
+const RPS_OPTIONS: Array<{ value: RpsChoice; icon: string; label: string }> = [
+  { value: "rock", icon: "✊", label: "ROCK" },
+  { value: "paper", icon: "✋", label: "PAPER" },
+  { value: "scissors", icon: "✌️", label: "SCISSORS" },
+];
+
+function RpsCard({ card, meId, busy, act }: { card: Card; meId: string; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
+  const opponent = card.actorId === meId ? card.targetName : card.actorName;
+  if (card.payload.hasChosen) return <Waiting title="Your move is locked." text={`Waiting for ${opponent} to choose. They cannot see your move.`}/>;
+  return <div className="play-card rps-card"><CardBadge type="rps"/><h2>{card.payload.tieCount ? "Tie! Choose again." : `Battle ${opponent}.`}</h2><p className="hint"><SipMug/> Pick secretly. The loser spins the 1–3 SIP wheel.</p><div className="rps-options">{RPS_OPTIONS.map((option) => <button key={option.value} disabled={busy} onClick={() => act("chooseRps", { rpsChoice: option.value })}><span>{option.icon}</span><strong>{option.label}</strong></button>)}</div></div>;
+}
+
+function BothDrinkCard({ card, meId, busy, act }: { card: Card; meId: string; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
+  const mine = card.actorId === meId;
+  return mine ? <div className="play-card both-card"><CardBadge type="both"/><h2>No guessing.<br/><em>You both drink.</em></h2><p className="hint"><SipMug/> Spin once. The result applies to both players.</p><button className="primary-button spin-button" disabled={busy} onClick={() => act("spinBoth")}><SipMug/> SPIN FOR BOTH →</button></div> : <Waiting title={`${card.actorName} will spin for both of you…`} text="The same 1–3 SIP result applies to both players."/>;
+}
+
+function CardBadge({ type }: { type: Exclude<Card["type"], "hidden"> }) { const meta = CARD_META[type]; return <span className={`card-type-badge ${meta.color}`}><b>{meta.icon}</b>{meta.label}</span>; }
+function SipMug() { return <span className="sip-mug" aria-hidden="true">🍺</span>; }
+function SipPicker({ value, onChange }: { value: number; onChange: (value: number) => void }) { return <div className="sip-picker-wrap"><span><SipMug/> HOW MANY SIPS?</span><div className="sip-picker">{[1, 2, 3].map((sips) => <button type="button" key={sips} className={value === sips ? "active" : ""} onClick={() => onChange(sips)}><SipMug/><strong>{sips}</strong><small>{sips === 1 ? "SIP" : "SIPS"}</small></button>)}</div></div>; }
+function Waiting({ title, text }: { title: string; text: string }) { return <div className="play-card waiting"><div className="bobble">🃏</div><span className="turn-badge">HANG TIGHT</span><h2>{title}</h2><p>{text}</p><div className="typing"><i/><i/><i/></div></div>; }
+function ScoreRail({ players, meId }: { players: Player[]; meId: string }) { return <aside className="score-rail">{players.map((player, index) => <div key={player.id}><span className={`avatar avatar-${index}`}>{player.name[0]}</span><strong>{player.name}{player.id === meId ? " · you" : ""}</strong><small><SipMug/> {player.sips} {player.sips === 1 ? "sip" : "sips"}</small></div>)}</aside>; }
+
+function Reveal({ card, players, meId, close }: { card: Card; players: Player[]; meId: string; close: () => void }) {
+  const hasWheel = card.type === "honto" || card.type === "preference" || card.type === "rps" || card.type === "both";
+  const [spinning, setSpinning] = useState(hasWheel);
+  useEffect(() => { if (!hasWheel) return; const timer = window.setTimeout(() => setSpinning(false), 1900); return () => window.clearTimeout(timer); }, [card.id, hasWheel]);
+  const drinker = players.find((player) => player.id === card.result.drinkerId)?.name;
+  let icon = "✓"; let eyebrow = "CARD COMPLETE"; let title = drinker ? `${drinker} drinks.` : "You found the number."; let detail = "The next card is waiting.";
+  if (card.type === "honto") { icon = card.result.correct ? "✓" : "×"; eyebrow = card.result.correct ? "TRUTH FOUND" : "BLUFF SUCCESS"; title = card.result.correct ? `${card.targetName} found the truth. ${drinker} takes ${card.result.sips} ${card.result.sips === 1 ? "sip" : "sips"}.` : `${card.targetName} fell for the bluff and takes ${card.result.sips} ${card.result.sips === 1 ? "sip" : "sips"}.`; detail = `The truth was: “${card.payload.statements?.[card.secret?.truthIndex ?? 0]}”`; }
+  if (card.type === "question") { icon = card.result.choice === "answer" ? "💬" : "🥃"; eyebrow = card.result.choice === "answer" ? "ANSWERED OUT LOUD" : "QUESTION SKIPPED"; title = `${drinker} takes ${card.result.sips} ${card.result.sips === 1 ? "sip" : "sips"}.`; detail = card.result.choice === "answer" ? `${card.targetName} chose to answer, so the asker drinks.` : `${card.targetName} chose not to answer.`; }
+  if (card.type === "preference") { const chosen = card.payload.options?.[card.secret?.preferenceIndex ?? 0]; icon = card.result.correct ? "🧠" : "×"; eyebrow = card.result.correct ? "MIND READ" : "NOT EVEN CLOSE"; title = card.result.correct ? `${card.targetName} guessed it. ${card.actorName} takes ${card.result.sips} ${card.result.sips === 1 ? "sip" : "sips"}.` : `${card.targetName} missed and takes ${card.result.sips} ${card.result.sips === 1 ? "sip" : "sips"}.`; detail = `${card.actorName} chose “${chosen}”.`; }
+  if (card.type === "estimate") { icon = "🎯"; eyebrow = card.result.firstTry ? "FIRST TRY" : "NUMBER FOUND"; title = card.result.firstTry ? `${card.targetName} nailed it. ${card.actorName} drinks.` : `${card.targetName} found it after ${card.result.wrongGuesses?.length} misses.`; detail = `The correct answer was ${card.result.correctNumber}.`; }
+  if (card.type === "rps") { const labels = { rock: "Rock ✊", paper: "Paper ✋", scissors: "Scissors ✌️" }; icon = "⚔️"; eyebrow = "BATTLE COMPLETE"; title = `${drinker} loses and takes ${card.result.sips} ${card.result.sips === 1 ? "sip" : "sips"}.`; detail = `${card.actorName}: ${labels[card.result.actorChoice ?? "rock"]} · ${card.targetName}: ${labels[card.result.targetChoice ?? "rock"]}`; }
+  if (card.type === "both") { icon = "🍻"; eyebrow = "BOTH DRINK"; title = `Both take ${card.result.sips} ${card.result.sips === 1 ? "sip" : "sips"}.`; detail = `${players.map((player) => player.name).join(" & ")}, cheers!`; }
+  const viewerDrinks = card.result.drinkerId === meId;
+  if (spinning) return <div className="modal-backdrop"><div className="reveal-card wheel-card" role="status" aria-live="polite"><span className="eyebrow"><SipMug/> SIP WHEEL</span><h2>How many sips?</h2><div className="sip-wheel-stage"><i className="sip-wheel-pointer"/><div className="sip-wheel"><span className="sip-wheel-number one">1</span><span className="sip-wheel-number two">2</span><span className="sip-wheel-number three">3</span></div></div><p><SipMug/> Spinning for {card.type === "both" ? "both players" : drinker}…</p></div></div>;
+  return <div className="modal-backdrop"><div className={`reveal-card ${viewerDrinks || card.type === "both" ? "wrong" : "correct"}`}><div className="result-mark">{icon}</div><span className="eyebrow">{eyebrow}</span>{hasWheel && <div className="wheel-result"><span>THE WHEEL SAYS</span><strong>{card.result.sips}</strong><small><SipMug/> {card.result.sips === 1 ? "SIP" : "SIPS"}</small></div>}<h2>{(card.result.drinkerId || card.type === "both") && <SipMug/>} {title}</h2><blockquote>{detail}</blockquote><button className="primary-button" onClick={close}>NEXT CARD →</button></div></div>;
 }
 
 function Finished({ players, leave }: { players: Player[]; leave: () => void }) {
-  const sorted = useMemo(() => [...players].sort((a,b) => a.sips - b.sips), [players]);
-  return <section className="finished"><span className="eyebrow">FIM DE PAPO. POR ENQUANTO.</span><h1>O maior detector de blefes foi…</h1><div className="winner">🏆<strong>{sorted[0]?.name}</strong><span>{sorted[0]?.sips} goles</span></div><div className="final-list">{sorted.map((p, i) => <div key={p.id}><b>#{i+1}</b><span>{p.name}</span><small>{p.sips} goles</small></div>)}</div><button className="primary-button" onClick={leave}>NOVA MESA →</button></section>;
+  const sorted = useMemo(() => [...players].sort((a, b) => a.sips - b.sips), [players]);
+  return <section className="finished"><span className="eyebrow">THE DECK IS EMPTY</span><h1>The lightest drinker was…</h1><div className="winner">🏆<strong>{sorted[0]?.name}</strong><span><SipMug/> {sorted[0]?.sips} {sorted[0]?.sips === 1 ? "sip" : "sips"}</span></div><div className="final-list">{sorted.map((player, index) => <div key={player.id}><b>#{index + 1}</b><span>{player.name}</span><small><SipMug/> {player.sips} {player.sips === 1 ? "sip" : "sips"}</small></div>)}</div><button className="primary-button" onClick={leave}>NEW TABLE →</button></section>;
 }
