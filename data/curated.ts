@@ -137,7 +137,7 @@ export const PREFERENCE_CARDS_BY_THEME: Record<CuratedTheme, readonly Preference
 
 export const QUESTION_LIBRARY_BY_THEME: Record<CuratedTheme, readonly string[]> = Object.fromEntries(
   CURATED_THEMES.map((theme) => [theme, PREFERENCE_CARDS_BY_THEME[theme].map((card) => card.question)])
-) as Record<CuratedTheme, readonly string[]>;
+) as unknown as Record<CuratedTheme, readonly string[]>;
 
 /** Topic cues used by the AI fallback and by older parts of the app. */
 export const THEME_CUES = QUESTION_LIBRARY_BY_THEME;
