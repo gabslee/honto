@@ -12,7 +12,7 @@ type Card = {
   payload: { prompt?: string; statements?: string[]; question?: string; sips?: number; options?: Array<number | string>; wrongGuesses?: number[]; hasChosen?: boolean; tieCount?: number };
   secret?: { truthIndex?: number; preferenceIndex?: number; correctNumber?: number };
   revealedBy?: string[];
-  result: { correct?: boolean; guessedIndex?: number; choice?: "answer" | "skip"; drinkerId?: string | null; spinById?: string | null; wheelStartedAt?: string; sips?: number; correctNumber?: number; wrongGuesses?: number[]; firstTry?: boolean; actorChoice?: RpsChoice; targetChoice?: RpsChoice; bothDrink?: boolean };
+  result: { correct?: boolean; guessedIndex?: number; choice?: "answer" | "skip"; skipped?: boolean; skipById?: string; drinkerId?: string | null; spinById?: string | null; wheelStartedAt?: string; sips?: number; correctNumber?: number; wrongGuesses?: number[]; firstTry?: boolean; actorChoice?: RpsChoice; targetChoice?: RpsChoice; bothDrink?: boolean };
 };
 type GameState = {
   room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; themeCategory: string; customTheme: string | null; startedAt: string | null };
@@ -152,25 +152,30 @@ function GameTable({ game, busy, act }: { game: GameState; busy: boolean; act: (
   const card = game.activeCard;
   const shownIntro = useRef(new Set<string>());
   const [introCardId, setIntroCardId] = useState<string | null>(null);
-  const revealComplete = !card || card.status !== "ready" || (card.revealedBy?.length ?? 0) >= 2;
+  const revealComplete = !card || card.status !== "ready" || (card.revealedBy ?? []).includes(card.actorId);
   useEffect(() => {
     if (card?.status === "ready" && !shownIntro.current.has(card.id)) {
       shownIntro.current.add(card.id);
       setIntroCardId(card.id);
     }
-    if (card?.status === "ready" && (card.revealedBy?.length ?? 0) >= 2) setIntroCardId(null);
+    if (card?.status === "ready" && (card.revealedBy ?? []).includes(card.actorId)) setIntroCardId(null);
   }, [card?.id, card?.status, card?.revealedBy?.length]);
   let content;
   if (!card) content = <Waiting title="Finding the next card…" text="The shared deck is syncing."/>;
   else if (card.status === "hidden") content = <DrawCard key={card.id} card={card} meId={game.meId} busy={busy} draw={() => act("drawCard")}/>;
-  else if (!revealComplete) content = <Waiting title="Reveal the card together." text="Both players tap the card before the challenge begins."/>;
+  else if (!revealComplete) content = <Waiting title="Waiting for the card reveal." text={`${card.actorName} will reveal it for both players.`}/>;
   else if (card.type === "honto") content = <HontoCard key={card.id} card={card} meId={game.meId} game={game} busy={busy} act={act}/>;
   else if (card.type === "question") content = <QuestionCard key={card.id} card={card} meId={game.meId} game={game} busy={busy} act={act}/>;
   else if (card.type === "preference") content = <PreferenceCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
   else if (card.type === "estimate") content = <EstimateCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
   else if (card.type === "rps") content = <RpsCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
   else content = <BothDrinkCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
-  return <section className="game-stage"><div className="round-strip"><span>CARD</span><b>{game.room.currentRound}/{game.room.roundCount}</b><div className="progress"><i style={{ width: `${(game.room.currentRound / game.room.roundCount) * 100}%` }}/></div><span>{game.room.roundCount - game.room.currentRound} LEFT IN THE DECK</span></div><ScoreRail players={game.players} meId={game.meId}/>{content}{introCardId === card?.id && card && <CardReveal card={card} meId={game.meId} acknowledge={() => act("ackReveal")}/>}</section>;
+  const canSkip = Boolean(card && revealComplete && ["ready", "guess", "choose"].includes(card.status));
+  return <section className="game-stage"><div className="round-strip"><span>CARD</span><b>{game.room.currentRound}/{game.room.roundCount}</b><div className="progress"><i style={{ width: `${(game.room.currentRound / game.room.roundCount) * 100}%` }}/></div><span>{game.room.roundCount - game.room.currentRound} LEFT IN THE DECK</span></div><ScoreRail players={game.players} meId={game.meId}/>{content}{canSkip && <SkipButton busy={busy} skip={() => act("skipCard")}/>} {introCardId === card?.id && card && <CardReveal card={card} meId={game.meId} acknowledge={() => act("ackReveal")}/>}</section>;
+}
+
+function SkipButton({ busy, skip }: { busy: boolean; skip: () => Promise<unknown> }) {
+  return <button type="button" className="skip-button" disabled={busy} onClick={() => void skip()}><span>↷</span><strong>SKIP THIS MINI GAME</strong><small><SipMug/> Spin for 2, 4 or 6 sips</small></button>;
 }
 
 function DrawCard({ card, meId, busy, draw }: { card: Card; meId: string; busy: boolean; draw: () => Promise<unknown> }) {
@@ -185,19 +190,17 @@ function CardReveal({ card, meId, acknowledge }: { card: Card; meId: string; ack
   const meta = CARD_META[card.type as Exclude<Card["type"], "hidden">];
   const revealedBy = card.revealedBy ?? [];
   const actorHasRevealed = revealedBy.includes(card.actorId);
-  const alreadyRevealed = revealedBy.includes(meId);
-  const canReveal = card.actorId === meId || actorHasRevealed;
-  const otherName = card.actorId === meId ? card.targetName : card.actorName;
+  const isActor = card.actorId === meId;
   const [turning, setTurning] = useState(false);
   const reveal = async () => {
-    if (alreadyRevealed || turning || !canReveal) return;
+    if (!isActor || actorHasRevealed || turning) return;
     setTurning(true);
     await new Promise((resolve) => window.setTimeout(resolve, 520));
     const result = await acknowledge();
     if (result === null) setTurning(false);
   };
-  const waitingForActor = !actorHasRevealed && card.actorId !== meId;
-  return <div className="card-reveal-backdrop"><button type="button" className={`game-reveal-card reveal-${meta.color} ${turning ? "is-turning" : ""} ${waitingForActor ? "is-waiting" : ""}`} onClick={() => void reveal()} disabled={alreadyRevealed || turning || !canReveal} aria-label={waitingForActor ? `Waiting for ${card.actorName} to reveal` : alreadyRevealed ? `Waiting for ${otherName} to reveal` : `Reveal ${meta.label}`}><span className="game-reveal-kicker">THE NEXT CHALLENGE</span><span className="game-reveal-icon"><MiniGameIcon type={card.type as Exclude<Card["type"], "hidden">}/></span><strong className="game-reveal-kanji">本当?!</strong><h2>{meta.label}</h2>{waitingForActor ? <p className="game-reveal-status"><b>{card.actorName} is turning the card first.</b><br/>You&apos;ll be able to confirm it after they reveal.</p> : alreadyRevealed ? <p className="game-reveal-status"><b>You&apos;re ready.</b><br/>{otherName} still needs to tap their card.</p> : <p>Tap the card to reveal it. The game starts when both players are ready.</p>}<span className="game-reveal-cta">{waitingForActor ? `WAITING FOR ${card.actorName.toUpperCase()}…` : alreadyRevealed ? "WAITING FOR PLAYER TWO…" : actorHasRevealed ? "TAP TO JOIN →" : "TAP TO REVEAL →"}</span></button></div>;
+  const waitingForActor = !actorHasRevealed && !isActor;
+  return <div className="card-reveal-backdrop"><button type="button" className={`game-reveal-card reveal-${meta.color} ${turning ? "is-turning" : ""} ${waitingForActor ? "is-waiting" : ""}`} onClick={() => void reveal()} disabled={!isActor || actorHasRevealed || turning} aria-label={waitingForActor ? `Waiting for ${card.actorName} to reveal` : actorHasRevealed ? "Starting the next game" : `Reveal ${meta.label}`}><span className="game-reveal-kicker">THE NEXT CHALLENGE</span><span className="game-reveal-icon"><MiniGameIcon type={card.type as Exclude<Card["type"], "hidden">}/></span><strong className="game-reveal-kanji">本当?!</strong><h2>{meta.label}</h2>{waitingForActor ? <p className="game-reveal-status"><b>{card.actorName} is revealing the card.</b><br/>You&apos;ll join the mini game as soon as it opens.</p> : actorHasRevealed ? <p className="game-reveal-status"><b>Card revealed!</b><br/>Opening the mini game now.</p> : <p>Tap the card to reveal it for both players.</p>}<span className="game-reveal-cta">{waitingForActor ? `WAITING FOR ${card.actorName.toUpperCase()}…` : actorHasRevealed ? "OPENING NEXT GAME…" : "TAP TO REVEAL →"}</span></button></div>;
 }
 
 function MiniGameIcon({ type }: { type: Exclude<Card["type"], "hidden"> }) {
@@ -281,7 +284,8 @@ function Waiting({ title, text }: { title: string; text: string }) { return <div
 function ScoreRail({ players, meId }: { players: Player[]; meId: string }) { return <aside className="score-rail">{players.map((player, index) => <div key={player.id}><span className={`avatar avatar-${index}`}>{player.name[0]}</span><strong>{player.name}{player.id === meId ? " · you" : ""}</strong><small><SipMug/> {player.sips} {player.sips === 1 ? "sip" : "sips"}</small></div>)}</aside>; }
 
 function Reveal({ card, players, meId, close, spinWheel }: { card: Card; players: Player[]; meId: string; close: () => void; spinWheel: () => Promise<unknown> }) {
-  const hasWheel = card.type === "honto" || card.type === "preference" || card.type === "rps" || card.type === "both";
+  const hasWheel = Boolean(card.result.skipped) || card.type === "honto" || card.type === "preference" || card.type === "rps" || card.type === "both";
+  const doubleSips = Boolean(card.result.skipped);
   const [requestingSpin, setRequestingSpin] = useState(false);
   const initialCompleteElapsed = Math.max(0, Date.now() - (card.completedAt ? new Date(card.completedAt).getTime() : Date.now()));
   const initialSpinElapsed = card.result.wheelStartedAt ? Math.max(0, Date.now() - new Date(card.result.wheelStartedAt).getTime()) : 0;
@@ -309,15 +313,16 @@ function Reveal({ card, players, meId, close, spinWheel }: { card: Card; players
   if (card.type === "estimate") { icon = "🎯"; eyebrow = card.result.firstTry ? "FIRST TRY" : "NUMBER FOUND"; title = card.result.firstTry ? `${card.targetName} nailed it. ${card.actorName} drinks.` : `${card.targetName} found it after ${card.result.wrongGuesses?.length} misses.`; detail = `The correct answer was ${card.result.correctNumber}.`; }
   if (card.type === "rps") { const labels = { rock: "Pedra ✊", paper: "Papel ✋", scissors: "Tesoura ✌️" }; icon = "⚔️"; eyebrow = "JOKEN-PÔ COMPLETE"; title = `${drinker} loses and takes ${card.result.sips} ${card.result.sips === 1 ? "sip" : "sips"}.`; detail = `${card.actorName}: ${labels[card.result.actorChoice ?? "rock"]} · ${card.targetName}: ${labels[card.result.targetChoice ?? "rock"]}`; }
   if (card.type === "both") { icon = "🍻"; eyebrow = "BOTH DRINK"; title = `Both take ${card.result.sips} ${card.result.sips === 1 ? "sip" : "sips"}.`; detail = `${players.map((player) => player.name).join(" & ")}, cheers!`; }
+  if (doubleSips) { const skipper = players.find((player) => player.id === (card.result.skipById ?? card.result.drinkerId))?.name ?? "The player"; icon = "↷"; eyebrow = "MINI GAME SKIPPED"; title = `${skipper} skips and takes ${card.result.sips} sips.`; detail = "Skipping doubles the wheel result: 2, 4, or 6 sips."; }
   const viewerDrinks = card.result.drinkerId === meId;
   const spinnerId = card.result.spinById ?? (card.type === "both" ? card.actorId : card.result.drinkerId);
   const spinnerName = players.find((player) => player.id === spinnerId)?.name ?? "The player";
   const rpsEmojis = { rock: "✊", paper: "✋", scissors: "✌️" };
   const rpsLoserName = drinker ? spinnerName : "The loser";
-  const introTitle = card.type === "rps" ? "Joken-pô!" : card.type === "both" ? "Everyone, cheers!" : card.type === "honto" ? "Truth or bluff?" : "Mind read complete!";
+  const introTitle = doubleSips ? "Skip & sip!" : card.type === "rps" ? "Joken-pô!" : card.type === "both" ? "Everyone, cheers!" : card.type === "honto" ? "Truth or bluff?" : "Mind read complete!";
   if (revealPhase === "intro") return <div className="modal-backdrop reveal-intro-backdrop"><div className={`reveal-card reveal-intro ${card.type === "rps" ? "rps-reveal-intro" : ""}`} role="status" aria-live="polite"><div className="result-mark">{icon}</div><span className="eyebrow">{eyebrow}</span>{card.type === "rps" ? <><h2>Joken-pô!</h2><div className="rps-reveal-battle"><div><span>{rpsEmojis[card.result.actorChoice ?? "rock"]}</span><small>{card.actorName}</small></div><b>VS</b><div><span>{rpsEmojis[card.result.targetChoice ?? "rock"]}</span><small>{card.targetName}</small></div></div><p className="rps-winner-callout"><strong>{rpsLoserName}</strong> loses this round.</p></> : <><h2>{introTitle}</h2><p className="reveal-intro-copy">The table is getting ready to find out who takes the next sip.</p><div className="reveal-dots"><i/><i/><i/></div></>}</div></div>;
-  if (revealPhase === "ready") return <div className="modal-backdrop"><div className="reveal-card wheel-ready" role="dialog" aria-live="polite"><div className="result-mark">{icon}</div><span className="eyebrow"><SipMug/> SIP WHEEL</span><h2>Ready to spin?</h2><p className="reveal-intro-copy">{card.type === "both" ? "One spin sets the SIPs for both players." : `${spinnerName} takes the wheel.`}</p><div className="sip-wheel-stage wheel-ready-stage"><i className="sip-wheel-pointer"/><div className="sip-wheel sip-wheel-static"><span className="sip-wheel-number one">1</span><span className="sip-wheel-number two">2</span><span className="sip-wheel-number three">3</span></div></div>{meId === spinnerId ? <button type="button" className="wheel-start-button" disabled={requestingSpin} onClick={async () => { setRequestingSpin(true); try { await spinWheel(); } finally { setRequestingSpin(false); } }}>{requestingSpin ? "STARTING THE WHEEL…" : <><SipMug/> CLICK BELOW TO SPIN</>}</button> : <p className="wheel-waiting"><strong>{spinnerName}</strong> is ready to spin the wheel…</p>}</div></div>;
-  if (revealPhase === "spinning") return <div className="modal-backdrop"><div className="reveal-card wheel-card" role="status" aria-live="polite"><span className="eyebrow"><SipMug/> SIP WHEEL</span><h2>How many sips?</h2><div className="sip-wheel-stage"><i className="sip-wheel-pointer"/><div className="sip-wheel"><span className="sip-wheel-number one">1</span><span className="sip-wheel-number two">2</span><span className="sip-wheel-number three">3</span></div></div><p><SipMug/> {spinnerName} is spinning the wheel…</p></div></div>;
+  if (revealPhase === "ready") return <div className="modal-backdrop"><div className="reveal-card wheel-ready" role="dialog" aria-live="polite"><div className="result-mark">{icon}</div><span className="eyebrow"><SipMug/> SIP WHEEL</span><h2>Ready to spin?</h2><p className="reveal-intro-copy">{doubleSips ? "Skipping doubles the wheel: 2, 4, or 6 sips." : card.type === "both" ? "One spin sets the SIPs for both players." : `${spinnerName} takes the wheel.`}</p><div className="sip-wheel-stage wheel-ready-stage"><i className="sip-wheel-pointer"/><div className="sip-wheel sip-wheel-static"><span className="sip-wheel-number one">{doubleSips ? 2 : 1}</span><span className="sip-wheel-number two">{doubleSips ? 4 : 2}</span><span className="sip-wheel-number three">{doubleSips ? 6 : 3}</span></div></div>{meId === spinnerId ? <button type="button" className="wheel-start-button" disabled={requestingSpin} onClick={async () => { setRequestingSpin(true); try { await spinWheel(); } finally { setRequestingSpin(false); } }}>{requestingSpin ? "STARTING THE WHEEL…" : <><SipMug/> CLICK BELOW TO SPIN</>}</button> : <p className="wheel-waiting"><strong>{spinnerName}</strong> is ready to spin the wheel…</p>}</div></div>;
+  if (revealPhase === "spinning") return <div className="modal-backdrop"><div className="reveal-card wheel-card" role="status" aria-live="polite"><span className="eyebrow"><SipMug/> SIP WHEEL</span><h2>How many sips?</h2><div className="sip-wheel-stage"><i className="sip-wheel-pointer"/><div className="sip-wheel"><span className="sip-wheel-number one">{doubleSips ? 2 : 1}</span><span className="sip-wheel-number two">{doubleSips ? 4 : 2}</span><span className="sip-wheel-number three">{doubleSips ? 6 : 3}</span></div></div><p><SipMug/> {spinnerName} is spinning the wheel…</p></div></div>;
   return <div className="modal-backdrop"><div className={`reveal-card ${viewerDrinks || card.type === "both" ? "wrong" : "correct"}`}><div className="result-mark">{icon}</div><span className="eyebrow">{eyebrow}</span>{hasWheel && <div className="wheel-result"><span>THE WHEEL SAYS</span><strong>{card.result.sips}</strong><small><SipMug/> {card.result.sips === 1 ? "SIP" : "SIPS"}</small></div>}<h2>{(card.result.drinkerId || card.type === "both") && <SipMug/>} {title}</h2><blockquote>{detail}</blockquote><button className="primary-button" onClick={close}>NEXT CARD →</button></div></div>;
 }
 

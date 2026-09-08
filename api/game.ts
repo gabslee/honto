@@ -193,7 +193,7 @@ export default async function handler(req: any, res: any) {
       const completed = completedRows[0] as any;
       if (!completed) throw new Error("There is no completed wheel to spin.");
       const result = parse(completed.result);
-      if (!["honto", "preference", "rps", "both"].includes(completed.type)) throw new Error("This card does not use the sip wheel.");
+      if (!["honto", "preference", "rps", "both"].includes(completed.type) && !result.skipped) throw new Error("This card does not use the sip wheel.");
       const spinById = result.spinById ?? (completed.type === "both" ? completed.actor_id : result.drinkerId);
       if (spinById !== me.id) throw new Error("The other player is responsible for spinning this wheel.");
       if (!result.wheelStartedAt) await sql`UPDATE deck_cards SET result = ${JSON.stringify({ ...result, spinById, wheelStartedAt: new Date().toISOString() })} WHERE id = ${completed.id} AND status = 'complete'`;
@@ -220,8 +220,14 @@ export default async function handler(req: any, res: any) {
       await sql`UPDATE deck_cards SET status = 'ready' WHERE id = ${card.id} AND status = 'hidden'`;
     }
     if (body.action === "ackReveal") {
-      if (!card || card.status !== "ready" || ![card.actor_id, card.target_id].includes(me.id)) throw new Error("This card is not ready to reveal.");
+      if (!card || card.status !== "ready" || card.actor_id !== me.id) throw new Error("Only the player who drew the card can reveal it.");
       await sql`UPDATE deck_cards SET revealed_by = ARRAY(SELECT DISTINCT player_id FROM unnest(COALESCE(revealed_by, ARRAY[]::text[]) || ARRAY[${me.id}]::text[]) AS player_id) WHERE id = ${card.id} AND status = 'ready'`;
+    }
+    if (body.action === "skipCard") {
+      if (!card || !["ready", "guess", "choose"].includes(card.status) || ![card.actor_id, card.target_id].includes(me.id)) throw new Error("This mini game cannot be skipped right now.");
+      const sips = spinSips() * 2;
+      const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ skipped: true, skipById: me.id, drinkerId: me.id, spinById: me.id, sips })}, completed_at = now() WHERE id = ${card.id} AND status IN ('ready', 'guess', 'choose') RETURNING id`;
+      if (updated[0]) { await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${me.id}`; await finishCard(room); }
     }
     if (body.action === "submitHonto") {
       if (!card || card.type !== "honto" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("This card is not ready for your stories.");
