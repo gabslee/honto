@@ -306,6 +306,12 @@ export default async function handler(req: any, res: any) {
       const payload = { ...parse(card.payload), options: estimateOptions(correctNumber), wrongGuesses: [] };
       await sql`UPDATE deck_cards SET status = 'guess', payload = ${JSON.stringify(payload)}, secret = ${JSON.stringify({ correctNumber })} WHERE id = ${card.id} AND status = 'ready'`;
     }
+    if (body.action === "nextEstimate") {
+      if (!card || card.type !== "estimate" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("Only the player answering can choose the next estimate.");
+      const payload = parse(card.payload); const themes = normalizedThemes(room.theme_category); const pool = shuffle(themes.flatMap((theme) => ESTIMATE_QUESTIONS_BY_THEME[theme]));
+      const currentQuestion = typeof payload.question === "string" ? payload.question : ""; const nextQuestion = pool.find((question) => question !== currentQuestion) ?? pool[0] ?? currentQuestion;
+      await sql`UPDATE deck_cards SET payload = ${JSON.stringify({ ...payload, question: nextQuestion, options: undefined, wrongGuesses: [] })}, secret = '{}' WHERE id = ${card.id} AND status = 'ready'`;
+    }
     if (body.action === "guessEstimate") {
       if (!card || card.type !== "estimate" || card.status !== "guess" || card.target_id !== me.id) throw new Error("This estimate is not yours to guess.");
       const payload = parse(card.payload); const options = Array.isArray(payload.options) ? payload.options.map(Number) : [];
