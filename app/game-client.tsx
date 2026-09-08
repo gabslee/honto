@@ -143,9 +143,17 @@ function Landing(props: { name: string; setName: (value: string) => void; joinCo
 }
 
 function Lobby({ game, host, busy, copied, copyInvite, act }: { game: GameState; host: boolean; busy: boolean; copied: boolean; copyInvite: () => void; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
-  const selected = storedThemes(game.room.themeCategory);
+  const [selected, setSelected] = useState<ThemeKey[]>(() => storedThemes(game.room.themeCategory));
+  const selectedRef = useRef(selected);
+  const themeSaveQueue = useRef(Promise.resolve());
   const configure = (extra: Record<string, unknown>) => act("configure", { roundCount: game.room.roundCount, themeCategory: game.room.themeCategory, customTheme: game.room.customTheme, ...extra });
-  const toggleTheme = (key: ThemeKey) => { const next = selected.includes(key) ? selected.filter((item) => item !== key) : [...selected, key]; void configure({ themeCategory: next.join(",") }); };
+  const toggleTheme = (key: ThemeKey) => {
+    const current = selectedRef.current;
+    const next = current.includes(key) ? current.filter((item) => item !== key) : [...current, key];
+    selectedRef.current = next;
+    setSelected(next);
+    themeSaveQueue.current = themeSaveQueue.current.then(() => configure({ themeCategory: next.join(",") })).then(() => undefined);
+  };
   return <section className="lobby"><div className="lobby-head"><span className="eyebrow">SHUFFLING THE CARDS</span><h1>Your deck is <em>almost</em> ready.</h1><p>Invite one person. This table has exactly two seats.</p></div><div className="lobby-grid"><div className="panel"><div className="panel-title"><h2>At the table <small className="room-name-tip" title={`Room ${game.room.code}`}>ROOM {game.room.code}</small></h2><span>{game.players.length}/2</span></div><div className="people-list">{game.players.map((player, index) => <div className="person" key={player.id}><span className={`avatar avatar-${index}`}>{player.name[0]}</span><div><strong>{player.name}</strong><small>{player.isHost ? "host" : "ready to play"}</small></div><i>●</i></div>)}</div><button className="invite-button" onClick={copyInvite}>{copied ? "LINK COPIED! ✓" : "COPY INVITE LINK"}</button></div><div className="panel"><div className="panel-title"><h2>The deck</h2><span className="sticker">6 CARD TYPES</span></div><div className="setting"><label>Number of cards</label><div className="segmented">{[8, 12, 16, 24].map((count) => <button key={count} disabled={!host} className={game.room.roundCount === count ? "active" : ""} onClick={() => configure({ roundCount: count })}>{count}</button>)}</div></div><div className="setting"><label>Theme categories</label><p className="setting-hint">These guide the question and preference cards.</p><div className="subject-checks">{THEME_KEYS.map((key) => <label className={`subject-check ${key === "spicy" ? "spicy-check" : ""} ${selected.includes(key) ? "selected" : ""}`} key={key}><input type="checkbox" checked={selected.includes(key)} disabled={!host} onChange={() => toggleTheme(key)} /><span>{THEME_LABELS[key]}</span></label>)}</div></div><div className="setting"><label>Optional custom subject</label><input className="custom-setting" defaultValue={game.room.customTheme ?? ""} disabled={!host} placeholder="e.g. our travel stories" onBlur={(event) => configure({ customTheme: event.target.value })}/></div>{host ? <button className="primary-button start-button" disabled={busy || game.players.length !== 2} onClick={() => act("start")}>{game.players.length === 2 ? "SHUFFLE & START →" : "WAITING FOR PLAYER TWO…"}</button> : <div className="host-note">The host is choosing the deck.</div>}</div></div></section>;
 }
 
