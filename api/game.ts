@@ -280,7 +280,7 @@ export default async function handler(req: any, res: any) {
       if (!card || card.type !== "rps" || card.status !== "ready") throw new Error("This Joken-pô card is not ready.");
       if (card.actor_id !== me.id && card.target_id !== me.id) throw new Error("You are not playing this card.");
       const rpsChoice = body.rpsChoice;
-      if (!rpsChoice || !["rock", "paper", "scissors"].includes(rpsChoice)) throw new Error("Choose your joken-pô move.");
+      if (!rpsChoice || !["rock", "paper", "scissors"].includes(rpsChoice)) throw new Error("Choose rock, paper, or scissors.");
       const key = card.actor_id === me.id ? "actorChoice" : "targetChoice";
       const chosen = key === "actorChoice"
         ? await sql`UPDATE deck_cards SET secret = jsonb_set(secret::jsonb, '{actorChoice}', to_jsonb(${rpsChoice}::text))::text WHERE id = ${card.id} AND status = 'ready' AND NOT (secret::jsonb ? 'actorChoice') RETURNING secret`
