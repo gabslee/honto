@@ -187,6 +187,16 @@ export default async function handler(req: any, res: any) {
 
     const token = String(body.token ?? "");
     const { room, me, card } = await getContext(roomCode, token);
+    if (body.action === "startWheel") {
+      const completedRows = await sql`SELECT * FROM deck_cards WHERE room_id = ${room.id} AND status = 'complete' ORDER BY card_number DESC LIMIT 1`;
+      const completed = completedRows[0] as any;
+      if (!completed) throw new Error("There is no completed wheel to spin.");
+      const result = parse(completed.result);
+      if (!["honto", "preference", "rps", "both"].includes(completed.type)) throw new Error("This card does not use the sip wheel.");
+      const spinById = result.spinById ?? (completed.type === "both" ? completed.actor_id : result.drinkerId);
+      if (spinById !== me.id) throw new Error("The other player is responsible for spinning this wheel.");
+      if (!result.wheelStartedAt) await sql`UPDATE deck_cards SET result = ${JSON.stringify({ ...result, spinById, wheelStartedAt: new Date().toISOString() })} WHERE id = ${completed.id} AND status = 'complete'`;
+    }
     if (body.action === "configure") {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can change the room settings.");
       const roundCount = Number.isInteger(body.roundCount) ? Math.max(6, Math.min(60, Number(body.roundCount))) : 12;
@@ -220,7 +230,7 @@ export default async function handler(req: any, res: any) {
       if (![0, 1, 2].includes(body.guessedIndex ?? -1)) throw new Error("Choose one story.");
       const truthIndex = Number(parse(card.secret).truthIndex); const correct = Number(body.guessedIndex) === truthIndex;
       const drinkerId = correct ? card.actor_id : card.target_id; const sips = spinSips();
-      const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ correct, guessedIndex: body.guessedIndex, drinkerId, sips })}, completed_at = now() WHERE id = ${card.id} AND status = 'guess' RETURNING id`;
+      const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ correct, guessedIndex: body.guessedIndex, drinkerId, spinById: drinkerId, sips })}, completed_at = now() WHERE id = ${card.id} AND status = 'guess' RETURNING id`;
       if (updated[0]) { await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${drinkerId}`; await finishCard(room); }
     }
     if (body.action === "submitQuestion") {
@@ -252,7 +262,7 @@ export default async function handler(req: any, res: any) {
       const preferenceIndex = Number(parse(card.secret).preferenceIndex);
       const correct = guessedIndex === preferenceIndex;
       const drinkerId = correct ? card.actor_id : card.target_id; const sips = spinSips();
-      const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ correct, guessedIndex, drinkerId, sips })}, completed_at = now() WHERE id = ${card.id} AND status = 'guess' RETURNING id`;
+      const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ correct, guessedIndex, drinkerId, spinById: drinkerId, sips })}, completed_at = now() WHERE id = ${card.id} AND status = 'guess' RETURNING id`;
       if (updated[0]) { await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${drinkerId}`; await finishCard(room); }
     }
     if (body.action === "chooseRps") {
@@ -275,7 +285,7 @@ export default async function handler(req: any, res: any) {
         const actorWins = (secret.actorChoice === "rock" && secret.targetChoice === "scissors") || (secret.actorChoice === "paper" && secret.targetChoice === "rock") || (secret.actorChoice === "scissors" && secret.targetChoice === "paper");
         const drinkerId = actorWins ? card.target_id : card.actor_id;
         const sips = spinSips();
-        const result = { actorChoice: secret.actorChoice, targetChoice: secret.targetChoice, drinkerId, sips };
+        const result = { actorChoice: secret.actorChoice, targetChoice: secret.targetChoice, drinkerId, spinById: drinkerId, sips };
         const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify(result)}, completed_at = now() WHERE id = ${card.id} AND status = 'ready' RETURNING id`;
         if (updated[0]) { await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${drinkerId}`; await finishCard(room); }
       }
@@ -283,7 +293,7 @@ export default async function handler(req: any, res: any) {
     if (body.action === "spinBoth") {
       if (!card || card.type !== "both" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("It is not your turn to spin.");
       const sips = spinSips();
-      const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ bothDrink: true, sips })}, completed_at = now() WHERE id = ${card.id} AND status = 'ready' RETURNING id`;
+      const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ bothDrink: true, spinById: card.actor_id, sips })}, completed_at = now() WHERE id = ${card.id} AND status = 'ready' RETURNING id`;
       if (updated[0]) { await sql`UPDATE players SET sips = sips + ${sips} WHERE room_id = ${room.id}`; await finishCard(room); }
     }
     if (body.action === "submitEstimate") {

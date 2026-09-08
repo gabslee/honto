@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { questionLibrary } from "./i18n";
 
 type ThemeKey = "mixed" | "family" | "innocent" | "life" | "flirty" | "spicy";
@@ -11,7 +11,7 @@ type Card = {
   actorId: string; actorName: string; targetId: string; targetName: string;
   payload: { prompt?: string; statements?: string[]; question?: string; sips?: number; options?: Array<number | string>; wrongGuesses?: number[]; hasChosen?: boolean; tieCount?: number };
   secret?: { truthIndex?: number; preferenceIndex?: number; correctNumber?: number };
-  result: { correct?: boolean; guessedIndex?: number; choice?: "answer" | "skip"; drinkerId?: string | null; sips?: number; correctNumber?: number; wrongGuesses?: number[]; firstTry?: boolean; actorChoice?: RpsChoice; targetChoice?: RpsChoice; bothDrink?: boolean };
+  result: { correct?: boolean; guessedIndex?: number; choice?: "answer" | "skip"; drinkerId?: string | null; spinById?: string | null; wheelStartedAt?: string; sips?: number; correctNumber?: number; wrongGuesses?: number[]; firstTry?: boolean; actorChoice?: RpsChoice; targetChoice?: RpsChoice; bothDrink?: boolean };
 };
 type GameState = {
   room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; themeCategory: string; customTheme: string | null; startedAt: string | null };
@@ -132,7 +132,7 @@ export default function GameClient() {
     {game.room.status === "lobby" && <Lobby game={game} host={Boolean(host)} busy={busy} copied={copied} copyInvite={copyInvite} act={act} />}
     {game.room.status === "playing" && <GameTable game={game} busy={busy} act={act} />}
     {game.room.status === "finished" && <Finished players={game.players} leave={leave} />}
-    {reveal && <Reveal card={reveal} players={game.players} meId={game.meId} close={() => setDismissedReveal(reveal.id)} />}
+    {reveal && <Reveal card={reveal} players={game.players} meId={game.meId} close={() => setDismissedReveal(reveal.id)} spinWheel={() => act("startWheel")} />}
   </main>;
 }
 
@@ -149,6 +149,14 @@ function Lobby({ game, host, busy, copied, copyInvite, act }: { game: GameState;
 
 function GameTable({ game, busy, act }: { game: GameState; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
   const card = game.activeCard;
+  const shownIntro = useRef(new Set<string>());
+  const [introCardId, setIntroCardId] = useState<string | null>(null);
+  useEffect(() => {
+    if (card?.status === "ready" && !shownIntro.current.has(card.id)) {
+      shownIntro.current.add(card.id);
+      setIntroCardId(card.id);
+    }
+  }, [card?.id, card?.status]);
   let content;
   if (!card) content = <Waiting title="Finding the next card…" text="The shared deck is syncing."/>;
   else if (card.status === "hidden") content = <DrawCard key={card.id} card={card} meId={game.meId} busy={busy} draw={() => act("drawCard")}/>;
@@ -158,15 +166,20 @@ function GameTable({ game, busy, act }: { game: GameState; busy: boolean; act: (
   else if (card.type === "estimate") content = <EstimateCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
   else if (card.type === "rps") content = <RpsCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
   else content = <BothDrinkCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
-  return <section className="game-stage"><div className="round-strip"><span>CARD</span><b>{game.room.currentRound}/{game.room.roundCount}</b><div className="progress"><i style={{ width: `${(game.room.currentRound / game.room.roundCount) * 100}%` }}/></div><span>{game.room.roundCount - game.room.currentRound} LEFT IN THE DECK</span></div><ScoreRail players={game.players} meId={game.meId}/>{content}</section>;
+  return <section className="game-stage"><div className="round-strip"><span>CARD</span><b>{game.room.currentRound}/{game.room.roundCount}</b><div className="progress"><i style={{ width: `${(game.room.currentRound / game.room.roundCount) * 100}%` }}/></div><span>{game.room.roundCount - game.room.currentRound} LEFT IN THE DECK</span></div><ScoreRail players={game.players} meId={game.meId}/>{content}{introCardId === card?.id && card && <CardReveal card={card} continueGame={() => setIntroCardId(null)}/>}</section>;
 }
 
 function DrawCard({ card, meId, busy, draw }: { card: Card; meId: string; busy: boolean; draw: () => Promise<unknown> }) {
   const mine = card.actorId === meId;
   const [flipping, setFlipping] = useState(false);
-  const reveal = () => { if (busy || flipping) return; setFlipping(true); window.setTimeout(() => { void draw(); }, 720); };
+  const reveal = () => { if (busy || flipping) return; setFlipping(true); window.setTimeout(() => { void draw(); }, 1080); };
   const cardFace = <><span className="playing-card-corner top">本当<small>?!</small></span><span className="playing-card-mark">!</span><span className="playing-card-center"><i>本当</i><strong>HONTO?!</strong><small>{mine ? "DRAW" : "WAIT"}</small></span><span className="playing-card-corner bottom">本当<small>?!</small></span></>;
   return <div className="play-card deck-draw"><span className="turn-badge">CARD {card.cardNumber}</span><h2>{mine ? "Your turn to draw." : `${card.actorName} is drawing the next card…`}</h2><p className="hint">{mine ? "Tap the card to flip it and reveal what comes next." : "The card will turn over on both screens."}</p><div className="draw-card-zone">{mine ? <button className={`honto-playing-card ${flipping ? "is-flipping" : ""}`} aria-label="Draw the next Honto card" disabled={busy || flipping} onClick={reveal}>{cardFace}</button> : <div className="honto-playing-card waiting-card" aria-hidden="true">{cardFace}</div>}</div>{flipping && <p className="flip-caption">REVEALING THE NEXT CHALLENGE…</p>}</div>;
+}
+
+function CardReveal({ card, continueGame }: { card: Card; continueGame: () => void }) {
+  const meta = CARD_META[card.type as Exclude<Card["type"], "hidden">];
+  return <div className="card-reveal-backdrop"><button type="button" className={`game-reveal-card reveal-${meta.color}`} onClick={continueGame} aria-label={`Continue to ${meta.label}`}><span className="game-reveal-kicker">THE NEXT CHALLENGE</span><span className="game-reveal-icon">{meta.icon}</span><strong className="game-reveal-kanji">本当?!</strong><h2>{meta.label}</h2><p>Tap to turn the card over and play.</p><span className="game-reveal-cta">CLICK TO PLAY →</span></button></div>;
 }
 
 function HontoCard({ card, meId, game, busy, act }: { card: Card; meId: string; game: GameState; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
@@ -225,7 +238,7 @@ function RpsCard({ card, meId, busy, act }: { card: Card; meId: string; busy: bo
 
 function BothDrinkCard({ card, meId, busy, act }: { card: Card; meId: string; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
   const mine = card.actorId === meId;
-  return mine ? <div className="play-card both-card"><CardBadge type="both"/><h2>No guessing.<br/><em>You both drink.</em></h2><p className="hint"><SipMug/> Spin once. The result applies to both players.</p><button className="primary-button spin-button" disabled={busy} onClick={() => act("spinBoth")}><SipMug/> SPIN FOR BOTH →</button></div> : <Waiting title={`${card.actorName} will spin for both of you…`} text="The same 1–3 SIP result applies to both players."/>;
+  return <div className="play-card both-card"><CardBadge type="both"/><h2>No guessing.<br/><em>Both of you drink.</em></h2><p className="hint"><SipMug/> Spin once. The result applies to both players.</p>{mine ? <button className="primary-button spin-button" disabled={busy} onClick={() => act("spinBoth")}><SipMug/> SPIN FOR BOTH →</button> : <div className="both-waiting"><span className="both-waiting-orbit"/><strong>{card.actorName} is rolling the sip wheel…</strong><small>You will both drink the result.</small></div>}</div>;
 }
 
 function CardBadge({ type }: { type: Exclude<Card["type"], "hidden"> }) { const meta = CARD_META[type]; return <span className={`card-type-badge ${meta.color}`}><b>{meta.icon}</b>{meta.label}</span>; }
@@ -234,19 +247,26 @@ function SipPicker({ value, onChange }: { value: number; onChange: (value: numbe
 function Waiting({ title, text }: { title: string; text: string }) { return <div className="play-card waiting"><div className="bobble">🃏</div><span className="turn-badge">HANG TIGHT</span><h2>{title}</h2><p>{text}</p><div className="typing"><i/><i/><i/></div></div>; }
 function ScoreRail({ players, meId }: { players: Player[]; meId: string }) { return <aside className="score-rail">{players.map((player, index) => <div key={player.id}><span className={`avatar avatar-${index}`}>{player.name[0]}</span><strong>{player.name}{player.id === meId ? " · you" : ""}</strong><small><SipMug/> {player.sips} {player.sips === 1 ? "sip" : "sips"}</small></div>)}</aside>; }
 
-function Reveal({ card, players, meId, close }: { card: Card; players: Player[]; meId: string; close: () => void }) {
+function Reveal({ card, players, meId, close, spinWheel }: { card: Card; players: Player[]; meId: string; close: () => void; spinWheel: () => Promise<unknown> }) {
   const hasWheel = card.type === "honto" || card.type === "preference" || card.type === "rps" || card.type === "both";
-  const elapsedSinceComplete = () => Math.max(0, Date.now() - (card.completedAt ? new Date(card.completedAt).getTime() : Date.now()));
-  const initialElapsed = elapsedSinceComplete();
-  const [revealPhase, setRevealPhase] = useState<"intro" | "wheel" | "result">(!hasWheel ? "result" : initialElapsed < 1050 ? "intro" : initialElapsed < 3800 ? "wheel" : "result");
+  const [requestingSpin, setRequestingSpin] = useState(false);
+  const initialCompleteElapsed = Math.max(0, Date.now() - (card.completedAt ? new Date(card.completedAt).getTime() : Date.now()));
+  const initialSpinElapsed = card.result.wheelStartedAt ? Math.max(0, Date.now() - new Date(card.result.wheelStartedAt).getTime()) : 0;
+  const introDuration = card.type === "rps" ? 1700 : 900;
+  const [revealPhase, setRevealPhase] = useState<"intro" | "ready" | "spinning" | "result">(!hasWheel ? "result" : card.result.wheelStartedAt ? (initialSpinElapsed < 2400 ? "spinning" : "result") : initialCompleteElapsed < introDuration ? "intro" : "ready");
   useEffect(() => {
-    const elapsed = elapsedSinceComplete();
-    setRevealPhase(!hasWheel ? "result" : elapsed < 1050 ? "intro" : elapsed < 3800 ? "wheel" : "result");
-    if (!hasWheel) return;
-    const wheelTimer = window.setTimeout(() => setRevealPhase("wheel"), Math.max(0, 1050 - elapsed));
-    const resultTimer = window.setTimeout(() => setRevealPhase("result"), Math.max(0, 3800 - elapsed));
-    return () => { window.clearTimeout(wheelTimer); window.clearTimeout(resultTimer); };
-  }, [card.id, hasWheel]);
+    if (!hasWheel) { setRevealPhase("result"); return; }
+    const completeElapsed = Math.max(0, Date.now() - (card.completedAt ? new Date(card.completedAt).getTime() : Date.now()));
+    if (!card.result.wheelStartedAt) {
+      setRevealPhase(completeElapsed < introDuration ? "intro" : "ready");
+      const readyTimer = window.setTimeout(() => setRevealPhase("ready"), Math.max(0, introDuration - completeElapsed));
+      return () => window.clearTimeout(readyTimer);
+    }
+    const spinElapsed = Math.max(0, Date.now() - new Date(card.result.wheelStartedAt).getTime());
+    setRevealPhase(spinElapsed < 2400 ? "spinning" : "result");
+    const resultTimer = window.setTimeout(() => setRevealPhase("result"), Math.max(0, 2400 - spinElapsed));
+    return () => window.clearTimeout(resultTimer);
+  }, [card.id, card.completedAt, card.result.wheelStartedAt, hasWheel]);
   const drinker = players.find((player) => player.id === card.result.drinkerId)?.name;
   let icon = "✓"; let eyebrow = "CARD COMPLETE"; let title = drinker ? `${drinker} drinks.` : "You found the number."; let detail = "The next card is waiting.";
   if (card.type === "honto") { icon = card.result.correct ? "✓" : "×"; eyebrow = card.result.correct ? "TRUTH FOUND" : "BLUFF SUCCESS"; title = card.result.correct ? `${card.targetName} found the truth. ${drinker} takes ${card.result.sips} ${card.result.sips === 1 ? "sip" : "sips"}.` : `${card.targetName} fell for the bluff and takes ${card.result.sips} ${card.result.sips === 1 ? "sip" : "sips"}.`; detail = `The truth was: “${card.payload.statements?.[card.secret?.truthIndex ?? 0]}”`; }
@@ -256,9 +276,14 @@ function Reveal({ card, players, meId, close }: { card: Card; players: Player[];
   if (card.type === "rps") { const labels = { rock: "Rock ✊", paper: "Paper ✋", scissors: "Scissors ✌️" }; icon = "⚔️"; eyebrow = "BATTLE COMPLETE"; title = `${drinker} loses and takes ${card.result.sips} ${card.result.sips === 1 ? "sip" : "sips"}.`; detail = `${card.actorName}: ${labels[card.result.actorChoice ?? "rock"]} · ${card.targetName}: ${labels[card.result.targetChoice ?? "rock"]}`; }
   if (card.type === "both") { icon = "🍻"; eyebrow = "BOTH DRINK"; title = `Both take ${card.result.sips} ${card.result.sips === 1 ? "sip" : "sips"}.`; detail = `${players.map((player) => player.name).join(" & ")}, cheers!`; }
   const viewerDrinks = card.result.drinkerId === meId;
+  const spinnerId = card.result.spinById ?? (card.type === "both" ? card.actorId : card.result.drinkerId);
+  const spinnerName = players.find((player) => player.id === spinnerId)?.name ?? "The player";
+  const rpsEmojis = { rock: "✊", paper: "✋", scissors: "✌️" };
+  const rpsLoserName = drinker ? spinnerName : "The loser";
   const introTitle = card.type === "rps" ? "Rock, paper, scissors!" : card.type === "both" ? "Everyone, cheers!" : card.type === "honto" ? "Truth or bluff?" : "Mind read complete!";
-  if (revealPhase === "intro") return <div className="modal-backdrop reveal-intro-backdrop"><div className="reveal-card reveal-intro" role="status" aria-live="polite"><div className="result-mark">{icon}</div><span className="eyebrow">{eyebrow}</span><h2>{introTitle}</h2><p className="reveal-intro-copy">The table is finding out who takes the next sip.</p><div className="reveal-dots"><i/><i/><i/></div></div></div>;
-  if (revealPhase === "wheel") return <div className="modal-backdrop"><div className="reveal-card wheel-card" role="status" aria-live="polite"><span className="eyebrow"><SipMug/> SIP WHEEL</span><h2>How many sips?</h2><div className="sip-wheel-stage"><i className="sip-wheel-pointer"/><div className="sip-wheel"><span className="sip-wheel-number one">1</span><span className="sip-wheel-number two">2</span><span className="sip-wheel-number three">3</span></div></div><p><SipMug/> Spinning for {card.type === "both" ? "both players" : drinker}…</p></div></div>;
+  if (revealPhase === "intro") return <div className="modal-backdrop reveal-intro-backdrop"><div className={`reveal-card reveal-intro ${card.type === "rps" ? "rps-reveal-intro" : ""}`} role="status" aria-live="polite"><div className="result-mark">{icon}</div><span className="eyebrow">{eyebrow}</span>{card.type === "rps" ? <><h2>Showdown!</h2><div className="rps-reveal-battle"><div><span>{rpsEmojis[card.result.actorChoice ?? "rock"]}</span><small>{card.actorName}</small></div><b>VS</b><div><span>{rpsEmojis[card.result.targetChoice ?? "rock"]}</span><small>{card.targetName}</small></div></div><p className="rps-winner-callout"><strong>{rpsLoserName}</strong> loses this round.</p></> : <><h2>{introTitle}</h2><p className="reveal-intro-copy">The table is getting ready to find out who takes the next sip.</p><div className="reveal-dots"><i/><i/><i/></div></>}</div></div>;
+  if (revealPhase === "ready") return <div className="modal-backdrop"><div className="reveal-card wheel-ready" role="dialog" aria-live="polite"><div className="result-mark">{icon}</div><span className="eyebrow"><SipMug/> SIP WHEEL</span><h2>Ready to spin?</h2><p className="reveal-intro-copy">{card.type === "both" ? "One spin sets the SIPs for both players." : `${spinnerName} takes the wheel.`}</p>{meId === spinnerId ? <button type="button" className="primary-button wheel-start-button" disabled={requestingSpin} onClick={async () => { setRequestingSpin(true); try { await spinWheel(); } finally { setRequestingSpin(false); } }}>{requestingSpin ? "STARTING THE WHEEL…" : "SPIN THE WHEEL →"}</button> : <p className="wheel-waiting"><strong>{spinnerName}</strong> is ready to spin the wheel…</p>}</div></div>;
+  if (revealPhase === "spinning") return <div className="modal-backdrop"><div className="reveal-card wheel-card" role="status" aria-live="polite"><span className="eyebrow"><SipMug/> SIP WHEEL</span><h2>How many sips?</h2><div className="sip-wheel-stage"><i className="sip-wheel-pointer"/><div className="sip-wheel"><span className="sip-wheel-number one">1</span><span className="sip-wheel-number two">2</span><span className="sip-wheel-number three">3</span></div></div><p><SipMug/> {spinnerName} is spinning the wheel…</p></div></div>;
   return <div className="modal-backdrop"><div className={`reveal-card ${viewerDrinks || card.type === "both" ? "wrong" : "correct"}`}><div className="result-mark">{icon}</div><span className="eyebrow">{eyebrow}</span>{hasWheel && <div className="wheel-result"><span>THE WHEEL SAYS</span><strong>{card.result.sips}</strong><small><SipMug/> {card.result.sips === 1 ? "SIP" : "SIPS"}</small></div>}<h2>{(card.result.drinkerId || card.type === "both") && <SipMug/>} {title}</h2><blockquote>{detail}</blockquote><button className="primary-button" onClick={close}>NEXT CARD →</button></div></div>;
 }
 
