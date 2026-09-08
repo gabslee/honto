@@ -20,9 +20,10 @@ let schemaReady: Promise<void> | null = null;
 function ensureSchema() {
   if (!schemaReady) schemaReady = (async () => {
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured.");
-    await sql`CREATE TABLE IF NOT EXISTS rooms (id text PRIMARY KEY, code text UNIQUE NOT NULL, status text NOT NULL DEFAULT 'lobby', round_count integer NOT NULL DEFAULT 12, current_round integer NOT NULL DEFAULT 1, theme_category text NOT NULL DEFAULT 'safe', custom_theme text, started_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
+    await sql`CREATE TABLE IF NOT EXISTS rooms (id text PRIMARY KEY, code text UNIQUE NOT NULL, status text NOT NULL DEFAULT 'lobby', round_count integer NOT NULL DEFAULT 12, current_round integer NOT NULL DEFAULT 1, theme_category text NOT NULL DEFAULT 'safe', custom_theme text, welcome_ack text[] NOT NULL DEFAULT '{}', started_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS theme_category text NOT NULL DEFAULT 'safe'`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS custom_theme text`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS welcome_ack text[] NOT NULL DEFAULT '{}'`;
     await sql`CREATE TABLE IF NOT EXISTS players (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, name text NOT NULL, token text UNIQUE NOT NULL, is_host boolean NOT NULL DEFAULT false, sips integer NOT NULL DEFAULT 0, joined_at timestamptz NOT NULL DEFAULT now())`;
     await sql`CREATE TABLE IF NOT EXISTS deck_cards (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, card_number integer NOT NULL, type text NOT NULL, actor_id text NOT NULL REFERENCES players(id), target_id text NOT NULL REFERENCES players(id), status text NOT NULL DEFAULT 'hidden', payload text NOT NULL DEFAULT '{}', secret text NOT NULL DEFAULT '{}', result text, created_at timestamptz NOT NULL DEFAULT now(), completed_at timestamptz, UNIQUE(room_id, card_number))`;
     await sql`ALTER TABLE deck_cards ADD COLUMN IF NOT EXISTS revealed_by text[] NOT NULL DEFAULT '{}'`;
@@ -118,7 +119,7 @@ async function state(roomCode: string, token: string) {
   const cardRows = room.status === "playing" ? await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.card_number = ${room.current_round} LIMIT 1` : [];
   const lastRows = await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.status = 'complete' ORDER BY c.card_number DESC LIMIT 1`;
   return {
-    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, startedAt: room.started_at },
+    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, welcomeAck: Array.isArray(room.welcome_ack) ? room.welcome_ack : [], startedAt: room.started_at },
     players, activeCard: publicCard(cardRows[0], me.id), lastCard: publicCard(lastRows[0], me.id, true), meId: me.id,
   };
 }
@@ -173,6 +174,13 @@ export default async function handler(req: any, res: any) {
 
     const token = String(body.token ?? "");
     const { room, me, card } = await getContext(roomCode, token);
+    const welcomeAck = Array.isArray(room.welcome_ack) ? room.welcome_ack : [];
+    const welcomeComplete = welcomeAck.length >= 2;
+    if (room.status === "playing" && !welcomeComplete && body.action !== "ackWelcome") throw new Error("Both players need to confirm the Honto welcome first.");
+    if (body.action === "ackWelcome") {
+      if (room.status !== "playing") throw new Error("The game has not started yet.");
+      await sql`UPDATE rooms SET welcome_ack = ARRAY(SELECT DISTINCT player_id FROM unnest(COALESCE(welcome_ack, ARRAY[]::text[]) || ARRAY[${me.id}]::text[]) AS player_id), updated_at = now() WHERE id = ${room.id}`;
+    }
     if (body.action === "startWheel") {
       const completedRows = await sql`SELECT * FROM deck_cards WHERE room_id = ${room.id} AND status = 'complete' ORDER BY card_number DESC LIMIT 1`;
       const completed = completedRows[0] as any;
@@ -197,7 +205,7 @@ export default async function handler(req: any, res: any) {
       if (players.length !== 2) throw new Error("Honto needs exactly two players.");
       await buildDeck(room.id, Number(room.round_count), players, room.theme_category);
       await sql`UPDATE players SET sips = 0 WHERE room_id = ${room.id}`;
-      await sql`UPDATE rooms SET status = 'playing', current_round = 1, started_at = now(), updated_at = now() WHERE id = ${room.id}`;
+      await sql`UPDATE rooms SET status = 'playing', current_round = 1, welcome_ack = '{}', started_at = now(), updated_at = now() WHERE id = ${room.id}`;
     }
     if (body.action === "drawCard") {
       if (!card || card.status !== "hidden" || card.actor_id !== me.id) throw new Error("It is not your turn to draw.");

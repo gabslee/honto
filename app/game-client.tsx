@@ -15,7 +15,7 @@ type Card = {
   result: { correct?: boolean; guessedIndex?: number; choice?: "answer" | "skip"; skipped?: boolean; skipById?: string; drinkerId?: string | null; spinById?: string | null; wheelStartedAt?: string; sips?: number; correctNumber?: number; wrongGuesses?: number[]; firstTry?: boolean; actorChoice?: RpsChoice; targetChoice?: RpsChoice; bothDrink?: boolean };
 };
 type GameState = {
-  room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; themeCategory: string; customTheme: string | null; startedAt: string | null };
+  room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; themeCategory: string; customTheme: string | null; welcomeAck: string[]; startedAt: string | null };
   players: Player[]; activeCard: Card | null; lastCard: Card | null; meId: string;
 };
 
@@ -160,6 +160,7 @@ function Lobby({ game, host, busy, copied, copyInvite, act }: { game: GameState;
 }
 
 function GameTable({ game, busy, act }: { game: GameState; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
+  if (game.room.welcomeAck.length < 2) return <WelcomeScreen game={game} busy={busy} acknowledge={() => act("ackWelcome")} />;
   const card = game.activeCard;
   const shownIntro = useRef(new Set<string>());
   const [introCardId, setIntroCardId] = useState<string | null>(null);
@@ -183,6 +184,11 @@ function GameTable({ game, busy, act }: { game: GameState; busy: boolean; act: (
   else content = <BothDrinkCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
   const canSkip = Boolean(card && revealComplete && ["ready", "guess", "choose"].includes(card.status));
   return <section className="game-stage"><div className="round-strip"><span>CARD</span><b>{game.room.currentRound}/{game.room.roundCount}</b><div className="progress"><i style={{ width: `${(game.room.currentRound / game.room.roundCount) * 100}%` }}/></div><span>{game.room.roundCount - game.room.currentRound} LEFT IN THE DECK</span></div><div className="round-controls">{canSkip && <SkipButton busy={busy} skip={() => act("skipCard")}/>}</div><ScoreRail players={game.players} meId={game.meId}/>{content}{introCardId === card?.id && card && <CardReveal card={card} meId={game.meId} acknowledge={() => act("ackReveal")}/>}</section>;
+}
+
+function WelcomeScreen({ game, busy, acknowledge }: { game: GameState; busy: boolean; acknowledge: () => Promise<unknown> }) {
+  const acknowledged = game.room.welcomeAck.includes(game.meId);
+  return <section className="game-stage welcome-stage"><div className="welcome-card"><span className="eyebrow">WELCOME TO HONTO</span><div className="welcome-mark" aria-hidden="true"><span>本当</span><b>?!</b></div><h1>Welcome to Honto.</h1><p>Honto is a shared card game for two. Draw a card, discover a mini game, and read each other as you play.</p><p className="welcome-flow"><strong>How it works</strong><br/>One player draws the next card. Both players see the challenge, then play it together until the next card.</p>{acknowledged ? <div className="welcome-waiting"><span className="typing"><i/><i/><i/></span><strong>Waiting for the other player…</strong><small>They need to tap GOT IT before the first card opens.</small></div> : <button type="button" className="primary-button welcome-button" disabled={busy} onClick={() => void acknowledge()}>{busy ? "SAVING…" : "GOT IT →"}</button>}</div></section>;
 }
 
 function SkipButton({ busy, skip }: { busy: boolean; skip: () => Promise<unknown> }) {
