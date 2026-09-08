@@ -178,7 +178,7 @@ export default async function handler(req: any, res: any) {
       const completed = completedRows[0] as any;
       if (!completed) throw new Error("There is no completed wheel to spin.");
       const result = parse(completed.result);
-      if (!["honto", "preference", "rps", "both"].includes(completed.type) && !result.skipped) throw new Error("This card does not use the sip wheel.");
+      if (!["honto", "preference", "rps", "both"].includes(completed.type) && !(completed.type === "estimate" && result.firstTry) && !result.skipped) throw new Error("This card does not use the sip wheel.");
       const spinById = result.spinById ?? (completed.type === "both" ? completed.actor_id : result.drinkerId);
       if (spinById !== me.id) throw new Error("The other player is responsible for spinning this wheel.");
       if (!result.wheelStartedAt) await sql`UPDATE deck_cards SET result = ${JSON.stringify({ ...result, spinById, wheelStartedAt: new Date().toISOString() })} WHERE id = ${completed.id} AND status = 'complete'`;
@@ -308,9 +308,9 @@ export default async function handler(req: any, res: any) {
         await sql`UPDATE deck_cards SET payload = ${JSON.stringify({ ...payload, wrongGuesses: [...wrongGuesses, estimate] })} WHERE id = ${card.id} AND status = 'guess'`;
         await sql`UPDATE players SET sips = sips + 1 WHERE id = ${card.target_id}`;
       } else {
-        const firstTry = wrongGuesses.length === 0; const drinkerId = firstTry ? card.actor_id : null;
-        const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ correctNumber, wrongGuesses, firstTry, drinkerId, sips: firstTry ? 1 : wrongGuesses.length })}, completed_at = now() WHERE id = ${card.id} AND status = 'guess' RETURNING id`;
-        if (updated[0]) { if (drinkerId) await sql`UPDATE players SET sips = sips + 1 WHERE id = ${drinkerId}`; await finishCard(room); }
+        const firstTry = wrongGuesses.length === 0; const drinkerId = firstTry ? card.actor_id : null; const sips = firstTry ? spinSips() : wrongGuesses.length;
+        const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ correctNumber, wrongGuesses, firstTry, drinkerId, spinById: firstTry ? drinkerId : null, sips })}, completed_at = now() WHERE id = ${card.id} AND status = 'guess' RETURNING id`;
+        if (updated[0]) { if (drinkerId) await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${drinkerId}`; await finishCard(room); }
       }
     }
     return json(res, await state(roomCode, token));
