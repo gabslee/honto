@@ -43,7 +43,7 @@ function shuffleLocal<T>(items: readonly T[]) {
   return [...items].sort(() => Math.random() - 0.5);
 }
 async function gameApi(body: Record<string, unknown>) {
-  const response = await fetch("/api/game", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const response = await fetch("/api/game", { method: "POST", cache: "no-store", headers: { "content-type": "application/json", "cache-control": "no-cache" }, body: JSON.stringify(body) });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? "Something went wrong.");
   return data;
@@ -62,6 +62,8 @@ export default function GameClient() {
 
   useEffect(() => {
     const room = new URLSearchParams(location.search).get("room")?.toUpperCase() ?? "";
+    // A bare URL is always a fresh landing page. Never resurrect a previous room from storage without an explicit invite code.
+    if (!room) { localStorage.removeItem("honto-session"); setSession(null); setJoinCode(""); setMode("create"); return; }
     const saved = localStorage.getItem("honto-session");
     if (saved) try {
       const parsed = JSON.parse(saved) as { code?: string; token?: string; savedAt?: number };
@@ -74,12 +76,16 @@ export default function GameClient() {
   const refresh = useCallback(async (quiet = false) => {
     if (!session) return;
     try {
-      const response = await fetch(`/api/game?code=${encodeURIComponent(session.code)}&token=${encodeURIComponent(session.token)}`, { cache: "no-store" });
+      const response = await fetch(`/api/game?code=${encodeURIComponent(session.code)}&token=${encodeURIComponent(session.token)}&_=${Date.now()}`, { cache: "no-store", headers: { "cache-control": "no-cache" } });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "This room is no longer available.");
       setGame(data);
       if (!quiet) setError("");
-    } catch (cause) { if (!quiet) setError(cause instanceof Error ? cause.message : "Connection error."); }
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Connection error.";
+      if (/room not found|no longer available|session is not valid|invalid session/i.test(message)) { localStorage.removeItem("honto-session"); setSession(null); setGame(null); setDismissedReveal(null); }
+      if (!quiet) setError(message);
+    }
   }, [session]);
 
   useEffect(() => { void refresh(); }, [refresh]);

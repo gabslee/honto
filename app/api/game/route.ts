@@ -1,5 +1,8 @@
 import gameHandler from "../../../api/game";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function run(request: Request) {
   const url = new URL(request.url);
   let body: Record<string, unknown> = {};

@@ -1,5 +1,8 @@
 import { themeCategories } from "../../i18n";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type Body = { kind?: "theme" | "lies" | "question"; truth?: string; prompt?: string; category?: string | string[]; exclude?: string[]; fresh?: boolean; customTheme?: string; questionHint?: string; count?: number };
 
 const fallbackTheme = (categories: string | string[] = "safe", exclude: string[] = []) => {
