@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { questionLibrary } from "./i18n";
 
-type ThemeKey = "mixed" | "family" | "innocent" | "life" | "flirty" | "spicy";
+type ThemeKey = "general" | "life" | "relationships" | "spicy";
 type Player = { id: string; name: string; isHost: number; sips: number; joinedAt: string };
 type Card = {
   id: string; cardNumber: number; type: "hidden" | "honto" | "question" | "preference" | "estimate" | "rps" | "both"; completedAt?: string | null;
@@ -20,8 +20,9 @@ type GameState = {
 };
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-const THEME_KEYS: ThemeKey[] = ["mixed", "family", "innocent", "life", "flirty", "spicy"];
-const THEME_LABELS: Record<ThemeKey, string> = { mixed: "General", family: "Family", innocent: "Innocent & silly", life: "Life stories", flirty: "Flirty", spicy: "Spicy · 18+" };
+const THEME_KEYS: ThemeKey[] = ["general", "life", "relationships", "spicy"];
+const THEME_LABELS: Record<ThemeKey, string> = { general: "General", life: "Life & stories", relationships: "Relationships", spicy: "Spicy · 18+" };
+const LEGACY_THEME_MAP: Record<string, ThemeKey> = { mixed: "general", family: "general", innocent: "general", life: "life", flirty: "relationships", spicy: "spicy", wild: "general" };
 const CARD_META = {
   honto: { icon: "🤥", label: "TWO LIES, ONE TRUTH", color: "yellow" },
   question: { icon: "❓", label: "QUESTION OR SIPS", color: "mint" },
@@ -34,11 +35,11 @@ type RpsChoice = "rock" | "paper" | "scissors";
 
 function storedThemes(value?: string | null): ThemeKey[] {
   if (!value || value === "safe") return [];
-  return value.split(",").filter((key): key is ThemeKey => THEME_KEYS.includes(key as ThemeKey));
+  return [...new Set(value.split(",").map((key) => LEGACY_THEME_MAP[key.trim()]).filter((key): key is ThemeKey => Boolean(key)))];
 }
 function activeThemes(value?: string | null) {
   const selected = storedThemes(value);
-  return selected.length ? selected : ["mixed", "family", "innocent", "life"] as ThemeKey[];
+  return selected.length ? selected : ["general", "life"] as ThemeKey[];
 }
 function shuffleLocal<T>(items: readonly T[]) {
   return [...items].sort(() => Math.random() - 0.5);
@@ -233,9 +234,9 @@ function HontoComposer({ card, game, busy, act }: { card: Card; game: GameState;
 function QuestionCard({ card, meId, game, busy, act }: { card: Card; meId: string; game: GameState; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
   const localQuestions = activeThemes(game.room.themeCategory).flatMap((key) => questionLibrary[key]);
   const [question, setQuestion] = useState(""); const [sips, setSips] = useState(1); const [ideas, setIdeas] = useState<string[]>(() => shuffleLocal(localQuestions).slice(0, 3)); const questionPointer = useRef({ x: 0, y: 0, moved: false });
-  const [showQuestionModal, setShowQuestionModal] = useState(false); const [questionHint, setQuestionHint] = useState(""); const [selectedThemes, setSelectedThemes] = useState<ThemeKey[]>(() => [activeThemes(game.room.themeCategory)[0] ?? "mixed"]); const [generating, setGenerating] = useState(false);
+  const [showQuestionModal, setShowQuestionModal] = useState(false); const [questionHint, setQuestionHint] = useState(""); const [selectedThemes, setSelectedThemes] = useState<ThemeKey[]>(() => [activeThemes(game.room.themeCategory)[0] ?? "general"]); const [generating, setGenerating] = useState(false);
   const refreshIdeas = () => setIdeas(shuffleLocal(localQuestions).slice(0, 3));
-  const generateWithAi = async () => { setGenerating(true); try { const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "question", count: 3, category: selectedThemes.length ? [selectedThemes[0]] : ["mixed"], customTheme: game.room.customTheme, questionHint }) }); const data = await response.json(); if (!response.ok || !Array.isArray(data.questions)) throw new Error("No questions available."); setIdeas(data.questions.slice(0, 3)); setShowQuestionModal(false); } catch (cause) { setIdeas(shuffleLocal(localQuestions).slice(0, 3)); setShowQuestionModal(false); } finally { setGenerating(false); } };
+  const generateWithAi = async () => { setGenerating(true); try { const response = await fetch("/api/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "question", count: 3, category: selectedThemes.length ? [selectedThemes[0]] : ["general"], customTheme: game.room.customTheme, questionHint }) }); const data = await response.json(); if (!response.ok || !Array.isArray(data.questions)) throw new Error("No questions available."); setIdeas(data.questions.slice(0, 3)); setShowQuestionModal(false); } catch (cause) { setIdeas(shuffleLocal(localQuestions).slice(0, 3)); setShowQuestionModal(false); } finally { setGenerating(false); } };
   if (card.status === "ready") return card.actorId === meId ? <><div className="play-card question-card"><CardBadge type="question"/><h2>Ask <em>{card.targetName}</em> anything.</h2><p className="hint">Choose a curated prompt, ask the AI for ideas, or write your own. If they answer out loud, you drink. If they skip, they drink.</p><textarea className="mini-game-input" value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={220} placeholder="Write your question…"/><div className="question-tools"><button type="button" className="ai-button" onClick={() => setShowQuestionModal(true)}>GET 3 AI QUESTIONS ✦</button><button type="button" className="curated-button" onClick={refreshIdeas}>USE CURATED QUESTIONS ↻</button></div>{ideas.length > 0 && <div className="question-option-list"><span>CHOOSE ONE · {activeThemes(game.room.themeCategory).join(" · ").toUpperCase()}</span>{ideas.map((idea) => <button type="button" className="question-option" key={idea} onPointerDown={(event) => { questionPointer.current = { x: event.clientX, y: event.clientY, moved: false }; }} onPointerMove={(event) => { if (Math.hypot(event.clientX - questionPointer.current.x, event.clientY - questionPointer.current.y) > 10) questionPointer.current.moved = true; }} onPointerCancel={() => { questionPointer.current.moved = true; }} onClick={(event) => { if (questionPointer.current.moved && event.detail !== 0) { event.preventDefault(); return; } setQuestion(idea); }}>{idea}</button>)}</div>}<SipPicker value={sips} onChange={setSips}/><button className="primary-button" disabled={busy || question.trim().length < 3} onClick={() => act("submitQuestion", { question, sips })}>SEND QUESTION →</button></div>{showQuestionModal && <div className="question-ai-backdrop" role="presentation"><div className="question-ai-modal" role="dialog" aria-modal="true" aria-labelledby="question-ai-title"><button type="button" className="question-modal-close" aria-label="Close question helper" onClick={() => setShowQuestionModal(false)}>×</button><span className="eyebrow">QUESTION HELPER</span><h2 id="question-ai-title">What kind of question do you want to ask?</h2><textarea className="question-hint-input" value={questionHint} onChange={(event) => setQuestionHint(event.target.value)} maxLength={180} placeholder="e.g. something playful about a first date"/><fieldset className="question-theme-fieldset"><legend>Choose one theme</legend><div className="question-theme-checks">{THEME_KEYS.map((key) => <label key={key} className={selectedThemes.includes(key) ? "selected" : ""}><input type="radio" name="question-theme" checked={selectedThemes.includes(key)} onChange={() => setSelectedThemes([key])}/><span>{THEME_LABELS[key]}</span></label>)}</div></fieldset><button type="button" className="primary-button" disabled={generating} onClick={generateWithAi}>{generating ? "THINKING…" : "GENERATE 3 QUESTIONS →"}</button><p className="question-modal-note">Choose one category to guide the AI. Leave the text empty for broad prompts.</p></div></div>}</> : <Waiting title={`${card.actorName} is choosing a question…`} text="Answer honestly or take the sips."/>;
   if (card.status === "choose") return card.targetId === meId ? <div className="play-card question-card"><CardBadge type="question"/><h2>{card.actorName} wants to know…</h2><blockquote className="big-question">{card.payload.question}</blockquote><p className="hint"><SipMug/> Answer out loud and {card.actorName} takes {card.payload.sips} {card.payload.sips === 1 ? "sip" : "sips"}. Skip and you take them.</p><div className="mini-game-actions"><button className="primary-button" disabled={busy} onClick={() => act("answerQuestion", { choice: "answer" })}>I&apos;LL ANSWER</button><button className="primary-button dare-button" disabled={busy} onClick={() => act("answerQuestion", { choice: "skip" })}><SipMug/> TAKE {card.payload.sips} SIPS</button></div></div> : <Waiting title={`${card.targetName} is deciding…`} text={card.payload.question ?? "The question is on the table."}/>;
   return null;

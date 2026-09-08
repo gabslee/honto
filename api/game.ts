@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { ESTIMATE_QUESTIONS_BY_THEME, PREFERENCE_CARDS_BY_THEME, type CuratedTheme } from "../data/curated";
 
 type CardType = "honto" | "question" | "preference" | "estimate" | "rps" | "both";
 type RpsChoice = "rock" | "paper" | "scissors";
@@ -12,28 +13,6 @@ type Body = {
 const WORDS = ["MOON", "MINT", "WAVE", "SAKE", "NEON", "MISO", "YUZU", "NORI", "KITSU", "MOMO", "SORA", "KUMA", "HOSHI", "RAMEN", "UMAMI"];
 const CARD_TYPES: CardType[] = ["honto", "question", "preference", "estimate", "rps", "both"];
 const ROOM_IDLE_MS = 12 * 60 * 60 * 1000;
-const ESTIMATE_QUESTIONS = [
-  "How many countries have you visited?", "How many hours do you usually sleep each night?",
-  "How many concerts have you been to?", "How many times a week do you order food?",
-  "How many unread messages are on your phone right now?", "How many alarms do you set to wake up?",
-  "How many pairs of shoes do you own?", "How many minutes does it take you to get ready?",
-  "How many photos are currently on your phone?", "How many books have you read this year?",
-  "How many apps do you use every day?", "How many cities have you lived in?",
-];
-const PREFERENCE_CARDS = [
-  { question: "Which place would you visit first?", options: ["Japan", "Italy", "Iceland"] },
-  { question: "Which comfort food would you choose tonight?", options: ["Pizza", "Sushi", "Tacos"] },
-  { question: "Which kind of trip sounds best?", options: ["Beach escape", "Mountain cabin", "Big city"] },
-  { question: "Which plan would you pick for a free day?", options: ["Stay home", "Explore somewhere new", "Meet friends"] },
-  { question: "Which new skill would you rather learn?", options: ["Play an instrument", "Speak a language", "Cook really well"] },
-  { question: "Which movie night would you choose?", options: ["Comedy", "Horror", "Romance"] },
-  { question: "Which surprise would make you happiest?", options: ["A planned trip", "A meaningful gift", "A surprise party"] },
-  { question: "Which place would you rather live for a year?", options: ["By the sea", "In the countryside", "In a huge city"] },
-  { question: "Which little luxury matters most?", options: ["Great coffee", "A perfect bed", "Fast internet"] },
-  { question: "Which evening sounds most like you?", options: ["A quiet dinner", "A crowded party", "A spontaneous adventure"] },
-  { question: "Which pet would you choose?", options: ["Dog", "Cat", "Something unusual"] },
-  { question: "Which gift would you rather receive?", options: ["An experience", "Something useful", "Something sentimental"] },
-];
 
 const sql = neon(process.env.DATABASE_URL ?? "");
 let schemaReady: Promise<void> | null = null;
@@ -56,6 +35,11 @@ const id = () => crypto.randomUUID();
 const code = () => `${WORDS[Math.floor(Math.random() * WORDS.length)]}-${Math.floor(10 + Math.random() * 90)}`;
 const spinSips = () => 1 + Math.floor(Math.random() * 3);
 const cleanName = (value?: string) => value?.trim().replace(/\s+/g, " ").slice(0, 24) ?? "";
+const LEGACY_THEME_MAP: Record<string, CuratedTheme> = { mixed: "general", family: "general", innocent: "general", life: "life", flirty: "relationships", spicy: "spicy", wild: "general" };
+const normalizedThemes = (value?: string | null): CuratedTheme[] => {
+  const themes = String(value ?? "").split(",").map((item) => LEGACY_THEME_MAP[item.trim()]).filter((item): item is CuratedTheme => Boolean(item));
+  return [...new Set(themes)].length ? [...new Set(themes)] : ["general", "life"];
+};
 const json = (res: any, body: unknown, status = 200) => { res.setHeader?.("Cache-Control", "no-store, max-age=0"); return res.status(status).json(body); };
 const parse = (value: unknown) => { try { return JSON.parse(typeof value === "string" ? value : "{}"); } catch { return {}; } };
 const shuffle = <T,>(items: T[]) => {
@@ -86,11 +70,12 @@ function estimateOptions(correct: number) {
   return shuffle([...candidates].slice(0, 5));
 }
 
-async function buildDeck(roomId: string, roundCount: number, players: any[]) {
+async function buildDeck(roomId: string, roundCount: number, players: any[], themeCategory?: string | null) {
   await sql`DELETE FROM deck_cards WHERE room_id = ${roomId}`;
   const types = makeDeckTypes(roundCount);
-  const questions = shuffle(ESTIMATE_QUESTIONS);
-  const preferences = shuffle(PREFERENCE_CARDS);
+  const themes = normalizedThemes(themeCategory);
+  const questions = shuffle(themes.flatMap((theme) => ESTIMATE_QUESTIONS_BY_THEME[theme]));
+  const preferences = shuffle(themes.flatMap((theme) => PREFERENCE_CARDS_BY_THEME[theme]));
   for (let index = 0; index < roundCount; index += 1) {
     const actor = players[index % 2];
     const target = players[(index + 1) % 2];
@@ -201,8 +186,7 @@ export default async function handler(req: any, res: any) {
     if (body.action === "configure") {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can change the room settings.");
       const roundCount = Number.isInteger(body.roundCount) ? Math.max(6, Math.min(60, Number(body.roundCount))) : 12;
-      const allowed = new Set(["mixed", "family", "innocent", "life", "flirty", "spicy"]);
-      const selected = (body.themeCategory ?? "").split(",").map((item) => item.trim()).filter((item) => allowed.has(item));
+      const selected = (body.themeCategory ?? "").split(",").map((item) => LEGACY_THEME_MAP[item.trim()]).filter((item): item is CuratedTheme => Boolean(item));
       const themeCategory = [...new Set(selected)].join(",") || "safe";
       const customTheme = typeof body.customTheme === "string" ? body.customTheme.trim().slice(0, 80) || null : null;
       await sql`UPDATE rooms SET round_count = ${roundCount}, theme_category = ${themeCategory}, custom_theme = ${customTheme}, updated_at = now() WHERE id = ${room.id}`;
@@ -211,7 +195,7 @@ export default async function handler(req: any, res: any) {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can start the game.");
       const players = await sql`SELECT id FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
       if (players.length !== 2) throw new Error("Honto needs exactly two players.");
-      await buildDeck(room.id, Number(room.round_count), players);
+      await buildDeck(room.id, Number(room.round_count), players, room.theme_category);
       await sql`UPDATE players SET sips = 0 WHERE room_id = ${room.id}`;
       await sql`UPDATE rooms SET status = 'playing', current_round = 1, started_at = now(), updated_at = now() WHERE id = ${room.id}`;
     }

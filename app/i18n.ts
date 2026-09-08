@@ -1,4 +1,4 @@
-import { themeCategories as improvedThemeCategories } from "./theme-data";
+import { QUESTION_LIBRARY_BY_THEME, THEME_CUES } from "../data/curated";
 
 export const supportedLocales = ["en"] as const;
 export type Locale = (typeof supportedLocales)[number];
@@ -13,10 +13,8 @@ const legacyThemeCategories = {
   wild: ["a party that got chaotic", "a ridiculous dare", "a night you barely planned", "a harmless conspiracy", "a spontaneous trip", "a rule you broke", "a risky fashion choice", "a terrible idea that worked", "a story nobody believes", "a moment you lost control", "a bizarre coincidence", "a mysterious message", "a time you improvised", "a strange encounter", "an accidental adventure", "a secret alter ego", "a wild misunderstanding", "a thing you did on a bet", "a story for future you", "your most chaotic friend"],
 } as const;
 
-export const themeCategories = improvedThemeCategories;
-
 /** Curated question prompts used by the Question card. Themes only affect this library. */
-export const questionLibrary = {
+const legacyQuestionLibrary = {
   mixed: [
     "What is something you believed for far too long?",
     "What small decision changed your life more than expected?",
@@ -61,6 +59,9 @@ export const questionLibrary = {
   ],
 } as const;
 
+export const themeCategories = THEME_CUES;
+export const questionLibrary = QUESTION_LIBRARY_BY_THEME;
+
 export const messages = {
   en: {
     meta: {
@@ -75,7 +76,7 @@ export const messages = {
       enter: "We couldn't enter the room.",
       sessionExpired: "This room session is no longer available. Start or join a new game.",
     },
-    prompts: themeCategories.mixed,
+    prompts: themeCategories.general,
     common: { back: "Back", exit: "Exit", you: "you", sip: "sip", sips: "sips" },
     loading: "Setting the table…",
     room: "ROOM",
@@ -102,7 +103,7 @@ export const messages = {
       rules: "Tonight's rules", yourCall: "YOUR CALL", length: "Game length", roundsSuffix: " rounds", custom: "Custom",
       everyoneSips: "Everyone sips", never: "Never", every1: "Every round", every3: "Every 3 rounds", every5: "Every 5 rounds", everyCustom: "Custom rounds",
       timer: "Sip reminder", timerHint: "Everyone drinks when the reminder appears", timerMinutes: "minutes", timerCustom: "Custom minutes",
-      writingTimer: "Writing timer", guessingTimer: "Guessing timer", enabled: "Enabled", theme: "Theme categories", mixed: "General", family: "Family", life: "Life stories", flirty: "Flirty", spicy: "Spicy · 18+", wild: "Wild", innocent: "Innocent & silly", selectSubjects: "Select any subjects you want in this game. Leave all unchecked for safe general themes.", exclusiveThemes: "Fresh themes", customTheme: "Your own subject", customThemePlaceholder: "e.g. our worst travel stories", gameMode: "Game mode", modeHonto: "Two Lies, One Truth", modeTruthSips: "Truth or Sips", truthOrDare: "Truth or Sips mini game", miniGameFrequency: "Mini game frequency", miniEvery2: "Every 2 rounds", miniEvery3: "Every 3 rounds", miniEvery5: "Every 5 rounds", miniEvery8: "Every 8 rounds",
+      writingTimer: "Writing timer", guessingTimer: "Guessing timer", enabled: "Enabled", theme: "Theme categories", general: "General", life: "Life & stories", relationships: "Relationships", spicy: "Spicy · 18+", selectSubjects: "Select any subjects you want in this game. Leave all unchecked for safe general themes.", exclusiveThemes: "Fresh themes", customTheme: "Your own subject", customThemePlaceholder: "e.g. our worst travel stories", gameMode: "Game mode", modeHonto: "Two Lies, One Truth", modeTruthSips: "Truth or Sips", truthOrDare: "Truth or Sips mini game", miniGameFrequency: "Mini game frequency", miniEvery2: "Every 2 rounds", miniEvery3: "Every 3 rounds", miniEvery5: "Every 5 rounds", miniEvery8: "Every 8 rounds",
       off: "Off", waiting: "WAITING FOR +1 PLAYER…", start: "START THE GAME →", pause: "PAUSE SESSION", resume: "RESUME SESSION",
       hostNote: "The host chooses the rules and starts the game.",
     },
