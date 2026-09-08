@@ -15,6 +15,52 @@ const legacyThemeCategories = {
 
 export const themeCategories = improvedThemeCategories;
 
+/** Curated question prompts used by the Question card. Themes only affect this library. */
+export const questionLibrary = {
+  mixed: [
+    "What is something you believed for far too long?",
+    "What small decision changed your life more than expected?",
+    "What is a story about you that sounds made up but is true?",
+    "What is one habit you would like your friend to understand?",
+    "What is the strangest compliment you have received?",
+  ],
+  family: [
+    "What family tradition would you keep forever?",
+    "What is a funny story your family still tells about you?",
+    "Who in your family influenced you the most?",
+    "What did your family teach you that you still use today?",
+    "What is a family rule you secretly ignored?",
+  ],
+  innocent: [
+    "What childhood fear makes you laugh now?",
+    "What was your favorite thing to do after school?",
+    "What harmless mistake do you still remember clearly?",
+    "What snack could you never get tired of?",
+    "What hobby would you love to try again?",
+  ],
+  life: [
+    "What decision are you proud you made?",
+    "What lesson did you learn later than most people?",
+    "What is a goal you changed your mind about?",
+    "What experience made you see someone differently?",
+    "What skill would make your everyday life easier?",
+  ],
+  flirty: [
+    "What is the boldest message you have ever sent?",
+    "What instantly makes someone more attractive to you?",
+    "What is your most memorable first date?",
+    "What romantic gesture would secretly win you over?",
+    "What is your biggest green flag in another person?",
+  ],
+  spicy: [
+    "What boundary took you a long time to learn to say out loud?",
+    "What kind of intimacy makes you feel most connected?",
+    "What desire have you changed your mind about?",
+    "What is something you find unexpectedly attractive?",
+    "What makes you feel confident when flirting?",
+  ],
+} as const;
+
 export const messages = {
   en: {
     meta: {

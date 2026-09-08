@@ -103,7 +103,7 @@ function publicCard(row: any, meId: string, completed = false) {
   if (!row) return null;
   const payload = parse(row.payload);
   const card: any = {
-    id: row.id, cardNumber: row.cardNumber, type: row.type, status: row.status,
+    id: row.id, cardNumber: row.cardNumber, type: row.type, status: row.status, completedAt: row.completedAt ?? null,
     actorId: row.actorId, actorName: row.actorName, targetId: row.targetId, targetName: row.targetName,
     payload, result: parse(row.result),
   };
@@ -129,8 +129,8 @@ async function state(roomCode: string, token: string) {
   const me: any = meRows[0];
   if (!me) throw new Error("Your session is not valid for this room.");
   const players = await sql`SELECT id, name, is_host AS "isHost", sips, joined_at AS "joinedAt" FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
-  const cardRows = room.status === "playing" ? await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.card_number = ${room.current_round} LIMIT 1` : [];
-  const lastRows = await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.status = 'complete' ORDER BY c.card_number DESC LIMIT 1`;
+  const cardRows = room.status === "playing" ? await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.card_number = ${room.current_round} LIMIT 1` : [];
+  const lastRows = await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.status = 'complete' ORDER BY c.card_number DESC LIMIT 1`;
   return {
     room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, startedAt: room.started_at },
     players, activeCard: publicCard(cardRows[0], me.id), lastCard: publicCard(lastRows[0], me.id, true), meId: me.id,
