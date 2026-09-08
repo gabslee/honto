@@ -46,6 +46,7 @@ function ensureSchema() {
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS custom_theme text`;
     await sql`CREATE TABLE IF NOT EXISTS players (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, name text NOT NULL, token text UNIQUE NOT NULL, is_host boolean NOT NULL DEFAULT false, sips integer NOT NULL DEFAULT 0, joined_at timestamptz NOT NULL DEFAULT now())`;
     await sql`CREATE TABLE IF NOT EXISTS deck_cards (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, card_number integer NOT NULL, type text NOT NULL, actor_id text NOT NULL REFERENCES players(id), target_id text NOT NULL REFERENCES players(id), status text NOT NULL DEFAULT 'hidden', payload text NOT NULL DEFAULT '{}', secret text NOT NULL DEFAULT '{}', result text, created_at timestamptz NOT NULL DEFAULT now(), completed_at timestamptz, UNIQUE(room_id, card_number))`;
+    await sql`ALTER TABLE deck_cards ADD COLUMN IF NOT EXISTS revealed_by text[] NOT NULL DEFAULT '{}'`;
     await sql`CREATE INDEX IF NOT EXISTS idx_deck_cards_room_status ON deck_cards(room_id, status, card_number)`;
   })();
   return schemaReady;
@@ -105,7 +106,7 @@ function publicCard(row: any, meId: string, completed = false) {
   const card: any = {
     id: row.id, cardNumber: row.cardNumber, type: row.type, status: row.status, completedAt: row.completedAt ?? null,
     actorId: row.actorId, actorName: row.actorName, targetId: row.targetId, targetName: row.targetName,
-    payload, result: parse(row.result),
+    payload, result: parse(row.result), revealedBy: Array.isArray(row.revealedBy) ? row.revealedBy : [],
   };
   if (row.status === "hidden") return { ...card, type: "hidden", payload: {}, result: {} };
   if (row.type === "rps" && row.status !== "complete") {
@@ -129,8 +130,8 @@ async function state(roomCode: string, token: string) {
   const me: any = meRows[0];
   if (!me) throw new Error("Your session is not valid for this room.");
   const players = await sql`SELECT id, name, is_host AS "isHost", sips, joined_at AS "joinedAt" FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
-  const cardRows = room.status === "playing" ? await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.card_number = ${room.current_round} LIMIT 1` : [];
-  const lastRows = await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.status = 'complete' ORDER BY c.card_number DESC LIMIT 1`;
+  const cardRows = room.status === "playing" ? await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.card_number = ${room.current_round} LIMIT 1` : [];
+  const lastRows = await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.status = 'complete' ORDER BY c.card_number DESC LIMIT 1`;
   return {
     room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, startedAt: room.started_at },
     players, activeCard: publicCard(cardRows[0], me.id), lastCard: publicCard(lastRows[0], me.id, true), meId: me.id,
@@ -217,6 +218,10 @@ export default async function handler(req: any, res: any) {
     if (body.action === "drawCard") {
       if (!card || card.status !== "hidden" || card.actor_id !== me.id) throw new Error("It is not your turn to draw.");
       await sql`UPDATE deck_cards SET status = 'ready' WHERE id = ${card.id} AND status = 'hidden'`;
+    }
+    if (body.action === "ackReveal") {
+      if (!card || card.status !== "ready" || ![card.actor_id, card.target_id].includes(me.id)) throw new Error("This card is not ready to reveal.");
+      await sql`UPDATE deck_cards SET revealed_by = ARRAY(SELECT DISTINCT player_id FROM unnest(COALESCE(revealed_by, ARRAY[]::text[]) || ARRAY[${me.id}]::text[]) AS player_id) WHERE id = ${card.id} AND status = 'ready'`;
     }
     if (body.action === "submitHonto") {
       if (!card || card.type !== "honto" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("This card is not ready for your stories.");

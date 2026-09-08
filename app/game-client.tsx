@@ -11,6 +11,7 @@ type Card = {
   actorId: string; actorName: string; targetId: string; targetName: string;
   payload: { prompt?: string; statements?: string[]; question?: string; sips?: number; options?: Array<number | string>; wrongGuesses?: number[]; hasChosen?: boolean; tieCount?: number };
   secret?: { truthIndex?: number; preferenceIndex?: number; correctNumber?: number };
+  revealedBy?: string[];
   result: { correct?: boolean; guessedIndex?: number; choice?: "answer" | "skip"; drinkerId?: string | null; spinById?: string | null; wheelStartedAt?: string; sips?: number; correctNumber?: number; wrongGuesses?: number[]; firstTry?: boolean; actorChoice?: RpsChoice; targetChoice?: RpsChoice; bothDrink?: boolean };
 };
 type GameState = {
@@ -151,22 +152,25 @@ function GameTable({ game, busy, act }: { game: GameState; busy: boolean; act: (
   const card = game.activeCard;
   const shownIntro = useRef(new Set<string>());
   const [introCardId, setIntroCardId] = useState<string | null>(null);
+  const revealComplete = !card || card.status !== "ready" || (card.revealedBy?.length ?? 0) >= 2;
   useEffect(() => {
     if (card?.status === "ready" && !shownIntro.current.has(card.id)) {
       shownIntro.current.add(card.id);
       setIntroCardId(card.id);
     }
-  }, [card?.id, card?.status]);
+    if (card?.status === "ready" && (card.revealedBy?.length ?? 0) >= 2) setIntroCardId(null);
+  }, [card?.id, card?.status, card?.revealedBy?.length]);
   let content;
   if (!card) content = <Waiting title="Finding the next card…" text="The shared deck is syncing."/>;
   else if (card.status === "hidden") content = <DrawCard key={card.id} card={card} meId={game.meId} busy={busy} draw={() => act("drawCard")}/>;
+  else if (!revealComplete) content = <Waiting title="Reveal the card together." text="Both players tap the card before the challenge begins."/>;
   else if (card.type === "honto") content = <HontoCard key={card.id} card={card} meId={game.meId} game={game} busy={busy} act={act}/>;
   else if (card.type === "question") content = <QuestionCard key={card.id} card={card} meId={game.meId} game={game} busy={busy} act={act}/>;
   else if (card.type === "preference") content = <PreferenceCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
   else if (card.type === "estimate") content = <EstimateCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
   else if (card.type === "rps") content = <RpsCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
   else content = <BothDrinkCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
-  return <section className="game-stage"><div className="round-strip"><span>CARD</span><b>{game.room.currentRound}/{game.room.roundCount}</b><div className="progress"><i style={{ width: `${(game.room.currentRound / game.room.roundCount) * 100}%` }}/></div><span>{game.room.roundCount - game.room.currentRound} LEFT IN THE DECK</span></div><ScoreRail players={game.players} meId={game.meId}/>{content}{introCardId === card?.id && card && <CardReveal card={card} continueGame={() => setIntroCardId(null)}/>}</section>;
+  return <section className="game-stage"><div className="round-strip"><span>CARD</span><b>{game.room.currentRound}/{game.room.roundCount}</b><div className="progress"><i style={{ width: `${(game.room.currentRound / game.room.roundCount) * 100}%` }}/></div><span>{game.room.roundCount - game.room.currentRound} LEFT IN THE DECK</span></div><ScoreRail players={game.players} meId={game.meId}/>{content}{introCardId === card?.id && card && <CardReveal card={card} meId={game.meId} acknowledge={() => act("ackReveal")}/>}</section>;
 }
 
 function DrawCard({ card, meId, busy, draw }: { card: Card; meId: string; busy: boolean; draw: () => Promise<unknown> }) {
@@ -177,9 +181,33 @@ function DrawCard({ card, meId, busy, draw }: { card: Card; meId: string; busy: 
   return <div className="play-card deck-draw"><span className="turn-badge">CARD {card.cardNumber}</span><h2>{mine ? "Your turn to draw." : `${card.actorName} is drawing the next card…`}</h2><p className="hint">{mine ? "Tap the card to flip it and reveal what comes next." : "The card will turn over on both screens."}</p><div className="draw-card-zone">{mine ? <button className={`honto-playing-card ${flipping ? "is-flipping" : ""}`} aria-label="Draw the next Honto card" disabled={busy || flipping} onClick={reveal}>{cardFace}</button> : <div className="honto-playing-card waiting-card" aria-hidden="true">{cardFace}</div>}</div>{flipping && <p className="flip-caption">REVEALING THE NEXT CHALLENGE…</p>}</div>;
 }
 
-function CardReveal({ card, continueGame }: { card: Card; continueGame: () => void }) {
+function CardReveal({ card, meId, acknowledge }: { card: Card; meId: string; acknowledge: () => Promise<unknown> }) {
   const meta = CARD_META[card.type as Exclude<Card["type"], "hidden">];
-  return <div className="card-reveal-backdrop"><button type="button" className={`game-reveal-card reveal-${meta.color}`} onClick={continueGame} aria-label={`Continue to ${meta.label}`}><span className="game-reveal-kicker">THE NEXT CHALLENGE</span><span className="game-reveal-icon">{meta.icon}</span><strong className="game-reveal-kanji">本当?!</strong><h2>{meta.label}</h2><p>Tap to turn the card over and play.</p><span className="game-reveal-cta">CLICK TO PLAY →</span></button></div>;
+  const revealedBy = card.revealedBy ?? [];
+  const alreadyRevealed = revealedBy.includes(meId);
+  const otherName = card.actorId === meId ? card.targetName : card.actorName;
+  const [turning, setTurning] = useState(false);
+  const reveal = async () => {
+    if (alreadyRevealed || turning) return;
+    setTurning(true);
+    await new Promise((resolve) => window.setTimeout(resolve, 520));
+    await acknowledge();
+    setTurning(false);
+  };
+  return <div className="card-reveal-backdrop"><button type="button" className={`game-reveal-card reveal-${meta.color} ${turning ? "is-turning" : ""}`} onClick={() => void reveal()} disabled={alreadyRevealed || turning} aria-label={alreadyRevealed ? `Waiting for ${otherName} to reveal` : `Reveal ${meta.label}`}><span className="game-reveal-kicker">THE NEXT CHALLENGE</span><span className="game-reveal-icon"><MiniGameIcon type={card.type as Exclude<Card["type"], "hidden">}/></span><strong className="game-reveal-kanji">本当?!</strong><h2>{meta.label}</h2>{alreadyRevealed ? <p className="game-reveal-status"><b>You&apos;re ready.</b><br/>{otherName} still needs to tap their card.</p> : <p>Tap the card to reveal it. The game starts when both players are ready.</p>}<span className="game-reveal-cta">{alreadyRevealed ? "WAITING FOR PLAYER TWO…" : "TAP TO REVEAL →"}</span></button></div>;
+}
+
+function MiniGameIcon({ type }: { type: Exclude<Card["type"], "hidden"> }) {
+  const fill = type === "honto" || type === "both" ? "#ffd644" : type === "question" ? "#a8e6cf" : type === "preference" || type === "rps" ? "#a9d5ff" : "#ff8eab";
+  const face = <><circle cx="37" cy="45" r="3.5" fill="currentColor"/><circle cx="59" cy="45" r="3.5" fill="currentColor"/><path d="M38 61c6 5 14 5 20 0" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/></>;
+  let art = <><circle cx="48" cy="48" r="40" fill={fill} stroke="currentColor" strokeWidth="4"/>{face}</>;
+  if (type === "honto") art = <><rect x="23" y="28" width="34" height="47" rx="6" fill="#ff8eab" stroke="currentColor" strokeWidth="4" transform="rotate(-10 23 28)"/><rect x="39" y="20" width="34" height="47" rx="6" fill={fill} stroke="currentColor" strokeWidth="4" transform="rotate(8 39 20)"/><path d="M49 37h14M49 47h9" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/><path d="M76 64l5 8 8-4-5-8z" fill="#f04444" stroke="currentColor" strokeWidth="3"/></>;
+  if (type === "question") art = <><path d="M18 25c0-7 6-12 13-12h34c7 0 13 5 13 12v25c0 7-6 12-13 12H42L28 77V62h-2c-5-2-8-6-8-12z" fill={fill} stroke="currentColor" strokeWidth="4" strokeLinejoin="round"/><path d="M42 32c2-5 12-5 14 1 2 7-7 8-7 14M49 56h.1" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round"/></>;
+  if (type === "preference") art = <><circle cx="29" cy="47" r="17" fill="#ff8eab" stroke="currentColor" strokeWidth="4"/><circle cx="67" cy="31" r="17" fill={fill} stroke="currentColor" strokeWidth="4"/><circle cx="67" cy="67" r="17" fill="#a8e6cf" stroke="currentColor" strokeWidth="4"/><path d="M43 42l9-6M43 53l9 8" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/>{face}</>;
+  if (type === "estimate") art = <><circle cx="48" cy="48" r="34" fill={fill} stroke="currentColor" strokeWidth="4"/><circle cx="48" cy="48" r="20" fill="none" stroke="currentColor" strokeWidth="5"/><circle cx="48" cy="48" r="7" fill="#f04444" stroke="currentColor" strokeWidth="3"/><path d="M48 10v13M48 73v13M10 48h13M73 48h13" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/><path d="M61 23l12 2-7 9" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/></>;
+  if (type === "rps") art = <><circle cx="48" cy="48" r="39" fill={fill} stroke="currentColor" strokeWidth="4"/><path d="M24 60V43c0-3 4-4 6-1l2 6V27c0-4 6-4 6 0v16-20c0-4 6-4 6 0v20-16c0-4 6-4 6 0v18-12c0-4 6-4 6 0v18c0 10-6 16-16 16H35c-6 0-11-4-11-7z" fill="#ff8eab" stroke="currentColor" strokeWidth="4" strokeLinejoin="round"/></>;
+  if (type === "both") art = <><path d="M18 34h35v28c0 7-5 12-12 12H30c-7 0-12-5-12-12z" fill={fill} stroke="currentColor" strokeWidth="4"/><path d="M53 43h7c8 0 11 11 4 15h-9" fill="none" stroke="currentColor" strokeWidth="4"/><path d="M25 27h21M26 19h18" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/><path d="M47 43h31v20c0 6-4 10-10 10H57" fill="#ff8eab" stroke="currentColor" strokeWidth="4"/><path d="M78 48h4c7 0 9 9 3 13h-7" fill="none" stroke="currentColor" strokeWidth="4"/></>;
+  return <svg viewBox="0 0 96 96" className="mini-game-svg" aria-hidden="true" focusable="false">{art}</svg>;
 }
 
 function HontoCard({ card, meId, game, busy, act }: { card: Card; meId: string; game: GameState; busy: boolean; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
@@ -252,8 +280,9 @@ function Reveal({ card, players, meId, close, spinWheel }: { card: Card; players
   const [requestingSpin, setRequestingSpin] = useState(false);
   const initialCompleteElapsed = Math.max(0, Date.now() - (card.completedAt ? new Date(card.completedAt).getTime() : Date.now()));
   const initialSpinElapsed = card.result.wheelStartedAt ? Math.max(0, Date.now() - new Date(card.result.wheelStartedAt).getTime()) : 0;
-  const introDuration = card.type === "rps" ? 1700 : 900;
-  const [revealPhase, setRevealPhase] = useState<"intro" | "ready" | "spinning" | "result">(!hasWheel ? "result" : card.result.wheelStartedAt ? (initialSpinElapsed < 2400 ? "spinning" : "result") : initialCompleteElapsed < introDuration ? "intro" : "ready");
+  const introDuration = card.type === "rps" ? 3200 : 1200;
+  const wheelDuration = 4200;
+  const [revealPhase, setRevealPhase] = useState<"intro" | "ready" | "spinning" | "result">(!hasWheel ? "result" : card.result.wheelStartedAt ? (initialSpinElapsed < wheelDuration ? "spinning" : "result") : initialCompleteElapsed < introDuration ? "intro" : "ready");
   useEffect(() => {
     if (!hasWheel) { setRevealPhase("result"); return; }
     const completeElapsed = Math.max(0, Date.now() - (card.completedAt ? new Date(card.completedAt).getTime() : Date.now()));
@@ -263,8 +292,8 @@ function Reveal({ card, players, meId, close, spinWheel }: { card: Card; players
       return () => window.clearTimeout(readyTimer);
     }
     const spinElapsed = Math.max(0, Date.now() - new Date(card.result.wheelStartedAt).getTime());
-    setRevealPhase(spinElapsed < 2400 ? "spinning" : "result");
-    const resultTimer = window.setTimeout(() => setRevealPhase("result"), Math.max(0, 2400 - spinElapsed));
+    setRevealPhase(spinElapsed < wheelDuration ? "spinning" : "result");
+    const resultTimer = window.setTimeout(() => setRevealPhase("result"), Math.max(0, wheelDuration - spinElapsed));
     return () => window.clearTimeout(resultTimer);
   }, [card.id, card.completedAt, card.result.wheelStartedAt, hasWheel]);
   const drinker = players.find((player) => player.id === card.result.drinkerId)?.name;
