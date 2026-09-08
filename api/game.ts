@@ -216,7 +216,7 @@ export default async function handler(req: any, res: any) {
       await sql`UPDATE deck_cards SET revealed_by = ARRAY(SELECT DISTINCT player_id FROM unnest(COALESCE(revealed_by, ARRAY[]::text[]) || ARRAY[${me.id}]::text[]) AS player_id) WHERE id = ${card.id} AND status = 'ready'`;
     }
     if (body.action === "skipCard") {
-      if (!card || !["ready", "guess", "choose"].includes(card.status) || ![card.actor_id, card.target_id].includes(me.id)) throw new Error("This mini game cannot be skipped right now.");
+      if (!card || !["ready", "guess", "choose"].includes(card.status) || card.actor_id !== me.id) throw new Error("Only the player who drew this card can skip it.");
       const sips = spinSips() * 2;
       const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ skipped: true, skipById: me.id, drinkerId: me.id, spinById: me.id, sips })}, completed_at = now() WHERE id = ${card.id} AND status IN ('ready', 'guess', 'choose') RETURNING id`;
       if (updated[0]) { await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${me.id}`; await finishCard(room); }

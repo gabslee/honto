@@ -182,7 +182,7 @@ function GameTable({ game, busy, act }: { game: GameState; busy: boolean; act: (
   else if (card.type === "estimate") content = <EstimateCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
   else if (card.type === "rps") content = <RpsCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
   else content = <BothDrinkCard key={card.id} card={card} meId={game.meId} busy={busy} act={act}/>;
-  const canSkip = Boolean(card && revealComplete && ["ready", "guess", "choose"].includes(card.status));
+  const canSkip = Boolean(card && card.actorId === game.meId && revealComplete && ["ready", "guess", "choose"].includes(card.status));
   return <section className="game-stage"><div className="round-strip"><span>CARD</span><b>{game.room.currentRound}/{game.room.roundCount}</b><div className="progress"><i style={{ width: `${(game.room.currentRound / game.room.roundCount) * 100}%` }}/></div><span>{game.room.roundCount - game.room.currentRound} LEFT IN THE DECK</span></div><div className="round-controls">{canSkip && <SkipButton busy={busy} skip={() => act("skipCard")}/>}</div><ScoreRail players={game.players} meId={game.meId}/>{content}{introCardId === card?.id && card && <CardReveal card={card} meId={game.meId} acknowledge={() => act("ackReveal")}/>}</section>;
 }
 
