@@ -317,7 +317,7 @@ function Reveal({ card, players, meId, close, spinWheel }: { card: Card; players
   const initialCompleteElapsed = Math.max(0, Date.now() - (card.completedAt ? new Date(card.completedAt).getTime() : Date.now()));
   const initialSpinElapsed = card.result.wheelStartedAt ? Math.max(0, Date.now() - new Date(card.result.wheelStartedAt).getTime()) : 0;
   const introDuration = card.type === "rps" ? 3800 : 1200;
-  const wheelDuration = 7000;
+  const wheelDuration = 6500;
   const [revealPhase, setRevealPhase] = useState<"intro" | "ready" | "spinning" | "result">(!hasWheel ? "result" : card.result.wheelStartedAt ? (initialSpinElapsed < wheelDuration ? "spinning" : "result") : initialCompleteElapsed < introDuration ? "intro" : "ready");
   useEffect(() => {
     if (!hasWheel) { setRevealPhase("result"); return; }
