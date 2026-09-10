@@ -1,6 +1,7 @@
 import { QUESTION_LIBRARY_BY_THEME, THEME_CUES } from "../data/curated";
+import { QUESTION_LIBRARY_BY_THEME_JA } from "../data/curated-ja";
 
-export const supportedLocales = ["en"] as const;
+export const supportedLocales = ["en", "ja"] as const;
 export type Locale = (typeof supportedLocales)[number];
 export const defaultLocale: Locale = "en";
 
@@ -61,6 +62,7 @@ const legacyQuestionLibrary = {
 
 export const themeCategories = THEME_CUES;
 export const questionLibrary = QUESTION_LIBRARY_BY_THEME;
+export const questionLibraryJa = QUESTION_LIBRARY_BY_THEME_JA;
 
 export const messages = {
   en: {
@@ -131,6 +133,13 @@ export const messages = {
     finished: {
       kicker: "THAT'S ALL. FOR NOW.", title: "The sharpest bluff detector was…",
       newTable: "NEW TABLE →",
+    },
+  },
+  ja: {
+    meta: {
+      title: "HONTO?! — 2人で遊ぶ共有カードゲーム",
+      description: "ブラフ、質問、心読み、数字当てを楽しむ2人用カードゲーム。",
+      socialDescription: "カードを引いて、相手を知ろう。次に飲むのは誰？",
     },
   },
 } as const;
