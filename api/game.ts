@@ -1,13 +1,15 @@
 import { neon } from "@neondatabase/serverless";
 import { ESTIMATE_QUESTIONS_BY_THEME, PREFERENCE_CARDS_BY_THEME, type CuratedTheme } from "../data/curated";
+import { ESTIMATE_QUESTIONS_BY_THEME_JA, PREFERENCE_CARDS_BY_THEME_JA } from "../data/curated-ja";
 
 type CardType = "honto" | "question" | "preference" | "estimate" | "rps" | "both";
+type Locale = "en" | "ja";
 type RpsChoice = "rock" | "paper" | "scissors";
 type Body = {
   action?: string; code?: string; name?: string; token?: string; roundCount?: number;
   themeCategory?: string; customTheme?: string | null; prompt?: string; statements?: string[];
   truthIndex?: number; guessedIndex?: number; question?: string; sips?: number;
-  choice?: "answer" | "skip"; preferenceIndex?: number; correctNumber?: number; estimate?: number; rpsChoice?: RpsChoice;
+  choice?: "answer" | "skip"; preferenceIndex?: number; correctNumber?: number; estimate?: number; rpsChoice?: RpsChoice; locale?: Locale; wager?: string;
 };
 
 const WORDS = ["MOON", "MINT", "WAVE", "SAKE", "NEON", "MISO", "YUZU", "NORI", "KITSU", "MOMO", "SORA", "KUMA", "HOSHI", "RAMEN", "UMAMI"];
@@ -20,10 +22,13 @@ let schemaReady: Promise<void> | null = null;
 function ensureSchema() {
   if (!schemaReady) schemaReady = (async () => {
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured.");
-    await sql`CREATE TABLE IF NOT EXISTS rooms (id text PRIMARY KEY, code text UNIQUE NOT NULL, status text NOT NULL DEFAULT 'lobby', round_count integer NOT NULL DEFAULT 12, current_round integer NOT NULL DEFAULT 1, theme_category text NOT NULL DEFAULT 'safe', custom_theme text, started_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
+    await sql`CREATE TABLE IF NOT EXISTS rooms (id text PRIMARY KEY, code text UNIQUE NOT NULL, status text NOT NULL DEFAULT 'lobby', round_count integer NOT NULL DEFAULT 12, current_round integer NOT NULL DEFAULT 1, theme_category text NOT NULL DEFAULT 'safe', custom_theme text, welcome_ack text[] NOT NULL DEFAULT '{}', locale text NOT NULL DEFAULT 'en', started_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS theme_category text NOT NULL DEFAULT 'safe'`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS custom_theme text`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS welcome_ack text[] NOT NULL DEFAULT '{}'`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS locale text NOT NULL DEFAULT 'en'`;
     await sql`CREATE TABLE IF NOT EXISTS players (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, name text NOT NULL, token text UNIQUE NOT NULL, is_host boolean NOT NULL DEFAULT false, sips integer NOT NULL DEFAULT 0, joined_at timestamptz NOT NULL DEFAULT now())`;
+    await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS wager text`;
     await sql`CREATE TABLE IF NOT EXISTS deck_cards (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, card_number integer NOT NULL, type text NOT NULL, actor_id text NOT NULL REFERENCES players(id), target_id text NOT NULL REFERENCES players(id), status text NOT NULL DEFAULT 'hidden', payload text NOT NULL DEFAULT '{}', secret text NOT NULL DEFAULT '{}', result text, created_at timestamptz NOT NULL DEFAULT now(), completed_at timestamptz, UNIQUE(room_id, card_number))`;
     await sql`ALTER TABLE deck_cards ADD COLUMN IF NOT EXISTS revealed_by text[] NOT NULL DEFAULT '{}'`;
     await sql`CREATE INDEX IF NOT EXISTS idx_deck_cards_room_status ON deck_cards(room_id, status, card_number)`;
@@ -70,12 +75,12 @@ function estimateOptions(correct: number) {
   return shuffle([...candidates].slice(0, 5));
 }
 
-async function buildDeck(roomId: string, roundCount: number, players: any[], themeCategory?: string | null) {
+async function buildDeck(roomId: string, roundCount: number, players: any[], themeCategory?: string | null, locale: Locale = "en") {
   await sql`DELETE FROM deck_cards WHERE room_id = ${roomId}`;
   const types = makeDeckTypes(roundCount);
   const themes = normalizedThemes(themeCategory);
-  const questions = shuffle(themes.flatMap((theme) => ESTIMATE_QUESTIONS_BY_THEME[theme]));
-  const preferences = shuffle(themes.flatMap((theme) => PREFERENCE_CARDS_BY_THEME[theme]));
+  const questions = shuffle(themes.flatMap((theme) => (locale === "ja" ? ESTIMATE_QUESTIONS_BY_THEME_JA[theme] : ESTIMATE_QUESTIONS_BY_THEME[theme])));
+  const preferences = shuffle(themes.flatMap((theme) => (locale === "ja" ? PREFERENCE_CARDS_BY_THEME_JA[theme] : PREFERENCE_CARDS_BY_THEME[theme])));
   for (let index = 0; index < roundCount; index += 1) {
     const actor = players[index % 2];
     const target = players[(index + 1) % 2];
@@ -114,11 +119,12 @@ async function state(roomCode: string, token: string) {
   const meRows = await sql`SELECT id FROM players WHERE room_id = ${room.id} AND token = ${token}`;
   const me: any = meRows[0];
   if (!me) throw new Error("Your session is not valid for this room.");
-  const players = await sql`SELECT id, name, is_host AS "isHost", sips, joined_at AS "joinedAt" FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
+  const playerRows = await sql`SELECT id, name, is_host AS "isHost", sips, joined_at AS "joinedAt", wager FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
+  const players = playerRows.map(({ wager, ...player }: any) => ({ ...player, hasWager: Boolean(wager), ...(room.status === "finished" ? { wager: wager ?? null } : {}) }));
   const cardRows = room.status === "playing" ? await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.card_number = ${room.current_round} LIMIT 1` : [];
   const lastRows = await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.status = 'complete' ORDER BY c.card_number DESC LIMIT 1`;
   return {
-    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, startedAt: room.started_at },
+    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, welcomeAck: Array.isArray(room.welcome_ack) ? room.welcome_ack : [], locale: room.locale === "ja" ? "ja" : "en", startedAt: room.started_at },
     players, activeCard: publicCard(cardRows[0], me.id), lastCard: publicCard(lastRows[0], me.id, true), meId: me.id,
   };
 }
@@ -155,7 +161,8 @@ export default async function handler(req: any, res: any) {
       let roomCode = code();
       for (let attempt = 0; attempt < 5 && (await sql`SELECT 1 FROM rooms WHERE code = ${roomCode}`).length; attempt += 1) roomCode = code();
       const roomId = id(); const token = id();
-      await sql`INSERT INTO rooms (id, code, round_count) VALUES (${roomId}, ${roomCode}, 12)`;
+      const locale = body.locale === "ja" ? "ja" : "en";
+      await sql`INSERT INTO rooms (id, code, round_count, locale) VALUES (${roomId}, ${roomCode}, 12, ${locale})`;
       await sql`INSERT INTO players (id, room_id, name, token, is_host) VALUES (${id()}, ${roomId}, ${name}, ${token}, true)`;
       return json(res, { code: roomCode, token }, 201);
     }
@@ -167,12 +174,29 @@ export default async function handler(req: any, res: any) {
       const name = cleanName(body.name); if (!name) return json(res, { error: "Enter your name." }, 400);
       const count = await sql`SELECT COUNT(*)::int AS total FROM players WHERE room_id = ${room.id}`;
       if ((count[0]?.total ?? 0) >= 2) return json(res, { error: "This room already has two players." }, 409);
-      const token = id(); await sql`INSERT INTO players (id, room_id, name, token) VALUES (${id()}, ${room.id}, ${name}, ${token})`;
+      const token = id();
+      if (body.locale === "ja" || body.locale === "en") await sql`UPDATE rooms SET locale = ${body.locale}, updated_at = now() WHERE id = ${room.id} AND status = 'lobby'`;
+      await sql`INSERT INTO players (id, room_id, name, token) VALUES (${id()}, ${room.id}, ${name}, ${token})`;
       return json(res, { code: roomCode, token }, 201);
     }
 
     const token = String(body.token ?? "");
     const { room, me, card } = await getContext(roomCode, token);
+    const welcomeAck = Array.isArray(room.welcome_ack) ? room.welcome_ack : [];
+    const welcomeComplete = welcomeAck.length >= 2;
+    if (room.status === "playing" && !welcomeComplete && !["submitWager", "ackWelcome"].includes(String(body.action))) throw new Error("Both players need to confirm the Honto welcome first.");
+    if (body.action === "submitWager") {
+      if (room.status !== "playing" || welcomeComplete) throw new Error("The wager phase is already complete.");
+      const wager = String(body.wager ?? "").trim().replace(/\s+/g, " ").slice(0, 220);
+      if (wager.length < 3) throw new Error("Write what the other player must do if you win.");
+      await sql`UPDATE players SET wager = ${wager} WHERE id = ${me.id} AND room_id = ${room.id}`;
+    }
+    if (body.action === "ackWelcome") {
+      if (room.status !== "playing") throw new Error("The game has not started yet.");
+      const wagers = await sql`SELECT COUNT(*)::int AS total FROM players WHERE room_id = ${room.id} AND wager IS NOT NULL AND wager <> ''`;
+      if (Number(wagers[0]?.total ?? 0) !== 2) throw new Error("Both players need to lock in their wagers first.");
+      await sql`UPDATE rooms SET welcome_ack = ARRAY(SELECT DISTINCT player_id FROM unnest(COALESCE(welcome_ack, ARRAY[]::text[]) || ARRAY[${me.id}]::text[]) AS player_id), updated_at = now() WHERE id = ${room.id}`;
+    }
     if (body.action === "startWheel") {
       const completedRows = await sql`SELECT * FROM deck_cards WHERE room_id = ${room.id} AND status = 'complete' ORDER BY card_number DESC LIMIT 1`;
       const completed = completedRows[0] as any;
@@ -189,15 +213,16 @@ export default async function handler(req: any, res: any) {
       const selected = (body.themeCategory ?? "").split(",").map((item) => LEGACY_THEME_MAP[item.trim()]).filter((item): item is CuratedTheme => Boolean(item));
       const themeCategory = [...new Set(selected)].join(",") || "safe";
       const customTheme = typeof body.customTheme === "string" ? body.customTheme.trim().slice(0, 80) || null : null;
-      await sql`UPDATE rooms SET round_count = ${roundCount}, theme_category = ${themeCategory}, custom_theme = ${customTheme}, updated_at = now() WHERE id = ${room.id}`;
+      const locale = body.locale === "ja" ? "ja" : body.locale === "en" ? "en" : room.locale === "ja" ? "ja" : "en";
+      await sql`UPDATE rooms SET round_count = ${roundCount}, theme_category = ${themeCategory}, custom_theme = ${customTheme}, locale = ${locale}, updated_at = now() WHERE id = ${room.id}`;
     }
     if (body.action === "start") {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can start the game.");
       const players = await sql`SELECT id FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
       if (players.length !== 2) throw new Error("Honto needs exactly two players.");
-      await buildDeck(room.id, Number(room.round_count), players, room.theme_category);
-      await sql`UPDATE players SET sips = 0 WHERE room_id = ${room.id}`;
-      await sql`UPDATE rooms SET status = 'playing', current_round = 1, started_at = now(), updated_at = now() WHERE id = ${room.id}`;
+      await buildDeck(room.id, Number(room.round_count), players, room.theme_category, room.locale === "ja" ? "ja" : "en");
+      await sql`UPDATE players SET sips = 0, wager = NULL WHERE room_id = ${room.id}`;
+      await sql`UPDATE rooms SET status = 'playing', current_round = 1, welcome_ack = '{}', started_at = now(), updated_at = now() WHERE id = ${room.id}`;
     }
     if (body.action === "drawCard") {
       if (!card || card.status !== "hidden" || card.actor_id !== me.id) throw new Error("It is not your turn to draw.");
@@ -208,7 +233,7 @@ export default async function handler(req: any, res: any) {
       await sql`UPDATE deck_cards SET revealed_by = ARRAY(SELECT DISTINCT player_id FROM unnest(COALESCE(revealed_by, ARRAY[]::text[]) || ARRAY[${me.id}]::text[]) AS player_id) WHERE id = ${card.id} AND status = 'ready'`;
     }
     if (body.action === "skipCard") {
-      if (!card || !["ready", "guess", "choose"].includes(card.status) || ![card.actor_id, card.target_id].includes(me.id)) throw new Error("This mini game cannot be skipped right now.");
+      if (!card || !["ready", "guess", "choose"].includes(card.status) || card.actor_id !== me.id) throw new Error("Only the player who drew this card can skip it.");
       const sips = spinSips() * 2;
       const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ skipped: true, skipById: me.id, drinkerId: me.id, spinById: me.id, sips })}, completed_at = now() WHERE id = ${card.id} AND status IN ('ready', 'guess', 'choose') RETURNING id`;
       if (updated[0]) { await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${me.id}`; await finishCard(room); }
@@ -294,9 +319,17 @@ export default async function handler(req: any, res: any) {
     if (body.action === "submitEstimate") {
       if (!card || card.type !== "estimate" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("This estimate card is not ready for your answer.");
       const correctNumber = Number(body.correctNumber);
+      const question = String(body.question ?? parse(card.payload).question ?? "").trim().replace(/\s+/g, " ").slice(0, 220);
       if (!Number.isInteger(correctNumber) || correctNumber < 0 || correctNumber > 1000000) throw new Error("Enter a whole number between 0 and 1,000,000.");
-      const payload = { ...parse(card.payload), options: estimateOptions(correctNumber), wrongGuesses: [] };
+      if (question.length < 3) throw new Error("Write a number question before locking your answer.");
+      const payload = { ...parse(card.payload), question, options: estimateOptions(correctNumber), wrongGuesses: [] };
       await sql`UPDATE deck_cards SET status = 'guess', payload = ${JSON.stringify(payload)}, secret = ${JSON.stringify({ correctNumber })} WHERE id = ${card.id} AND status = 'ready'`;
+    }
+    if (body.action === "nextEstimate") {
+      if (!card || card.type !== "estimate" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("Only the player answering can choose the next estimate.");
+      const payload = parse(card.payload); const themes = normalizedThemes(room.theme_category); const pool = shuffle(themes.flatMap((theme) => (room.locale === "ja" ? ESTIMATE_QUESTIONS_BY_THEME_JA[theme] : ESTIMATE_QUESTIONS_BY_THEME[theme])));
+      const currentQuestion = typeof payload.question === "string" ? payload.question : ""; const nextQuestion = pool.find((question) => question !== currentQuestion) ?? pool[0] ?? currentQuestion;
+      await sql`UPDATE deck_cards SET payload = ${JSON.stringify({ ...payload, question: nextQuestion, options: undefined, wrongGuesses: [] })}, secret = '{}' WHERE id = ${card.id} AND status = 'ready'`;
     }
     if (body.action === "guessEstimate") {
       if (!card || card.type !== "estimate" || card.status !== "guess" || card.target_id !== me.id) throw new Error("This estimate is not yours to guess.");

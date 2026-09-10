@@ -22,6 +22,13 @@
       "when": 1788807940000,
       "tag": "0002_shared_deck",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789041600000,
+      "tag": "0003_player_wagers",
+      "breakpoints": true
     }
   ]
 }
