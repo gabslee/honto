@@ -2,7 +2,7 @@
 .account-slot { width:72%; margin:14px auto 0; }
 .account-stack { display:flex; flex-direction:column; gap:8px; width:100%; }
 .account-auth-buttons { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; }
-.account-auth-buttons .account-control { position:relative; width:82px; min-width:82px; height:36px; min-height:36px; padding:5px; border-radius:8px; }
+.account-auth-buttons .account-control { position:relative; width:84px; min-width:84px; height:36px; min-height:36px; padding:5px; border-radius:8px; }
 .account-auth-buttons .google-mark,.account-auth-buttons .apple-mark { width:26px; height:26px; }
 .account-auth-buttons .curated-button { background:var(--yellow); color:var(--ink); }
 .apple-auth-button { background:#050b17!important; color:#fff!important; border-color:#050b17!important; box-shadow:3px 3px 0 #fff; opacity:1!important; }
@@ -94,11 +94,17 @@ h1 em,h2 em { color:var(--red); font-style:normal; position:relative; }
 .hero-copy p { font-family:Arial,sans-serif; font-size:20px; line-height:1.5; max-width:560px; }
 .eyebrow { display:inline-flex; background:var(--yellow); border:2px solid var(--ink); padding:7px 10px; transform:rotate(-1deg); box-shadow:3px 3px 0 var(--ink); }
 .rule-cards { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); align-items:center; gap:14px; max-width:560px; margin-top:34px; }
-.landing-mini-icon { position:relative; display:grid; place-items:center; justify-self:center; width:100%; max-width:64px; aspect-ratio:1; color:var(--ink); border:3px solid var(--ink); border-radius:50%; background:#fffdf8; box-shadow:4px 4px 0 var(--ink); transition:transform .18s ease,box-shadow .18s ease; }
+.landing-mini-icon { position:relative; display:grid; place-items:center; justify-self:center; width:100%; max-width:64px; aspect-ratio:1; color:var(--ink); border:3px solid var(--ink); border-radius:50%; background:#fffdf8; box-shadow:4px 4px 0 var(--ink); transition:transform .18s ease,box-shadow .18s ease; animation:landing-mini-lift 10s ease-in-out infinite; }
 .landing-mini-icon::after { content:""; position:absolute; inset:-5px; border:2px solid var(--red); border-radius:50%; opacity:.65; pointer-events:none; }
 .landing-mini-icon.yellow { background:var(--yellow); }.landing-mini-icon.mint { background:var(--mint); }.landing-mini-icon.blue { background:#b6dcff; }.landing-mini-icon.pink { background:var(--pink); }
 .landing-mini-icon .mini-game-svg { width:42px; height:42px; }.landing-mini-icon:hover { transform:translateY(-5px) rotate(-4deg); box-shadow:5px 8px 0 var(--ink); }
 @keyframes landing-mini-lift { 0%,8%,100% { transform:translateY(0) rotate(0); box-shadow:2px 2px 0 var(--ink); } 4% { transform:translateY(-6px) rotate(-2deg); box-shadow:4px 7px 0 var(--ink); } }
+.landing-mini-icon:nth-child(2) { animation-delay:.7s; }
+.landing-mini-icon:nth-child(3) { animation-delay:1.4s; }
+.landing-mini-icon:nth-child(4) { animation-delay:2.1s; }
+.landing-mini-icon:nth-child(5) { animation-delay:2.8s; }
+.landing-mini-icon:nth-child(6) { animation-delay:3.5s; }
+.landing-mini-icon:nth-child(7) { animation-delay:4.2s; }
 .entry-card,.panel,.play-card { background:#fffdf8; border:var(--line); border-radius:22px; box-shadow:10px 10px 0 var(--ink); }
 .entry-card { padding:28px; transform:rotate(1deg); }
 .card-tabs { display:grid; grid-template-columns:1fr 1fr; background:#efe8dc; border-radius:11px; padding:4px; margin-bottom:26px; }
@@ -390,7 +396,7 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .lobby-composite .panel { width:100%; box-sizing:border-box; height:max-content; align-self:start; }
 .lobby-composite .people-list { min-height:0; }
 .lobby-auth-buttons { position:absolute; top:16px; right:24px; display:flex; gap:8px; z-index:3; }
-.lobby-auth-button { position:relative; display:grid; place-items:center; width:76px; height:36px; padding:5px; border:2px solid var(--ink); border-radius:8px; background:var(--yellow); color:var(--ink); box-shadow:3px 3px 0 var(--ink); }
+.lobby-auth-button { position:relative; display:grid; place-items:center; width:84px; height:36px; padding:5px; border:2px solid var(--ink); border-radius:8px; background:var(--yellow); color:var(--ink); box-shadow:3px 3px 0 var(--ink); }
 .lobby-auth-button .google-mark,.lobby-auth-button .apple-mark { width:26px; height:26px; }
 .lobby-auth-button:hover:not(:disabled) { transform:translate(1px,1px); box-shadow:2px 2px 0 var(--ink); }
 .lobby-apple-button { background:#050b17; color:#fff; border-color:#050b17; box-shadow:3px 3px 0 #fff; opacity:1; }
@@ -483,7 +489,7 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .lobby-composite .deck-filter-panel { margin:0; }
   .card-type-checks { gap:7px; }
   .lobby-auth-buttons { top:8px; right:16px; gap:6px; }
-  .lobby-auth-button { width:82px; height:36px; }
+  .lobby-auth-button { width:84px; height:36px; }
   .lobby-composite .panel { width:calc(100% - 32px); margin-inline:auto; }
   .pricing-page { padding:8px 12px 5px; }
   .pricing-page .pricing-back { margin-bottom:3px; }
