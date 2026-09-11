@@ -49,8 +49,8 @@ function LanguageMenu({ onChange, landing = false }: { onChange?: (locale: Local
 function AccountControl() {
   const [user, setUser] = useState<{ email: string; displayName?: string } | null>(null);
   useEffect(() => { void fetch("/api/auth/me", { cache: "no-store" }).then((response) => response.json()).then((data) => setUser(data.user ?? null)).catch(() => undefined); }, []);
-  if (!user) return <a className="curated-button" href="/api/auth/google/start">SIGN IN WITH GOOGLE</a>;
-  return <span className="microcopy">{user.displayName ?? user.email}</span>;
+  if (!user) return <span className="account-control"><a className="curated-button" href="/api/auth/google/start">SIGN IN WITH GOOGLE</a></span>;
+  return <span className="account-control signed-in-account">{user.displayName ?? user.email}</span>;
 }
 
 function storedThemes(value?: string | null): ThemeKey[] {

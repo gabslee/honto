@@ -1,4 +1,8 @@
 :root { --ink:#17243d; --paper:#fff7e8; --cream:#ffe8ba; --red:#f04444; --pink:#ff8eab; --yellow:#ffd644; --mint:#a8e6cf; --line:3px solid var(--ink); }
+.account-control { position:fixed; top:18px; right:112px; z-index:30; display:inline-flex; align-items:center; }
+.account-control .curated-button { min-height:34px; padding:8px 12px; font-size:10px; white-space:nowrap; text-decoration:none; }
+.signed-in-account { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:8px 12px; border:2px solid var(--ink); border-radius:999px; background:var(--mint); color:var(--ink); font-size:10px; font-weight:900; letter-spacing:.04em; }
+@media (max-width:620px) { .account-control { top:14px; right:68px; } .account-control .curated-button { padding:7px 8px; font-size:8px; } .signed-in-account { max-width:120px; padding:7px 8px; font-size:8px; } }
 * { box-sizing:border-box; }
 html { background:var(--paper); }
 body { margin:0; color:var(--ink); background:var(--paper); font-family:"Arial Rounded MT Bold","Trebuchet MS",Arial,sans-serif; }
