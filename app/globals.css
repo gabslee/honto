@@ -441,6 +441,9 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .question-card .sip-choice strong { font-size:13px; }
   .question-card .sip-choice small { font-size:8px; }
   .question-card > .primary-button { padding:11px 12px; font-size:10px; }
+  .deck-draw { min-height:430px; padding:28px 16px 32px; }
+  .deck-draw .draw-card-zone { min-height:310px; margin-top:14px; }
+  .deck-draw .honto-playing-card { width:194px; height:274px; }
 }
 
 @media (max-width:800px) {
