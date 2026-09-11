@@ -16,6 +16,7 @@ export function ensureIdentitySchema() {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan text NOT NULL DEFAULT 'free'`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status text NOT NULL DEFAULT 'inactive'`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_expires_at timestamptz`;
+    await sql`UPDATE users SET plan = 'premium', subscription_status = 'active', subscription_expires_at = NULL WHERE role = 'admin'`;
     await sql`CREATE TABLE IF NOT EXISTS auth_accounts (id text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, provider text NOT NULL, provider_account_id text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(provider, provider_account_id))`;
     await sql`CREATE TABLE IF NOT EXISTS admin_sessions (token_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now())`;
     await sql`CREATE TABLE IF NOT EXISTS user_sessions (token_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now())`;

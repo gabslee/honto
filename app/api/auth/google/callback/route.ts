@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     await ensureIdentitySchema();
     const email = profile.email.toLowerCase();
     const role = process.env.HONTO_ADMIN_EMAIL?.trim().toLowerCase() === email ? "admin" : "user";
-    const users = await sql`INSERT INTO users (id, email, display_name, role) VALUES (${crypto.randomUUID()}, ${email}, ${(profile.name ?? profile.email).slice(0, 80)}, ${role}) ON CONFLICT (email) DO UPDATE SET display_name = EXCLUDED.display_name, role = CASE WHEN users.role = 'admin' OR EXCLUDED.role = 'admin' THEN 'admin' ELSE users.role END, updated_at = now() RETURNING id`;
+    const users = await sql`INSERT INTO users (id, email, display_name, role, plan, subscription_status) VALUES (${crypto.randomUUID()}, ${email}, ${(profile.name ?? profile.email).slice(0, 80)}, ${role}, ${role === "admin" ? "premium" : "free"}, ${role === "admin" ? "active" : "inactive"}) ON CONFLICT (email) DO UPDATE SET display_name = EXCLUDED.display_name, role = CASE WHEN users.role = 'admin' OR EXCLUDED.role = 'admin' THEN 'admin' ELSE users.role END, plan = CASE WHEN users.role = 'admin' OR EXCLUDED.role = 'admin' THEN 'premium' ELSE users.plan END, subscription_status = CASE WHEN users.role = 'admin' OR EXCLUDED.role = 'admin' THEN 'active' ELSE users.subscription_status END, updated_at = now() RETURNING id`;
     const userId = String(users[0].id);
     await sql`INSERT INTO auth_accounts (id, user_id, provider, provider_account_id) VALUES (${crypto.randomUUID()}, ${userId}, 'google', ${profile.sub}) ON CONFLICT (provider, provider_account_id) DO UPDATE SET user_id = EXCLUDED.user_id`;
     const session = await createUserSession(userId);
