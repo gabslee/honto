@@ -129,8 +129,8 @@ async function state(roomCode: string, token: string, currentUser: CurrentUser |
   const meRows = await sql`SELECT id FROM players WHERE room_id = ${room.id} AND token = ${token}`;
   const me: any = meRows[0];
   if (!me) throw new Error("Your session is not valid for this room.");
-  const playerRows = await sql`SELECT id, name, is_host AS "isHost", sips, joined_at AS "joinedAt", wager FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
-  const players = playerRows.map(({ wager, ...player }: any) => ({ ...player, hasWager: Boolean(wager), ...(room.status === "finished" ? { wager: wager ?? null } : {}) }));
+  const playerRows = await sql`SELECT id, name, is_host AS "isHost", sips, joined_at AS "joinedAt", wager, user_id AS "userId" FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
+  const players = playerRows.map(({ wager, userId, ...player }: any) => ({ ...player, connected: Boolean(userId), hasWager: Boolean(wager), ...(room.status === "finished" ? { wager: wager ?? null } : {}) }));
   const cardRows = room.status === "playing" ? await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.card_number = ${room.current_round} LIMIT 1` : [];
   const lastRows = await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.status = 'complete' ORDER BY c.card_number DESC LIMIT 1`;
   return {

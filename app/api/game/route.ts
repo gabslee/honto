@@ -16,7 +16,7 @@ async function run(request: Request) {
     status(nextStatus: number) { status = nextStatus; return response; },
     json(nextPayload: unknown) { payload = nextPayload; return nextPayload; },
   };
-  await gameHandler({ method: request.method, body, query: Object.fromEntries(url.searchParams) }, response);
+  await gameHandler({ method: request.method, body, query: Object.fromEntries(url.searchParams), headers: request.headers }, response);
   return Response.json(payload, { status, headers: { "Cache-Control": "no-store, max-age=0" } });
 }
 
