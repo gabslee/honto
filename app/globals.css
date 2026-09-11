@@ -435,10 +435,11 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .pricing-amount { gap:3px; margin-bottom:5px; }
   .pricing-amount strong { font-size:20px; }
   .pricing-amount span { font-size:8px; }
-  .pricing-card p { min-height:44px; font-size:9px; line-height:1.25; }
+  .pricing-card p { min-height:34px; font-size:9px; line-height:1.25; }
+  .billing-card p { min-height:26px; margin:4px 0; }
   .pricing-card ul { min-height:112px; margin:6px 0 8px; padding-left:13px; font-size:9px; line-height:1.35; }
   .pricing-card .primary-button { padding:9px 5px; font-size:9px; letter-spacing:0; box-shadow:2px 2px 0 var(--ink); }
-  .pricing-footnote { max-width:390px; margin:9px auto 0; font-size:8px; line-height:1.25; }
+  .pricing-footnote { max-width:390px; margin:5px auto 0; font-size:8px; line-height:1.2; }
   .pricing-page .legal-footer { display:none; }
 }
 
