@@ -179,6 +179,7 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .question-option-list>span { font-size:10px; font-weight:1000; letter-spacing:.12em; }
 .question-option-list button { border:2px solid var(--ink); border-radius:10px; background:white; padding:12px; text-align:left; font:14px/1.35 Arial,sans-serif; }
 .question-option-list button:hover { background:var(--yellow); }
+.question-option-list button.selected { background:var(--yellow); box-shadow:4px 4px 0 var(--ink); transform:translate(-1px,-1px); }
 .ai-status-note { margin:13px 0 4px; padding:10px 12px; color:var(--ink); border:2px solid var(--ink); border-radius:9px; background:#fff1ba; box-shadow:3px 3px 0 var(--ink); font:700 12px/1.4 Arial,sans-serif; }
 .question-tools { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin:12px 0 6px; }
 .curated-button { border:2px solid var(--ink); border-radius:9px; background:var(--yellow); padding:12px; font-size:10px; font-weight:1000; box-shadow:3px 3px 0 var(--ink); }
