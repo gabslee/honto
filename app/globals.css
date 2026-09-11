@@ -209,6 +209,10 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .preference-options .preference-number { display:block; color:var(--ink); font-size:11px; font-weight:1000; opacity:.55; }
 .preference-options .preference-label { display:flex; align-items:center; width:100%; min-height:58px; margin:0; color:var(--ink); font:900 20px/1.2 "Arial Rounded MT Bold","Trebuchet MS",Arial,sans-serif; opacity:1; visibility:visible; white-space:normal; overflow-wrap:anywhere; }
 .preference-options small { display:block; width:100%; padding-top:9px; color:var(--ink); border-top:2px solid var(--ink); font-size:9px; font-weight:1000; letter-spacing:.08em; }
+.preference-question-wrap { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:stretch; margin:24px 0; }
+.preference-question-wrap .big-question { margin:0; }
+.preference-next-button { min-width:132px; padding:10px 13px; color:var(--ink); border:2px dashed var(--ink); border-radius:10px; background:var(--yellow); box-shadow:3px 3px 0 var(--ink); font-size:9px; font-weight:1000; letter-spacing:.06em; }
+.preference-next-button:hover:not(:disabled) { transform:translate(2px,2px) rotate(-1deg); box-shadow:1px 1px 0 var(--ink); }
 .would-rather-compose { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:14px; align-items:center; margin:24px 0; }
 .would-rather-compose label { display:grid; gap:8px; min-width:0; font-size:10px; font-weight:1000; letter-spacing:.1em; }
 .would-rather-compose> b { display:grid; place-items:center; width:42px; height:42px; border:3px solid var(--ink); border-radius:50%; background:var(--pink); box-shadow:3px 3px 0 var(--ink); font-size:10px; }
@@ -235,6 +239,7 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 @media (max-width:800px) { .estimate-options { grid-template-columns:repeat(2,1fr); }.estimate-options button:last-child { grid-column:1 / -1; }.deck-stack { width:145px; height:190px; }.mini-game-actions { grid-template-columns:1fr; } }
 @media (max-width:600px) { .preference-options,.would-rather-options { grid-template-columns:1fr; }.preference-options button { min-height:100px; }.would-rather-options button { min-height:130px; }.would-rather-compose { grid-template-columns:1fr; }.would-rather-compose> b { margin:auto; }.rps-options { gap:7px; }.rps-options button { min-height:125px; }.rps-options span { font-size:42px; }.draw-card-zone { min-height:285px; }.honto-playing-card { width:180px; height:255px; }.playing-card-center { width:112px; min-height:132px; }.playing-card-center i { font-size:37px; } }
 @media (max-width:600px) { .estimate-question-wrap { grid-template-columns:1fr; }.estimate-question-actions { grid-template-columns:1fr 1fr; grid-template-rows:auto; width:100%; }.estimate-next-button,.estimate-write-button { min-height:44px; } }
+@media (max-width:600px) { .preference-question-wrap { grid-template-columns:1fr; }.preference-next-button { min-height:44px; } }
 @media (max-width:600px) { .all-wagers { grid-template-columns:1fr; }.wager-reveal { padding:24px 17px; } }
 @media (max-width:600px) { .question-tools { grid-template-columns:1fr; }.question-ai-modal { padding:25px 18px; }.question-theme-checks { grid-template-columns:1fr; } }
 @media (max-width:600px) { .game-reveal-card { min-height:470px; padding:27px 20px 24px; }.game-reveal-icon { width:138px; height:138px; }.mini-game-svg { width:104px; height:104px; }.game-reveal-card h2 { font-size:27px; } }

@@ -285,6 +285,12 @@ export default async function handler(req: any, res: any) {
       const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify(result)}, completed_at = now() WHERE id = ${card.id} AND status = 'choose' RETURNING id`;
       if (updated[0]) { if (skipped) await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${card.target_id}`; await finishCard(room); }
     }
+    if (body.action === "nextPreference") {
+      if (!card || card.type !== "preference" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("Only the player choosing can move to the next question.");
+      const payload = parse(card.payload); const themes = normalizedThemes(room.theme_category); const pool = shuffle(themes.flatMap((theme) => (room.locale === "ja" ? PREFERENCE_CARDS_BY_THEME_JA[theme] : PREFERENCE_CARDS_BY_THEME[theme])));
+      const currentQuestion = typeof payload.question === "string" ? payload.question : ""; const nextCard = pool.find((item) => item.question !== currentQuestion) ?? pool[0];
+      if (nextCard) await sql`UPDATE deck_cards SET payload = ${JSON.stringify(nextCard)}, secret = '{}' WHERE id = ${card.id} AND status = 'ready'`;
+    }
     if (body.action === "choosePreference") {
       if (!card || card.type !== "preference" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("This choice is not yours to make.");
       const options = parse(card.payload).options;
