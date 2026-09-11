@@ -46,6 +46,12 @@ function LanguageMenu({ onChange, landing = false }: { onChange?: (locale: Local
   const choose = (next: Locale) => { setLocale(next); onChange?.(next); setOpen(false); };
   return <div className={landing ? "language-picker" : "language-menu"}><button type="button" className="language-trigger" aria-haspopup="listbox" aria-expanded={open} aria-label={ja ? "言語を選択" : "Choose language"} onClick={() => setOpen((current) => !current)}><span aria-hidden="true">{landing ? (ja ? "言語" : "LANGUAGE") : "文"}</span><strong>{locale === "ja" ? "日本語" : "EN"}</strong><i aria-hidden="true">⌄</i></button>{open && <div className="language-options" role="listbox" aria-label={ja ? "言語" : "Language"}><button type="button" role="option" aria-selected={locale === "en"} className={locale === "en" ? "selected" : ""} onClick={() => choose("en")}>EN</button><button type="button" role="option" aria-selected={locale === "ja"} className={locale === "ja" ? "selected" : ""} onClick={() => choose("ja")}>日本語</button></div>}</div>;
 }
+function AccountControl() {
+  const [user, setUser] = useState<{ email: string; displayName?: string } | null>(null);
+  useEffect(() => { void fetch("/api/auth/me", { cache: "no-store" }).then((response) => response.json()).then((data) => setUser(data.user ?? null)).catch(() => undefined); }, []);
+  if (!user) return <a className="curated-button" href="/api/auth/google/start">SIGN IN WITH GOOGLE</a>;
+  return <span className="microcopy">{user.displayName ?? user.email}</span>;
+}
 
 function storedThemes(value?: string | null): ThemeKey[] {
   if (!value || value === "safe") return [];
@@ -183,7 +189,7 @@ export default function GameClient() {
     setSession(null); setGame(null); setDismissedReveal(null);
   }
 
-  if (!session) return <LocaleContext.Provider value={{ locale, setLocale, roomCode: undefined, sessionToken: undefined }}><Landing name={name} setName={setName} joinCode={joinCode} setJoinCode={setJoinCode} mode={mode} setMode={setMode} enter={enter} busy={busy} error={error} /></LocaleContext.Provider>;
+  if (!session) return <LocaleContext.Provider value={{ locale, setLocale, roomCode: undefined, sessionToken: undefined }}><AccountControl/><Landing name={name} setName={setName} joinCode={joinCode} setJoinCode={setJoinCode} mode={mode} setMode={setMode} enter={enter} busy={busy} error={error} /></LocaleContext.Provider>;
   if (!game) return <main className="loading"><div className="stamp">HONTO?!</div><p>{locale === "ja" ? "デッキをシャッフル中…" : "Shuffling the deck…"}</p>{error && <p className="form-error">{error}</p>}</main>;
 
   const host = game.players.find((player) => player.id === game.meId)?.isHost;
