@@ -1,5 +1,6 @@
 import { themeCategories } from "../../i18n";
 import { neon } from "@neondatabase/serverless";
+import { getAdminUser } from "../../server-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -111,7 +112,8 @@ export async function POST(request: Request) {
   }
   let fallbackReason: FallbackReason = "request_failed";
   try {
-    if (!(await consumeAiAllowance(request, body))) {
+    const admin = await getAdminUser(request);
+    if (!admin && !(await consumeAiAllowance(request, body))) {
       return Response.json(fallbackPayload(body, categories, locale, "rate_limited"));
     }
     const instruction = body.kind === "lies"
