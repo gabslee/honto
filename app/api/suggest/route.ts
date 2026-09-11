@@ -1,6 +1,6 @@
 import { themeCategories } from "../../i18n";
 import { neon } from "@neondatabase/serverless";
-import { getAdminUser } from "../../server-auth";
+import { getAdminUser, getCurrentUser, hasPremiumAccess } from "../../server-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -9,8 +9,10 @@ type Locale = "en" | "ja";
 type Body = { kind?: "theme" | "lies" | "question"; truth?: string; prompt?: string; category?: string | string[]; exclude?: string[]; fresh?: boolean; customTheme?: string; questionHint?: string; count?: number; locale?: Locale; roomCode?: string; sessionToken?: string };
 type FallbackReason = "not_configured" | "quota_exhausted" | "request_failed" | "invalid_response" | "safety_refusal" | "rate_limited";
 
-const ROOM_AI_LIMIT = 6;
-const PLAYER_AI_DAILY_LIMIT = 20;
+const ROOM_AI_LIMIT = 10;
+const PLAYER_AI_DAILY_LIMIT = 10;
+const PLAYER_AI_WEEKLY_LIMIT = 60;
+const PREMIUM_AI_MONTHLY_LIMIT = 300;
 const IP_AI_HOURLY_LIMIT = 30;
 const usageSql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
 let usageSchemaReady: Promise<void> | null = null;
@@ -39,13 +41,23 @@ async function consumeAiAllowance(request: Request, body: Body) {
   if (!usageSql) return true;
   await ensureUsageSchema();
   const now = new Date();
+  const currentUser = await getCurrentUser(request);
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
   if (!(await consumeAllowance("ip-hour", await usageKey(ip), new Date(Math.floor(now.getTime() / 3600000) * 3600000), IP_AI_HOURLY_LIMIT))) return false;
   if (!body.roomCode || !body.sessionToken) return true;
   const rows = await usageSql`SELECT r.id, p.id AS player_id, p.user_id FROM rooms r JOIN players p ON p.room_id = r.id WHERE r.code = ${String(body.roomCode).trim().toUpperCase()} AND p.token = ${body.sessionToken} AND r.status = 'playing' LIMIT 1`;
   const room = rows[0] as { id?: string; player_id?: string; user_id?: string | null } | undefined;
   if (!room?.id || !room.player_id) return true;
-  if (!(await consumeAllowance("player-day", await usageKey(room.user_id ?? room.player_id), new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())), PLAYER_AI_DAILY_LIMIT))) return false;
+  const accountKey = await usageKey(currentUser?.id ?? room.user_id ?? room.player_id);
+  if (hasPremiumAccess(currentUser)) {
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    if (!(await consumeAllowance("player-month-premium", accountKey, monthStart, PREMIUM_AI_MONTHLY_LIMIT))) return false;
+  } else {
+    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    if (!(await consumeAllowance("player-day", accountKey, dayStart, PLAYER_AI_DAILY_LIMIT))) return false;
+    const weekDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - now.getUTCDay()));
+    if (!(await consumeAllowance("player-week", accountKey, weekDay, PLAYER_AI_WEEKLY_LIMIT))) return false;
+  }
   return consumeAllowance("room", room.id, new Date(0), ROOM_AI_LIMIT);
 }
 
