@@ -1,11 +1,52 @@
 import { themeCategories } from "../../i18n";
+import { neon } from "@neondatabase/serverless";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type Locale = "en" | "ja";
-type Body = { kind?: "theme" | "lies" | "question"; truth?: string; prompt?: string; category?: string | string[]; exclude?: string[]; fresh?: boolean; customTheme?: string; questionHint?: string; count?: number; locale?: Locale };
-type FallbackReason = "not_configured" | "quota_exhausted" | "request_failed" | "invalid_response" | "safety_refusal";
+type Body = { kind?: "theme" | "lies" | "question"; truth?: string; prompt?: string; category?: string | string[]; exclude?: string[]; fresh?: boolean; customTheme?: string; questionHint?: string; count?: number; locale?: Locale; roomCode?: string; sessionToken?: string };
+type FallbackReason = "not_configured" | "quota_exhausted" | "request_failed" | "invalid_response" | "safety_refusal" | "rate_limited";
+
+const ROOM_AI_LIMIT = 6;
+const PLAYER_AI_DAILY_LIMIT = 20;
+const IP_AI_HOURLY_LIMIT = 30;
+const usageSql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
+let usageSchemaReady: Promise<void> | null = null;
+
+function ensureUsageSchema() {
+  if (!usageSql) return Promise.resolve();
+  if (!usageSchemaReady) usageSchemaReady = (async () => {
+    await usageSql`CREATE TABLE IF NOT EXISTS ai_usage (scope text NOT NULL, scope_key text NOT NULL, window_start timestamptz NOT NULL, uses integer NOT NULL DEFAULT 0, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(scope, scope_key, window_start))`;
+    await usageSql`CREATE INDEX IF NOT EXISTS idx_ai_usage_updated_at ON ai_usage(updated_at)`;
+  })();
+  return usageSchemaReady;
+}
+
+async function usageKey(value: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${process.env.AI_USAGE_SALT ?? "honto-ai-usage"}:${value}`));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function consumeAllowance(scope: string, key: string, windowStart: Date, limit: number) {
+  if (!usageSql) return true;
+  const rows = await usageSql`INSERT INTO ai_usage (scope, scope_key, window_start, uses) VALUES (${scope}, ${key}, ${windowStart}, 1) ON CONFLICT (scope, scope_key, window_start) DO UPDATE SET uses = ai_usage.uses + 1, updated_at = now() WHERE ai_usage.uses < ${limit} RETURNING uses`;
+  return rows.length > 0;
+}
+
+async function consumeAiAllowance(request: Request, body: Body) {
+  if (!usageSql) return true;
+  await ensureUsageSchema();
+  const now = new Date();
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
+  if (!(await consumeAllowance("ip-hour", await usageKey(ip), new Date(Math.floor(now.getTime() / 3600000) * 3600000), IP_AI_HOURLY_LIMIT))) return false;
+  if (!body.roomCode || !body.sessionToken) return true;
+  const rows = await usageSql`SELECT r.id, p.id AS player_id FROM rooms r JOIN players p ON p.room_id = r.id WHERE r.code = ${String(body.roomCode).trim().toUpperCase()} AND p.token = ${body.sessionToken} AND r.status = 'playing' LIMIT 1`;
+  const room = rows[0] as { id?: string; player_id?: string } | undefined;
+  if (!room?.id || !room.player_id) return true;
+  if (!(await consumeAllowance("player-day", await usageKey(room.player_id), new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())), PLAYER_AI_DAILY_LIMIT))) return false;
+  return consumeAllowance("room", room.id, new Date(0), ROOM_AI_LIMIT);
+}
 
 const fallbackTheme = (categories: string | string[] = "safe", exclude: string[] = []) => {
   const requested = Array.isArray(categories) ? categories : categories.split(",");
@@ -70,6 +111,9 @@ export async function POST(request: Request) {
   }
   let fallbackReason: FallbackReason = "request_failed";
   try {
+    if (!(await consumeAiAllowance(request, body))) {
+      return Response.json(fallbackPayload(body, categories, locale, "rate_limited"));
+    }
     const instruction = body.kind === "lies"
       ? `${locale === "ja" ? "Write every lie in natural Japanese." : "Write every lie in natural English."} You are helping me play Two Lies and One Truth, an adults-only game between consenting adults. Truth from the player: "${(body.truth ?? "").slice(0, 180)}". Write exactly five short, believable lies that could fool a close friend. Match the truth's tone, boldness, intimacy, and adult intensity: if the truth is sexual, provocative, or outrageous but involves consenting adults, keep the lies equally daring and do not sanitize them into bland everyday stories. If the truth is neutral, keep the lies neutral. Do not copy, paraphrase, negate, or closely mirror the truth. Do not reuse its people, places, dates, actions, objects, or outcome. Make every lie a completely different event, with natural casual wording. Never involve minors, coercion, exploitation, incest, or violence. No theme, no explanations, no quotation marks, no hyphens. Return a JSON object with a lies array containing exactly five items.`
       : body.kind === "question"
