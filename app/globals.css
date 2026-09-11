@@ -272,7 +272,7 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .would-rather-options span { display:grid; place-items:center; width:34px; height:34px; border:2px solid var(--ink); border-radius:50%; background:var(--yellow); font-size:16px; font-weight:1000; }
 .would-rather-options strong { align-self:center; font:900 clamp(17px,2.5vw,23px)/1.2 "Arial Rounded MT Bold","Trebuchet MS",Arial,sans-serif; overflow-wrap:anywhere; }
 .would-rather-options small { padding-top:11px; border-top:2px solid var(--ink); font-size:9px; font-weight:1000; letter-spacing:.07em; }
-.rps-card { background:#eef7ff; text-align:center; }
+.rps-card { max-width:920px; background:#eef7ff; text-align:center; }
 .rps-options { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:28px; }
 .rps-options button { min-height:170px; display:grid; place-items:center; align-content:center; gap:13px; border:3px solid var(--ink); border-radius:18px; background:white; box-shadow:6px 6px 0 var(--ink); transition:.15s; animation:rps-float 2.4s ease-in-out infinite; }
 .rps-options button:nth-child(2) { animation-delay:.18s; }.rps-options button:nth-child(3) { animation-delay:.36s; }
@@ -454,6 +454,7 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .topbar .session-tools { gap:4px; }
   .topbar .language-menu .language-trigger { padding:4px 5px; font-size:8px; }
   .topbar .language-menu .language-trigger strong { font-size:9px; }
+  .rps-card { max-width:none; }
 }
 
 /* Make lie choices feel like playful game cards instead of plain form rows. */
