@@ -415,7 +415,7 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .landing nav { height:56px; flex:0 0 56px; }
   .landing .logo { font-size:25px; }
   .landing .logo b { font-size:28px; }
-  .hero { min-height:0; padding:2px 0 8px; gap:5px; align-content:center; justify-items:center; overflow:hidden; }
+  .hero { min-height:0; padding:6px 0 8px; gap:5px; align-content:start; align-items:start; justify-items:center; overflow:hidden; }
   .hero-copy { min-height:0; width:100%; text-align:center; }
   .hero-copy .eyebrow { margin-top:0; }
   .hero-copy h1 { font-size:clamp(38px,11vw,48px); margin:5px 0 8px; }
@@ -424,7 +424,7 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .landing-mini-icon { max-width:none; border-width:2px; box-shadow:2px 2px 0 var(--ink); }
   .landing-mini-icon::after { inset:-3px; border-width:1px; }
   .landing-mini-icon .mini-game-svg { width:clamp(23px,7vw,34px); height:clamp(23px,7vw,34px); }
-  .entry-card { width:min(100%,340px); justify-self:center; padding:16px; border-radius:18px; box-shadow:5px 5px 0 var(--ink); }
+  .entry-card { width:min(100%,340px); justify-self:center; align-self:start; transform-origin:top center; padding:16px; border-radius:18px; box-shadow:5px 5px 0 var(--ink); }
   .card-tabs { margin-bottom:10px; padding:3px; }
   .card-tabs button { padding:8px 6px; font-size:11px; }
   .entry-card label { margin:8px 0; font-size:9px; }
