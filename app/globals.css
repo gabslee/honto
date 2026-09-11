@@ -418,7 +418,8 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .pricing-page h1 { font-size:clamp(30px,8vw,40px); margin:7px auto 5px; }
   .pricing-lead { max-width:360px; margin-bottom:8px; font-size:11px; line-height:1.25; }
   .pricing-signin { margin:0 auto 7px; font-size:10px; }
-  .terms-consent { max-width:380px; margin-bottom:8px; font-size:10px; }
+  .terms-consent { max-width:380px; margin-bottom:3px; gap:5px; font-size:9px; line-height:1.15; }
+  .terms-consent input { width:14px; height:14px; }
   .pricing-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; max-width:620px; }
   .pricing-benefits { margin-bottom:10px; padding:10px 12px; box-shadow:3px 3px 0 var(--ink); }
   .pricing-benefits h2 { margin:4px 0 8px; font-size:15px; }
