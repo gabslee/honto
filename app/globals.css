@@ -351,6 +351,32 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .session-clock { max-width:112px; }
 }
 
+/* The landing screen is a single mobile viewport, not a long marketing page. */
+@media (max-width:800px) {
+  .landing { height:100svh; min-height:100svh; padding:0 16px; overflow:hidden; }
+  .landing nav { height:56px; flex:0 0 56px; }
+  .landing .logo { font-size:25px; }
+  .landing .logo b { font-size:28px; }
+  .hero { min-height:0; padding:10px 0 8px; gap:10px; align-content:center; overflow:hidden; }
+  .hero-copy { min-height:0; }
+  .hero-copy h1 { font-size:clamp(38px,11vw,48px); margin:8px 0 10px; }
+  .hero-copy p { margin:0 auto; font-size:14px; line-height:1.3; max-width:430px; }
+  .rule-cards { grid-template-columns:repeat(7,minmax(0,1fr)); gap:5px; max-width:430px; margin:14px auto 0; }
+  .landing-mini-icon { max-width:none; border-width:2px; box-shadow:2px 2px 0 var(--ink); }
+  .landing-mini-icon::after { inset:-3px; border-width:1px; }
+  .landing-mini-icon .mini-game-svg { width:clamp(23px,7vw,34px); height:clamp(23px,7vw,34px); }
+  .entry-card { padding:14px; border-radius:16px; box-shadow:5px 5px 0 var(--ink); }
+  .card-tabs { margin-bottom:10px; padding:3px; }
+  .card-tabs button { padding:8px 6px; font-size:11px; }
+  .entry-card label { margin:8px 0; font-size:9px; }
+  .entry-card input { margin-top:5px; padding:10px 11px; }
+  .entry-card .primary-button { padding:12px 14px; }
+  .entry-card small { margin-top:9px; font-size:10px; }
+  .account-slot { margin-top:8px; }
+  .account-control { min-height:30px; padding:6px 9px; font-size:8px; }
+  .landing > footer { display:none; }
+}
+
 /* Make lie choices feel like playful game cards instead of plain form rows. */
 .lie-options { gap:14px; margin:18px 0 26px; }
 .lie-options label { position:relative; grid-template-columns:46px minmax(0,1fr) 84px; border:3px solid var(--ink); border-radius:16px; background:#fffdf8; box-shadow:5px 5px 0 var(--ink); transition:transform .15s, box-shadow .15s, background .15s; }
