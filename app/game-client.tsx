@@ -53,7 +53,7 @@ function AccountControl() {
   useEffect(() => {
     const anchor = document.querySelector<HTMLElement>(".entry-card .primary-button");
     if (!anchor) return;
-    const update = () => { const rect = anchor.getBoundingClientRect(); const width = rect.width * 0.72; setPlacement({ left: rect.left + (rect.width - width) / 2, top: rect.bottom + 14, width }); };
+    const update = () => { const rect = anchor.getBoundingClientRect(); const width = rect.width * 0.72; setPlacement({ left: rect.left + (rect.width - width) / 2, top: rect.bottom + 58, width }); };
     update(); window.addEventListener("resize", update); window.addEventListener("scroll", update, { passive: true });
     return () => { window.removeEventListener("resize", update); window.removeEventListener("scroll", update); };
   });
