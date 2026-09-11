@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   if (!clientId || !clientSecret) return redirect(request, "/?auth=missing_config", clearState);
   try {
     const origin = url.origin;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI ?? `${origin}/api/auth/google/callback`;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI ?? `${origin}/api/auth/callback/google`;
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code: url.searchParams.get("code")!, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: "authorization_code" }) });
     if (!tokenResponse.ok) throw new Error(`Google token exchange failed (${tokenResponse.status})`);
     const tokens = await tokenResponse.json() as { access_token?: string };
