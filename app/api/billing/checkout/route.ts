@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   try { body = await request.json(); } catch { /* use monthly */ }
   const price = body.interval === "year" ? stripeYearlyPrice() : stripeMonthlyPrice();
   const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "https://repo-two-jet-78.vercel.app";
-  const params = new URLSearchParams({ mode: "subscription", "line_items[0][price]": price, "line_items[0][quantity]": "1", customer_email: user.email, "subscription_data[trial_period_days]": "7", "subscription_data[trial_settings][end_behavior][missing_payment_method]": "cancel", success_url: `${origin}/?billing=success`, cancel_url: `${origin}/?billing=cancelled`, "metadata[user_id]": user.id, "subscription_data[metadata][user_id]": user.id });
+  const params = new URLSearchParams({ mode: "subscription", "line_items[0][price]": price, "line_items[0][quantity]": "1", customer_email: user.email, payment_method_collection: "if_required", "subscription_data[trial_period_days]": "7", "subscription_data[trial_settings][end_behavior][missing_payment_method]": "cancel", success_url: `${origin}/?billing=success`, cancel_url: `${origin}/?billing=cancelled`, "metadata[user_id]": user.id, "subscription_data[metadata][user_id]": user.id });
   const response = await stripeRequest("/checkout/sessions", params);
   const data = await response.json() as { url?: string; error?: { message?: string } };
   if (!response.ok || !data.url) return Response.json({ error: data.error?.message || "Unable to create Stripe checkout." }, { status: 502 });
