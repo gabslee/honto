@@ -2,8 +2,8 @@
 .account-slot { width:72%; margin:14px auto 0; }
 .account-stack { display:flex; flex-direction:column; gap:8px; width:100%; }
 .account-auth-buttons { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; }
-.account-auth-buttons .account-control { position:relative; width:50px; min-width:50px; height:34px; min-height:34px; padding:5px; border-radius:8px; }
-.account-auth-buttons .google-mark,.account-auth-buttons .apple-mark { width:22px; height:22px; }
+.account-auth-buttons .account-control { position:relative; width:60px; min-width:60px; height:34px; min-height:34px; padding:5px; border-radius:8px; }
+.account-auth-buttons .google-mark,.account-auth-buttons .apple-mark { width:24px; height:24px; }
 .account-auth-buttons .curated-button { background:var(--yellow); color:var(--ink); }
 .apple-auth-button { background:#050b17!important; color:#fff!important; border-color:#050b17!important; box-shadow:3px 3px 0 #fff; opacity:1!important; }
 .apple-auth-button:disabled { cursor:not-allowed; }
