@@ -4,7 +4,7 @@ import { ensureIdentitySchema } from "./server-auth";
 export const stripeApi = "https://api.stripe.com/v1";
 export const stripeSecret = () => process.env.STRIPE_SECRET_KEY ?? "";
 export const stripeMonthlyPrice = () => process.env.STRIPE_MONTHLY_PRICE_ID ?? "price_1UEXCMEtqzZaLNKx6X0n1lj9";
-export const stripeYearlyPrice = () => process.env.STRIPE_YEARLY_PRICE_ID ?? "price_1UEXDdEtqzZaLNKxLTk22kH8";
+export const stripeYearlyPrice = () => process.env.STRIPE_YEARLY_PRICE_ID ?? process.env.STRIPE_ANNUAL_PRICE_ID ?? "price_1UEXDdEtqzZaLNKxLTk22kH8";
 const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
 
 export function stripeHeaders() {
