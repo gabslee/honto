@@ -400,6 +400,7 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .deck-filter-toggle:hover { color:var(--ink); }
 .hero > .entry-card { align-self:start; }
 .deck-filter-content { margin-top:14px; }
+.deck-filter-panel:has(.deck-filter-content) .deck-filter-content { margin-top:24px; }
 @media (max-width:800px) {
   .prompt-row textarea.prompt-input { min-height:82px; }
   .topbar { grid-template-columns:minmax(0,1fr) auto; }
