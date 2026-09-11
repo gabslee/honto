@@ -424,6 +424,25 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .pricing-page .legal-footer { display:none; }
 }
 
+@media (max-width:600px) {
+  .question-card { padding:14px 12px; }
+  .question-card .card-type-badge { padding:5px 8px; font-size:8px; }
+  .question-card h2 { margin:10px 0 7px; font-size:25px; line-height:.98; }
+  .question-card > .hint { margin:7px 0; font-size:11px; line-height:1.25; }
+  .question-card .mini-game-input { min-height:62px; margin:8px 0; padding:9px 10px; font-size:14px; line-height:1.25; }
+  .question-card .question-tools { gap:6px; margin:7px 0 4px; }
+  .question-card .question-tools button { padding:8px 7px; font-size:9px; line-height:1.1; }
+  .question-card .question-option-list { gap:5px; margin:7px 0 9px; }
+  .question-card .question-option-list > span { font-size:8px; }
+  .question-card .question-option { padding:8px 9px; font-size:11px; line-height:1.2; }
+  .question-card .sip-picker-wrap { margin:9px 0; }
+  .question-card .sip-picker-wrap > span { margin-bottom:5px; font-size:8px; }
+  .question-card .sip-choice { min-width:45px; padding:4px 5px; }
+  .question-card .sip-choice strong { font-size:13px; }
+  .question-card .sip-choice small { font-size:8px; }
+  .question-card > .primary-button { padding:11px 12px; font-size:10px; }
+}
+
 /* Make lie choices feel like playful game cards instead of plain form rows. */
 .lie-options { gap:14px; margin:18px 0 26px; }
 .lie-options label { position:relative; grid-template-columns:46px minmax(0,1fr) 84px; border:3px solid var(--ink); border-radius:16px; background:#fffdf8; box-shadow:5px 5px 0 var(--ink); transition:transform .15s, box-shadow .15s, background .15s; }
