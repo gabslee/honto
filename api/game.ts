@@ -11,7 +11,7 @@ type Body = {
   action?: string; code?: string; name?: string; token?: string; roundCount?: number;
   themeCategory?: string; customTheme?: string | null; prompt?: string; statements?: string[];
   truthIndex?: number; guessedIndex?: number; question?: string; sips?: number;
-  choice?: "answer" | "skip"; preferenceIndex?: number; correctNumber?: number; estimate?: number; rpsChoice?: RpsChoice; locale?: Locale; wager?: string; wouldRatherIndex?: number;
+  choice?: "answer" | "skip"; preferenceIndex?: number; correctNumber?: number; estimate?: number; rpsChoice?: RpsChoice; locale?: Locale; wager?: string; wouldRatherIndex?: number; cardTypes?: string;
 };
 
 const WORDS = ["MOON", "MINT", "WAVE", "SAKE", "NEON", "MISO", "YUZU", "NORI", "KITSU", "MOMO", "SORA", "KUMA", "HOSHI", "RAMEN", "UMAMI"];
@@ -29,6 +29,7 @@ function ensureSchema() {
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS custom_theme text`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS welcome_ack text[] NOT NULL DEFAULT '{}'`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS locale text NOT NULL DEFAULT 'en'`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS card_types text NOT NULL DEFAULT 'honto,question,wouldrather,preference,estimate,rps,both'`;
     await sql`CREATE TABLE IF NOT EXISTS players (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, name text NOT NULL, token text UNIQUE NOT NULL, is_host boolean NOT NULL DEFAULT false, sips integer NOT NULL DEFAULT 0, joined_at timestamptz NOT NULL DEFAULT now())`;
     await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS wager text`;
     await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS user_id text`;
@@ -60,9 +61,14 @@ const shuffle = <T,>(items: T[]) => {
   return copy;
 };
 
-function makeDeckTypes(count: number) {
+function normalizedCardTypes(value?: string | null): CardType[] {
+  const selected = String(value ?? "").split(",").filter((item): item is CardType => CARD_TYPES.includes(item as CardType));
+  return [...new Set(selected)].length >= 3 ? [...new Set(selected)] : CARD_TYPES;
+}
+
+function makeDeckTypes(count: number, available: CardType[] = CARD_TYPES) {
   const result: CardType[] = [];
-  while (result.length < count) result.push(...shuffle(CARD_TYPES));
+  while (result.length < count) result.push(...shuffle(available));
   return result.slice(0, count);
 }
 
@@ -79,9 +85,9 @@ function estimateOptions(correct: number) {
   return shuffle([...candidates].slice(0, 5));
 }
 
-async function buildDeck(roomId: string, roundCount: number, players: any[], themeCategory?: string | null, locale: Locale = "en") {
+async function buildDeck(roomId: string, roundCount: number, players: any[], themeCategory?: string | null, locale: Locale = "en", cardTypes?: string | null) {
   await sql`DELETE FROM deck_cards WHERE room_id = ${roomId}`;
-  const types = makeDeckTypes(roundCount);
+  const types = makeDeckTypes(roundCount, normalizedCardTypes(cardTypes));
   const themes = normalizedThemes(themeCategory);
   const questions = shuffle(themes.flatMap((theme) => (locale === "ja" ? ESTIMATE_QUESTIONS_BY_THEME_JA[theme] : ESTIMATE_QUESTIONS_BY_THEME[theme])));
   const preferences = shuffle(themes.flatMap((theme) => (locale === "ja" ? PREFERENCE_CARDS_BY_THEME_JA[theme] : PREFERENCE_CARDS_BY_THEME[theme])));
@@ -128,7 +134,7 @@ async function state(roomCode: string, token: string, currentUser: CurrentUser |
   const cardRows = room.status === "playing" ? await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.card_number = ${room.current_round} LIMIT 1` : [];
   const lastRows = await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.status = 'complete' ORDER BY c.card_number DESC LIMIT 1`;
   return {
-    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, welcomeAck: Array.isArray(room.welcome_ack) ? room.welcome_ack : [], locale: room.locale === "ja" ? "ja" : "en", startedAt: room.started_at, canUseSpicy: hasPremiumAccess(currentUser) },
+    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, cardTypes: normalizedCardTypes(room.card_types).join(","), welcomeAck: Array.isArray(room.welcome_ack) ? room.welcome_ack : [], locale: room.locale === "ja" ? "ja" : "en", startedAt: room.started_at, canUseSpicy: hasPremiumAccess(currentUser), canCustomizeDeck: hasPremiumAccess(currentUser) },
     players, activeCard: publicCard(cardRows[0], me.id), lastCard: publicCard(lastRows[0], me.id, true), meId: me.id,
   };
 }
@@ -235,13 +241,15 @@ export default async function handler(req: any, res: any) {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can change the room settings.");
       const { roundCount, themeCategory, customTheme, locale } = normalizeRoomSettings(room, body, LEGACY_THEME_MAP);
       if (themeCategory.split(",").includes("spicy") && !hasPremiumAccess(currentUser)) throw new Error("Spicy is a Premium theme. Start your Premium trial to unlock it.");
-      await sql`UPDATE rooms SET round_count = ${roundCount}, theme_category = ${themeCategory}, custom_theme = ${customTheme}, locale = ${locale}, updated_at = now() WHERE id = ${room.id}`;
+      const cardTypes = normalizedCardTypes(body.cardTypes ?? room.card_types).join(",");
+      if (body.cardTypes !== undefined && cardTypes !== normalizedCardTypes(CARD_TYPES.join(",")).join(",") && !hasPremiumAccess(currentUser)) throw new Error("Custom decks are a Premium feature.");
+      await sql`UPDATE rooms SET round_count = ${roundCount}, theme_category = ${themeCategory}, custom_theme = ${customTheme}, locale = ${locale}, card_types = ${cardTypes}, updated_at = now() WHERE id = ${room.id}`;
     }
     if (body.action === "start") {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can start the game.");
       const players = await sql`SELECT id FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
       if (players.length !== 2) throw new Error("Honto needs exactly two players.");
-      await buildDeck(room.id, Number(room.round_count), players, room.theme_category, room.locale === "ja" ? "ja" : "en");
+      await buildDeck(room.id, Number(room.round_count), players, room.theme_category, room.locale === "ja" ? "ja" : "en", room.card_types);
       await sql`UPDATE players SET sips = 0, wager = NULL WHERE room_id = ${room.id}`;
       await sql`UPDATE rooms SET status = 'playing', current_round = 1, welcome_ack = '{}', started_at = now(), updated_at = now() WHERE id = ${room.id}`;
     }
