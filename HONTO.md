@@ -19,7 +19,7 @@ O nome vem de **honto (本当)**, palavra japonesa que significa “é verdade?�
 
 O placar mostra quantos sips cada pessoa acumulou. Ao final do deck, vence quem tiver bebido menos. As duas apostas são reveladas e o perdedor recebe o desafio escrito pelo vencedor; em caso de empate, não há desafio obrigatório.
 
-## Os seis mini games
+## Os sete mini games
 
 ### 1. Two Lies, One Truth
 
@@ -33,25 +33,29 @@ Quem comprou a carta escolhe uma pergunta curada, pede três sugestões à IA us
 
 O autor escolhe se a pergunta vale 1, 2 ou 3 sips. O outro jogador pode responder em voz alta; nesse caso, quem perguntou bebe. Se preferir não responder, ele bebe os sips da pergunta.
 
-### 3. Read My Mind
+### 3. Would You Rather
+
+Quem comprou a carta escreve duas opções para o adversário. O outro jogador escolhe uma delas ou usa a terceira opção, **Skip**. Ao pular as duas alternativas, ele gira a roleta especial de 2, 3 ou 4 sips.
+
+### 4. Read My Mind
 
 O jogador que comprou a carta recebe uma pergunta de preferência com três opções, como “Qual lugar você visitaria primeiro?”. Ele escolhe uma opção em segredo.
 
 O adversário tenta adivinhar a escolha. Se acertar, quem fez a escolha bebe. Se errar, quem adivinhou bebe. A roleta define 1, 2 ou 3 sips.
 
-### 4. Number Estimate
+### 5. Number Estimate
 
-O jogador que comprou a carta responde em segredo uma pergunta quantificável, como “Quantos países você já visitou?”. O jogo cria quatro alternativas plausíveis além da resposta correta, totalizando cinco opções.
+O jogador que comprou a carta responde em segredo uma pergunta quantificável, como “Quantos países você já visitou?”. Ele pode usar uma pergunta sugerida ou escrever a própria questão. O jogo cria quatro alternativas plausíveis além da resposta correta, totalizando cinco opções. Se o adversário acertar de primeira, quem definiu o número gira a roleta especial de 2, 3 ou 4 sips.
 
 O outro jogador tenta adivinhar. Cada erro vale 1 sip e elimina aquela opção; ele pode tentar novamente até acertar. Depois de um erro, aparece uma confirmação clara do sip e a pessoa continua. Se acertar de primeira, quem respondeu gira a roleta de 1, 2 ou 3 sips. Também é possível trocar a pergunta ou escrever uma pergunta numérica própria antes de responder.
 
-### 5. Joken-pô
+### 6. Joken-pô
 
 Os dois jogadores escolhem secretamente **rock**, **paper** ou **scissors**. O app revela as duas mãos com uma animação de confronto. Em caso de empate, aparece a animação de empate e os dois jogam novamente.
 
 Quem perder gira a roleta de 1, 2 ou 3 sips. O nome do mini game permanece “Joken-pô”, inclusive na interface japonesa.
 
-### 6. Both Drink
+### 7. Both Drink
 
 Não há adivinhação: os dois bebem. O jogador que comprou a carta toca em **Spin**; a roleta aparece para todos e define 1, 2 ou 3 sips para cada jogador.
 
@@ -59,7 +63,7 @@ Não há adivinhação: os dois bebem. O jogador que comprou a carta toca em **S
 
 A roleta nunca gira sozinha. Primeiro ela aparece parada; somente o jogador responsável toca em **Spin**. Enquanto gira, o outro vê quem está girando. O resultado final fica visível antes da próxima carta e o número indicado pelo ponteiro é o mesmo número exibido no resultado.
 
-O jogador que comprou a carta pode usar **Skip** quando o mini game estiver aberto. Pular não é gratuito: a roleta especial usa 2, 4 ou 6 sips, o dobro da roleta normal. O adversário não pode pular a carta.
+O jogador que comprou a carta pode usar **Skip** quando o mini game estiver aberto. Pular não é gratuito: a roleta especial usa 2, 3 ou 4 sips. O adversário não pode pular a carta.
 
 ## Idiomas
 

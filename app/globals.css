@@ -173,7 +173,7 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 @keyframes reveal-icon-pop { from { opacity:0; transform:scale(.4) rotate(-12deg); } 70% { transform:scale(1.1) rotate(4deg); } to { opacity:1; transform:scale(1) rotate(0); } }
 .card-type-badge { display:inline-flex; align-items:center; gap:8px; padding:7px 11px; border:2px solid var(--ink); border-radius:999px; box-shadow:3px 3px 0 var(--ink); font-size:10px; font-weight:1000; letter-spacing:.1em; }
 .card-type-badge b { font-size:20px; line-height:1; }.card-type-badge.yellow { background:var(--yellow); }.card-type-badge.mint { background:var(--mint); }.card-type-badge.blue { background:#a9d5ff; }.card-type-badge.pink { background:var(--pink); }
-.question-card { background:#effcf6; }.preference-card { background:#eef7ff; }.estimate-card { background:#fff0f4; }
+.question-card { background:#effcf6; }.would-rather-card { background:#fff4cf; }.preference-card { background:#eef7ff; }.estimate-card { background:#fff0f4; }
 .big-question { margin:24px 0; padding:20px; border:3px solid var(--ink); border-radius:14px; background:#fffdf8; box-shadow:4px 4px 0 var(--ink); font:clamp(19px,3vw,26px)/1.35 Arial,sans-serif; }
 .question-option-list { display:grid; gap:8px; margin:16px 0 22px; text-align:left; }
 .question-option-list>span { font-size:10px; font-weight:1000; letter-spacing:.12em; }
@@ -207,6 +207,18 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .preference-options .preference-number { display:block; color:var(--ink); font-size:11px; font-weight:1000; opacity:.55; }
 .preference-options .preference-label { display:flex; align-items:center; width:100%; min-height:58px; margin:0; color:var(--ink); font:900 20px/1.2 "Arial Rounded MT Bold","Trebuchet MS",Arial,sans-serif; opacity:1; visibility:visible; white-space:normal; overflow-wrap:anywhere; }
 .preference-options small { display:block; width:100%; padding-top:9px; color:var(--ink); border-top:2px solid var(--ink); font-size:9px; font-weight:1000; letter-spacing:.08em; }
+.would-rather-compose { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:14px; align-items:center; margin:24px 0; }
+.would-rather-compose label { display:grid; gap:8px; min-width:0; font-size:10px; font-weight:1000; letter-spacing:.1em; }
+.would-rather-compose> b { display:grid; place-items:center; width:42px; height:42px; border:3px solid var(--ink); border-radius:50%; background:var(--pink); box-shadow:3px 3px 0 var(--ink); font-size:10px; }
+.would-rather-compose textarea { min-height:130px; margin:0; resize:vertical; background:#fffdf8; }
+.would-rather-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:26px; }
+.would-rather-options button { min-height:210px; display:grid; grid-template-rows:auto 1fr auto; gap:16px; padding:16px; color:var(--ink); border:3px solid var(--ink); border-radius:18px; background:var(--pink); box-shadow:6px 6px 0 var(--ink); text-align:left; transition:.15s; }
+.would-rather-options button:nth-child(2) { background:var(--mint); transform:rotate(1deg); }
+.would-rather-options button.would-rather-skip { background:#fffdf8; border-style:dashed; transform:rotate(-1deg); }
+.would-rather-options button:hover:not(:disabled) { transform:translateY(-6px) rotate(-1deg); box-shadow:8px 11px 0 var(--ink); }
+.would-rather-options span { display:grid; place-items:center; width:34px; height:34px; border:2px solid var(--ink); border-radius:50%; background:var(--yellow); font-size:16px; font-weight:1000; }
+.would-rather-options strong { align-self:center; font:900 clamp(17px,2.5vw,23px)/1.2 "Arial Rounded MT Bold","Trebuchet MS",Arial,sans-serif; overflow-wrap:anywhere; }
+.would-rather-options small { padding-top:11px; border-top:2px solid var(--ink); font-size:9px; font-weight:1000; letter-spacing:.07em; }
 .rps-card { background:#eef7ff; text-align:center; }
 .rps-options { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:28px; }
 .rps-options button { min-height:170px; display:grid; place-items:center; align-content:center; gap:13px; border:3px solid var(--ink); border-radius:18px; background:white; box-shadow:6px 6px 0 var(--ink); transition:.15s; animation:rps-float 2.4s ease-in-out infinite; }
@@ -219,7 +231,7 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .both-card .card-type-badge { align-self:center; }.both-card .spin-button { max-width:410px; margin:30px auto 0; }
 .both-waiting { max-width:410px; display:grid; place-items:center; gap:8px; margin:30px auto 0; padding:18px; border:2px dashed var(--ink); border-radius:12px; background:#fffdf8cc; }.both-waiting strong { font-size:14px; }.both-waiting small { font:11px Arial,sans-serif; opacity:.65; }.both-waiting-orbit { width:34px; height:34px; border:5px dotted var(--red); border-radius:50%; animation:orbit-spin 1.1s linear infinite; }
 @media (max-width:800px) { .estimate-options { grid-template-columns:repeat(2,1fr); }.estimate-options button:last-child { grid-column:1 / -1; }.deck-stack { width:145px; height:190px; }.mini-game-actions { grid-template-columns:1fr; } }
-@media (max-width:600px) { .preference-options { grid-template-columns:1fr; }.preference-options button { min-height:100px; }.rps-options { gap:7px; }.rps-options button { min-height:125px; }.rps-options span { font-size:42px; }.draw-card-zone { min-height:285px; }.honto-playing-card { width:180px; height:255px; }.playing-card-center { width:112px; min-height:132px; }.playing-card-center i { font-size:37px; } }
+@media (max-width:600px) { .preference-options,.would-rather-options { grid-template-columns:1fr; }.preference-options button { min-height:100px; }.would-rather-options button { min-height:130px; }.would-rather-compose { grid-template-columns:1fr; }.would-rather-compose> b { margin:auto; }.rps-options { gap:7px; }.rps-options button { min-height:125px; }.rps-options span { font-size:42px; }.draw-card-zone { min-height:285px; }.honto-playing-card { width:180px; height:255px; }.playing-card-center { width:112px; min-height:132px; }.playing-card-center i { font-size:37px; } }
 @media (max-width:600px) { .estimate-question-wrap { grid-template-columns:1fr; }.estimate-question-actions { grid-template-columns:1fr 1fr; grid-template-rows:auto; width:100%; }.estimate-next-button,.estimate-write-button { min-height:44px; } }
 @media (max-width:600px) { .all-wagers { grid-template-columns:1fr; }.wager-reveal { padding:24px 17px; } }
 @media (max-width:600px) { .question-tools { grid-template-columns:1fr; }.question-ai-modal { padding:25px 18px; }.question-theme-checks { grid-template-columns:1fr; } }

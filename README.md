@@ -2,13 +2,13 @@
 
 **Draw a card. Read each other. Who takes the sip?**
 
-HONTO?! is an online card game for exactly two players. Both devices share one shuffled deck with six journeys: Two Lies, One Truth; Question or Sips; Read My Mind; Number Estimate; Rock Paper Scissors; and Both Drink. Roles alternate on every card, secret answers stay server-side until the reveal, and “Hontō?” (本当?) means “is it true?” in Japanese.
+HONTO?! is an online card game for exactly two players. Both devices share one shuffled deck with seven journeys: Two Lies, One Truth; Question or Sips; Would You Rather; Read My Mind; Number Estimate; Rock Paper Scissors; and Both Drink. Roles alternate on every card, secret answers stay server-side until the reveal, and “Hontō?” (本当?) means “is it true?” in Japanese.
 
 ## MVP
 
 - No-account entry by name, room code, or invite link
 - Exactly two seats and one synchronized deck
-- Balanced mix of the six card types with alternating roles
+- Balanced mix of the seven card types with alternating roles
 - Secret truth and numeric answers that are never sent to the guesser
 - AI-assisted questions and lies with local fallbacks
 - Persistent room session and sip count
@@ -21,7 +21,7 @@ English is the only supported language and the default locale today. All interfa
 
 ## Architecture
 
-The project uses React and TypeScript with server routes in the same deployment. Shared state lives in D1; the browser stores only the opaque token required to resume its own session. The `/api/game` endpoint handles room actions and never reveals the truth before a guess.
+The project uses React and TypeScript with server routes in the same deployment. Shared state lives in Postgres; each browser tab stores only the opaque token required to resume its own session. The `/api/game` endpoint handles room actions and never reveals the truth before a guess.
 
 AI generation runs only on the server, returns structured responses, and falls back to local content. API keys are never exposed to the browser.
 

@@ -2,18 +2,18 @@ import { neon } from "@neondatabase/serverless";
 import { ESTIMATE_QUESTIONS_BY_THEME, PREFERENCE_CARDS_BY_THEME, type CuratedTheme } from "../data/curated";
 import { ESTIMATE_QUESTIONS_BY_THEME_JA, PREFERENCE_CARDS_BY_THEME_JA } from "../data/curated-ja";
 
-type CardType = "honto" | "question" | "preference" | "estimate" | "rps" | "both";
+type CardType = "honto" | "question" | "wouldrather" | "preference" | "estimate" | "rps" | "both";
 type Locale = "en" | "ja";
 type RpsChoice = "rock" | "paper" | "scissors";
 type Body = {
   action?: string; code?: string; name?: string; token?: string; roundCount?: number;
   themeCategory?: string; customTheme?: string | null; prompt?: string; statements?: string[];
   truthIndex?: number; guessedIndex?: number; question?: string; sips?: number;
-  choice?: "answer" | "skip"; preferenceIndex?: number; correctNumber?: number; estimate?: number; rpsChoice?: RpsChoice; locale?: Locale; wager?: string;
+  choice?: "answer" | "skip"; preferenceIndex?: number; correctNumber?: number; estimate?: number; rpsChoice?: RpsChoice; locale?: Locale; wager?: string; wouldRatherIndex?: number;
 };
 
 const WORDS = ["MOON", "MINT", "WAVE", "SAKE", "NEON", "MISO", "YUZU", "NORI", "KITSU", "MOMO", "SORA", "KUMA", "HOSHI", "RAMEN", "UMAMI"];
-const CARD_TYPES: CardType[] = ["honto", "question", "preference", "estimate", "rps", "both"];
+const CARD_TYPES: CardType[] = ["honto", "question", "wouldrather", "preference", "estimate", "rps", "both"];
 const ROOM_IDLE_MS = 12 * 60 * 60 * 1000;
 
 const sql = neon(process.env.DATABASE_URL ?? "");
@@ -39,8 +39,9 @@ function ensureSchema() {
 const id = () => crypto.randomUUID();
 const code = () => `${WORDS[Math.floor(Math.random() * WORDS.length)]}-${Math.floor(10 + Math.random() * 90)}`;
 const spinSips = () => 1 + Math.floor(Math.random() * 3);
+const spinHighSips = () => 2 + Math.floor(Math.random() * 3);
 const cleanName = (value?: string) => value?.trim().replace(/\s+/g, " ").slice(0, 24) ?? "";
-const LEGACY_THEME_MAP: Record<string, CuratedTheme> = { mixed: "general", family: "general", innocent: "general", life: "life", flirty: "relationships", spicy: "spicy", wild: "general" };
+const LEGACY_THEME_MAP: Record<string, CuratedTheme> = { general: "general", relationships: "relationships", mixed: "general", family: "general", innocent: "general", life: "life", flirty: "relationships", spicy: "spicy", wild: "general" };
 const normalizedThemes = (value?: string | null): CuratedTheme[] => {
   const themes = String(value ?? "").split(",").map((item) => LEGACY_THEME_MAP[item.trim()]).filter((item): item is CuratedTheme => Boolean(item));
   return [...new Set(themes)].length ? [...new Set(themes)] : ["general", "life"];
@@ -234,7 +235,7 @@ export default async function handler(req: any, res: any) {
     }
     if (body.action === "skipCard") {
       if (!card || !["ready", "guess", "choose"].includes(card.status) || card.actor_id !== me.id) throw new Error("Only the player who drew this card can skip it.");
-      const sips = spinSips() * 2;
+      const sips = spinHighSips();
       const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ skipped: true, skipById: me.id, drinkerId: me.id, spinById: me.id, sips })}, completed_at = now() WHERE id = ${card.id} AND status IN ('ready', 'guess', 'choose') RETURNING id`;
       if (updated[0]) { await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${me.id}`; await finishCard(room); }
     }
@@ -267,6 +268,22 @@ export default async function handler(req: any, res: any) {
       const drinkerId = body.choice === "answer" ? card.actor_id : card.target_id;
       const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ choice: body.choice, drinkerId, sips })}, completed_at = now() WHERE id = ${card.id} AND status = 'choose' RETURNING id`;
       if (updated[0]) { await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${drinkerId}`; await finishCard(room); }
+    }
+    if (body.action === "submitWouldRather") {
+      if (!card || card.type !== "wouldrather" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("This Would You Rather card is not ready.");
+      const options = body.statements?.map((item) => String(item).trim().replace(/\s+/g, " ").slice(0, 140)) ?? [];
+      if (options.length !== 2 || options.some((option) => option.length < 2)) throw new Error("Write both Would You Rather options.");
+      await sql`UPDATE deck_cards SET status = 'choose', payload = ${JSON.stringify({ options })} WHERE id = ${card.id} AND status = 'ready'`;
+    }
+    if (body.action === "answerWouldRather") {
+      if (!card || card.type !== "wouldrather" || card.status !== "choose" || card.target_id !== me.id) throw new Error("This Would You Rather choice is not yours.");
+      const wouldRatherIndex = Number(body.wouldRatherIndex);
+      if (![0, 1, 2].includes(wouldRatherIndex)) throw new Error("Choose one option or skip.");
+      const skipped = wouldRatherIndex === 2;
+      const sips = skipped ? spinHighSips() : 0;
+      const result = { wouldRatherIndex, skipped, skipById: skipped ? card.target_id : null, drinkerId: skipped ? card.target_id : null, spinById: skipped ? card.target_id : null, sips };
+      const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify(result)}, completed_at = now() WHERE id = ${card.id} AND status = 'choose' RETURNING id`;
+      if (updated[0]) { if (skipped) await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${card.target_id}`; await finishCard(room); }
     }
     if (body.action === "choosePreference") {
       if (!card || card.type !== "preference" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("This choice is not yours to make.");
@@ -341,7 +358,7 @@ export default async function handler(req: any, res: any) {
         await sql`UPDATE deck_cards SET payload = ${JSON.stringify({ ...payload, wrongGuesses: [...wrongGuesses, estimate] })} WHERE id = ${card.id} AND status = 'guess'`;
         await sql`UPDATE players SET sips = sips + 1 WHERE id = ${card.target_id}`;
       } else {
-        const firstTry = wrongGuesses.length === 0; const drinkerId = firstTry ? card.actor_id : null; const sips = firstTry ? spinSips() : wrongGuesses.length;
+        const firstTry = wrongGuesses.length === 0; const drinkerId = firstTry ? card.actor_id : null; const sips = firstTry ? spinHighSips() : wrongGuesses.length;
         const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify({ correctNumber, wrongGuesses, firstTry, drinkerId, spinById: firstTry ? drinkerId : null, sips })}, completed_at = now() WHERE id = ${card.id} AND status = 'guess' RETURNING id`;
         if (updated[0]) { if (drinkerId) await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${drinkerId}`; await finishCard(room); }
       }
