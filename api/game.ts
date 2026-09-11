@@ -220,7 +220,7 @@ export default async function handler(req: any, res: any) {
       const completed = completedRows[0] as any;
       if (!completed) throw new Error("There is no completed wheel to spin.");
       const result = parse(completed.result);
-      if (!["honto", "preference", "rps", "both"].includes(completed.type) && !(completed.type === "estimate" && result.firstTry) && !result.skipped) throw new Error("This card does not use the sip wheel.");
+      if (!["honto", "preference", "rps", "both", "wouldrather"].includes(completed.type) && !(completed.type === "estimate" && result.firstTry) && !result.skipped) throw new Error("This card does not use the sip wheel.");
       const spinById = result.spinById ?? (completed.type === "both" ? completed.actor_id : result.drinkerId);
       if (spinById !== me.id) throw new Error("The other player is responsible for spinning this wheel.");
       if (!result.wheelStartedAt) await sql`UPDATE deck_cards SET result = ${JSON.stringify({ ...result, spinById, wheelStartedAt: new Date().toISOString() })} WHERE id = ${completed.id} AND status = 'complete'`;
@@ -293,10 +293,12 @@ export default async function handler(req: any, res: any) {
       const wouldRatherIndex = Number(body.wouldRatherIndex);
       if (![0, 1, 2].includes(wouldRatherIndex)) throw new Error("Choose one option or skip.");
       const skipped = wouldRatherIndex === 2;
-      const sips = skipped ? spinHighSips() : 0;
-      const result = { wouldRatherIndex, skipped, skipById: skipped ? card.target_id : null, drinkerId: skipped ? card.target_id : null, spinById: skipped ? card.target_id : null, sips };
+      const drinkerId = skipped ? card.target_id : card.actor_id;
+      const sips = skipped ? spinHighSips() : spinSips();
+      const result = { wouldRatherIndex, skipped, skipById: skipped ? card.target_id : null, drinkerId, spinById: drinkerId, sips };
       const updated = await sql`UPDATE deck_cards SET status = 'complete', result = ${JSON.stringify(result)}, completed_at = now() WHERE id = ${card.id} AND status = 'choose' RETURNING id`;
-      if (updated[0]) { if (skipped) await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${card.target_id}`; await finishCard(room); }
+      if (updated[0]) await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${drinkerId}`;
+      if (updated[0]) await finishCard(room);
     }
     if (body.action === "nextPreference") {
       if (!card || card.type !== "preference" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("Only the player choosing can move to the next question.");
