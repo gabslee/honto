@@ -380,15 +380,23 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .lobby-composite .lobby-grid { display:contents; }
 .lobby-composite .lobby-grid > .panel:first-child { grid-area:table; }
 .lobby-composite .lobby-grid > .panel:nth-child(2) { grid-area:deck; }
-.lobby-composite .deck-filter-panel { position:relative; max-width:none; margin:0; padding:18px 22px; align-self:start; transform:none; border:3px dashed #d8a500; background:#fffdf8; box-shadow:6px 6px 0 var(--ink); }
-.deck-filter-panel .panel-title .sticker { position:absolute; top:-11px; right:-10px; z-index:1; transform:rotate(4deg); padding:7px 11px; border:2px solid var(--ink); border-radius:5px; background:var(--yellow); color:var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:10px; letter-spacing:.1em; }
+.lobby-composite .deck-filter-panel { position:relative; max-width:none; margin:0; padding:24px 22px 18px; align-self:start; transform:none; border:3px solid var(--ink); background:#fffdf8; box-shadow:6px 6px 0 var(--ink); }
+.deck-filter-panel::before { content:""; position:absolute; inset:7px; border:2px dashed #d8a500; border-radius:14px; pointer-events:none; }
+.deck-filter-panel::after { content:"PREMIUM"; position:absolute; top:-13px; right:-10px; z-index:3; padding:7px 13px; border:2px solid var(--ink); background:var(--yellow); color:var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:9px; font-weight:1000; letter-spacing:.1em; transform:rotate(4deg); clip-path:polygon(0 0,100% 0,100% 30%,94% 50%,100% 70%,100% 100%,0 100%,0 70%,6% 50%,0 30%); }
+.deck-filter-panel::after { background:radial-gradient(circle at 7px 50%, #fffdf8 0 2px, transparent 2.5px),radial-gradient(circle at calc(100% - 7px) 50%, #fffdf8 0 2px, transparent 2.5px),var(--yellow); }
+.deck-filter-panel > * { position:relative; z-index:1; }
+.deck-filter-panel .panel-title .sticker { display:none; }
 .lobby-composite .panel { width:100%; box-sizing:border-box; height:max-content; align-self:start; }
 .lobby-composite .people-list { min-height:0; }
-.lobby-google-button { position:absolute; top:16px; right:24px; display:inline-flex; align-items:center; justify-content:center; padding:9px 12px; border:2px solid var(--ink); border-radius:8px; background:#fffdf8; color:var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:9px; font-weight:1000; letter-spacing:.04em; text-decoration:none; }
-.lobby-google-button:hover { background:var(--yellow); transform:translate(1px,1px); box-shadow:2px 2px 0 var(--ink); }
+.lobby-auth-buttons { position:absolute; top:16px; right:24px; display:flex; gap:8px; z-index:3; }
+.lobby-auth-button { position:relative; display:grid; place-items:center; width:60px; height:34px; padding:5px; border:2px solid var(--ink); border-radius:8px; background:var(--yellow); color:var(--ink); box-shadow:3px 3px 0 var(--ink); }
+.lobby-auth-button .google-mark,.lobby-auth-button .apple-mark { width:24px; height:24px; }
+.lobby-auth-button:hover:not(:disabled) { transform:translate(1px,1px); box-shadow:2px 2px 0 var(--ink); }
+.lobby-apple-button { background:#050b17; color:#fff; border-color:#050b17; box-shadow:3px 3px 0 #fff; opacity:1; }
+.lobby-apple-button::after { content:"SOON"; position:absolute; top:-9px; right:-9px; padding:3px 4px; border:1.5px solid var(--ink); border-radius:4px; background:var(--yellow); color:var(--ink); font-size:6px; font-weight:1000; letter-spacing:.08em; transform:rotate(7deg); }
 .deck-filter-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; border:0; background:transparent; padding:0; color:var(--ink); text-align:left; font-size:19px; font-weight:1000; line-height:1.2; cursor:pointer; }
 .deck-filter-toggle b { display:grid; place-items:center; width:24px; height:24px; border:2px solid var(--ink); border-radius:50%; background:var(--yellow); font:1000 18px/1 Arial,sans-serif; }
-.deck-filter-toggle:hover { color:#8a6500; }
+.deck-filter-toggle:hover { color:var(--ink); }
 .deck-filter-content { margin-top:14px; }
 @media (max-width:800px) {
   .prompt-row textarea.prompt-input { min-height:82px; }
@@ -464,7 +472,8 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .lobby-composite .deck-filter-lobby { padding:0 24px 40px; }
   .lobby-composite .deck-filter-panel { margin:0; }
   .card-type-checks { gap:7px; }
-  .lobby-google-button { top:8px; right:16px; padding:7px 9px; font-size:8px; }
+  .lobby-auth-buttons { top:8px; right:16px; gap:6px; }
+  .lobby-auth-button { width:60px; height:34px; }
   .lobby-composite .panel { width:calc(100% - 32px); margin-inline:auto; }
   .pricing-page { padding:8px 12px 5px; }
   .pricing-page .pricing-back { margin-bottom:3px; }
