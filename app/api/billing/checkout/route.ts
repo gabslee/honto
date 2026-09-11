@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const user = await getCurrentUser(request);
   if (!user) return Response.json({ error: "Sign in to start Premium." }, { status: 401 });
+  if (!user.termsAcceptedAt) return Response.json({ error: "Accept the Terms of Use and Privacy Policy before starting Premium." }, { status: 428 });
   if (user.role === "admin" || hasPremiumAccess(user)) return Response.json({ error: "Premium is already active." }, { status: 409 });
   if (!stripeSecret()) return Response.json({ error: "Stripe is not configured yet." }, { status: 503 });
   let body: { interval?: string } = {};
