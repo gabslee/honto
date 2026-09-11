@@ -59,6 +59,8 @@ function shuffleLocal<T>(items: readonly T[]) {
 }
 function aiFallbackNotice(locale: Locale, reason?: string) {
   if (reason === "quota_exhausted") return locale === "ja" ? "AIのクレジットが不足しているため、内蔵の候補を表示しています。" : "AI credits are unavailable right now, so these are built-in suggestions.";
+  if (reason === "safety_refusal") return locale === "ja" ? "AIはこの内容に回答できなかったため、内蔵の候補を表示しています。" : "AI could not answer this request, so these are built-in suggestions.";
+  if (reason === "invalid_response") return locale === "ja" ? "AIの回答が不完全だったため、内蔵の候補を表示しています。もう一度試せます。" : "AI returned an incomplete answer, so these are built-in suggestions. You can try again.";
   return locale === "ja" ? "AIに接続できなかったため、内蔵の候補を表示しています。" : "AI could not be reached, so these are built-in suggestions.";
 }
 async function gameApi(body: Record<string, unknown>) {
