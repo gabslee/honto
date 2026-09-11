@@ -121,8 +121,24 @@ export default function GameClient() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [dismissedReveal, setDismissedReveal] = useState<string | null>(null);
+  const [headerHidden, setHeaderHidden] = useState(false);
   const mutationEpoch = useRef(0);
   const mutationActive = useRef(false);
+
+  useEffect(() => {
+    if (!session || !game) { setHeaderHidden(false); return; }
+    const scroller = document.querySelector<HTMLElement>(".app-shell > .lobby-composite, .app-shell > .game-stage, .app-shell > .finished");
+    if (!scroller) return;
+    let previous = scroller.scrollTop;
+    const onScroll = () => {
+      const current = scroller.scrollTop;
+      if (current > previous + 5 && current > 24) setHeaderHidden(true);
+      else if (current < previous - 5) setHeaderHidden(false);
+      previous = current;
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => scroller.removeEventListener("scroll", onScroll);
+  }, [session, game?.room.status]);
 
   useEffect(() => {
     const savedLocale = localStorage.getItem("honto-locale");
@@ -213,7 +229,7 @@ export default function GameClient() {
   const changeLocale = (next: Locale) => { setLocale(next); };
 
   return <LocaleContext.Provider value={{ locale, setLocale, roomCode: session.code, sessionToken: session.token }}><main className="app-shell">
-    <header className="topbar"><button className="brand" onClick={leave}><span>HONTO?</span><b>!</b></button><div className="room-pill"><span className="live-dot"/>{locale === "ja" ? "ルーム" : "ROOM"} <strong>{game.room.code}</strong></div><div className="session-tools"><LanguageMenu onChange={changeLocale}/><button className="tiny-button" onClick={leave}>{locale === "ja" ? "退出" : "EXIT"}</button></div></header>
+    <header className={`topbar ${headerHidden ? "topbar-hidden" : ""}`}><button className="brand" onClick={leave}><span>HONTO?</span><b>!</b></button><div className="room-pill"><span className="live-dot"/>{locale === "ja" ? "ルーム" : "ROOM"} <strong>{game.room.code}</strong></div><div className="session-tools"><LanguageMenu onChange={changeLocale}/><button className="tiny-button" onClick={leave}>{locale === "ja" ? "退出" : "EXIT"}</button></div></header>
     {error && <div className="toast error-toast">{error}<button onClick={() => setError("")}>×</button></div>}
     {game.room.status === "lobby" && <Lobby game={game} host={Boolean(host)} busy={busy} copied={copied} copyInvite={copyInvite} act={act} />}
     {game.room.status === "playing" && <GameTable game={game} busy={busy} act={act} />}
