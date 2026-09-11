@@ -264,6 +264,12 @@ function Lobby(props: { game: GameState; host: boolean; busy: boolean; copied: b
   const [deckOpen, setDeckOpen] = useState(true);
   useEffect(() => { setSelected(String(game.room.cardTypes ?? DECK_KEYS.join(",")).split(",")); }, [game.room.cardTypes]);
   useEffect(() => { if (window.matchMedia("(max-width: 800px)").matches) setDeckOpen(false); }, []);
+  useEffect(() => {
+    const root = document.querySelector<HTMLElement>(".lobby-composite");
+    if (!root || root.querySelector(".lobby-google-button")) return;
+    const link = document.createElement("a"); link.href = "/api/auth/google/start"; link.className = "lobby-google-button"; link.textContent = "SIGN IN WITH GOOGLE"; root.appendChild(link);
+    return () => { link.remove(); };
+  }, []);
   const toggle = (key: string) => { if (!canCustomizeDeck) return; const next = selected.includes(key) ? selected.filter((item) => item !== key) : [...selected, key]; if (next.length < 3) return; setSelected(next); void props.act("configure", { cardTypes: next.join(",") }); };
   return <div className="lobby-composite"><LegacyLobby {...props}/><section className="lobby deck-filter-lobby"><div className="panel deck-filter-panel"><button type="button" className="deck-filter-toggle" aria-expanded={deckOpen} onClick={() => setDeckOpen((value) => !value)}><span>{ja ? "デッキをカスタマイズしますか？" : "Want to personalize your deck?"}</span><b>{deckOpen ? "−" : "+"}</b></button>{deckOpen && <div className="deck-filter-content"><div className="panel-title"><h2>{ja ? "カードの種類" : "Card types"}</h2><span className="sticker">{canCustomizeDeck ? "PREMIUM" : (ja ? "ロック中" : "PREMIUM")}</span></div><p className="setting-hint">{canCustomizeDeck ? (ja ? "使いたいカードだけを選べます。順番はシャッフルされます。" : "Choose the games you want. The order stays shuffled.") : (ja ? "Premiumで遊ぶカードを選べます。" : "Choose which games to play with Premium.")}</p><div className="subject-checks card-type-checks">{DECK_KEYS.map((key) => <label className={`subject-check card-type-check ${selected.includes(key) ? "selected" : ""} ${!canCustomizeDeck ? "locked" : ""}`} key={key}><input type="checkbox" checked={selected.includes(key)} disabled={!props.host || !canCustomizeDeck || (selected.length <= 3 && selected.includes(key))} onChange={() => toggle(key)}/><span>{ja ? CARD_META_JA[key].label : CARD_META[key].label}</span></label>)}</div><small className="deck-filter-note">{ja ? "最低3種類。枚数と順番は自動で決まります。" : "Choose at least 3 types. Counts and order stay automatic."}</small></div>}</div></section></div>;
 }
