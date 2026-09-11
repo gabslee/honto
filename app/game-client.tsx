@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, FormEvent, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, FormEvent, type CSSProperties, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { questionLibrary, questionLibraryJa, type Locale } from "./i18n";
 import { loadRoomSession, removeRoomSession, saveRoomSession } from "./session-store";
 
@@ -48,9 +48,17 @@ function LanguageMenu({ onChange, landing = false }: { onChange?: (locale: Local
 }
 function AccountControl() {
   const [user, setUser] = useState<{ email: string; displayName?: string } | null>(null);
+  const [placement, setPlacement] = useState<CSSProperties>({});
   useEffect(() => { void fetch("/api/auth/me", { cache: "no-store" }).then((response) => response.json()).then((data) => setUser(data.user ?? null)).catch(() => undefined); }, []);
-  if (!user) return <span className="account-control"><a className="curated-button" href="/api/auth/google/start">SIGN IN WITH GOOGLE</a></span>;
-  return <span className="account-control signed-in-account">{user.displayName ?? user.email}</span>;
+  useEffect(() => {
+    const anchor = document.querySelector<HTMLElement>(".entry-card .primary-button");
+    if (!anchor) return;
+    const update = () => { const rect = anchor.getBoundingClientRect(); const width = rect.width * 0.72; setPlacement({ left: rect.left + (rect.width - width) / 2, top: rect.bottom + 14, width }); };
+    update(); window.addEventListener("resize", update); window.addEventListener("scroll", update, { passive: true });
+    return () => { window.removeEventListener("resize", update); window.removeEventListener("scroll", update); };
+  });
+  if (!user) return <span className="account-control" style={placement}><a className="curated-button" href="/api/auth/google/start"><svg className="google-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.35 12.27c0-.72-.06-1.42-.18-2.09H12v3.96h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.7 2.91-4.2 2.91-7.26Z"/><path fill="#34A853" d="M12 21.7c2.63 0 4.84-.87 6.45-2.37l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.7-1.72-5.47-4.03H3.29v2.53A9.74 9.74 0 0 0 12 21.7Z"/><path fill="#FBBC05" d="M6.53 13.77A5.85 5.85 0 0 1 6.22 12c0-.62.11-1.22.31-1.77V7.7H3.29A9.74 9.74 0 0 0 2.25 12c0 1.57.38 3.05 1.04 4.3l3.24-2.53Z"/><path fill="#EA4335" d="M12 6.2c1.43 0 2.72.49 3.73 1.45l2.8-2.8C16.84 3.25 14.63 2.3 12 2.3a9.74 9.74 0 0 0-8.71 5.4l3.24 2.53C7.3 7.92 9.46 6.2 12 6.2Z"/></svg>SIGN IN WITH GOOGLE</a></span>;
+  return <span className="account-control signed-in-account" style={placement}>{user.displayName ?? user.email}</span>;
 }
 
 function storedThemes(value?: string | null): ThemeKey[] {
