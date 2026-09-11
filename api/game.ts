@@ -225,6 +225,12 @@ export default async function handler(req: any, res: any) {
       if (spinById !== me.id) throw new Error("The other player is responsible for spinning this wheel.");
       if (!result.wheelStartedAt) await sql`UPDATE deck_cards SET result = ${JSON.stringify({ ...result, spinById, wheelStartedAt: new Date().toISOString() })} WHERE id = ${completed.id} AND status = 'complete'`;
     }
+    if (body.action === "newTable") {
+      if (room.status !== "finished") throw new Error("The current game is still in progress.");
+      await sql`DELETE FROM deck_cards WHERE room_id = ${room.id}`;
+      await sql`UPDATE players SET sips = 0, wager = NULL WHERE room_id = ${room.id}`;
+      await sql`UPDATE rooms SET status = 'lobby', current_round = 1, welcome_ack = '{}', started_at = NULL, updated_at = now() WHERE id = ${room.id}`;
+    }
     if (body.action === "configure") {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can change the room settings.");
       const { roundCount, themeCategory, customTheme, locale } = normalizeRoomSettings(room, body, LEGACY_THEME_MAP);
