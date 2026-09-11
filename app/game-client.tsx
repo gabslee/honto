@@ -267,7 +267,7 @@ function Lobby(props: { game: GameState; host: boolean; busy: boolean; copied: b
   useEffect(() => {
     const root = document.querySelector<HTMLElement>(".lobby-composite");
     if (!root || root.querySelector(".lobby-google-button")) return;
-    const link = document.createElement("a"); link.href = "/api/auth/google/start"; link.className = "lobby-google-button"; link.textContent = "SIGN IN WITH GOOGLE"; root.appendChild(link);
+    const link = document.createElement("a"); link.href = "/api/auth/google/start"; link.className = "lobby-google-button"; link.innerHTML = '<svg class="google-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.35 12.27c0-.72-.06-1.42-.18-2.09H12v3.96h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.7 2.91-4.2 2.91-7.26Z"/><path fill="#34A853" d="M12 21.7c2.63 0 4.84-.87 6.45-2.37l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.7-1.72-5.47-4.03H3.29v2.53A9.74 9.74 0 0 0 12 21.7Z"/><path fill="#FBBC05" d="M6.53 13.77A5.85 5.85 0 0 1 6.22 12c0-.62.11-1.22.31-1.77V7.7H3.29A9.74 9.74 0 0 0 2.25 12c0 1.57.38 3.05 1.04 4.3l3.24-2.53Z"/><path fill="#EA4335" d="M12 6.2c1.43 0 2.72.49 3.73 1.45l2.8-2.8C16.84 3.25 14.63 2.3 12 2.3a9.74 9.74 0 0 0-8.71 5.4l3.24 2.53C7.3 7.92 9.46 6.2 12 6.2Z"/></svg><span>SIGN IN WITH GOOGLE</span>'; root.appendChild(link);
     return () => { link.remove(); };
   }, []);
   const toggle = (key: string) => { if (!canCustomizeDeck) return; const next = selected.includes(key) ? selected.filter((item) => item !== key) : [...selected, key]; if (next.length < 3) return; setSelected(next); void props.act("configure", { cardTypes: next.join(",") }); };
