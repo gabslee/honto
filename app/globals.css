@@ -1,13 +1,13 @@
 :root { --ink:#17243d; --paper:#fff7e8; --cream:#ffe8ba; --red:#f04444; --pink:#ff8eab; --yellow:#ffd644; --mint:#a8e6cf; --line:3px solid var(--ink); }
 .account-slot { width:72%; margin:14px auto 0; }
 .account-stack { display:flex; flex-direction:column; gap:8px; width:100%; }
-.account-auth-buttons { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; width:100%; }
-.account-auth-buttons .account-control { min-width:0; padding:8px 6px; font-size:8px; white-space:normal; line-height:1.05; }
-.apple-auth-button { background:#050b17; color:#fff; box-shadow:3px 3px 0 #fff; }
-.apple-auth-button:disabled { opacity:.78; }
-.apple-auth-button > span:last-child { display:grid; gap:3px; }
-.apple-auth-button small { font-size:7px; letter-spacing:.08em; color:var(--yellow); }
-.apple-mark { display:inline-grid; place-items:center; width:18px; height:18px; font-size:14px; line-height:1; color:#fff; }
+.account-auth-buttons { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; }
+.account-auth-buttons .account-control { position:relative; width:40px; min-width:40px; height:34px; min-height:34px; padding:5px; border-radius:8px; }
+.account-auth-buttons .google-mark,.account-auth-buttons .apple-mark { width:18px; height:18px; }
+.apple-auth-button { background:#050b17; color:#fff; border-color:#050b17; box-shadow:3px 3px 0 #fff; opacity:1!important; }
+.apple-auth-button:disabled { cursor:not-allowed; }
+.apple-auth-button::after { content:"SOON"; position:absolute; top:-9px; right:-9px; padding:3px 4px; border:1.5px solid var(--ink); border-radius:4px; background:var(--yellow); color:var(--ink); font-size:6px; font-weight:1000; letter-spacing:.08em; transform:rotate(7deg); }
+.apple-mark { display:block; color:#fff; }
 .pricing-page { min-height:100vh; padding:28px 22px 56px; color:var(--ink); background:var(--paper); text-align:center; }
 .pricing-back { display:inline-block; color:var(--ink); font-size:11px; font-weight:900; text-decoration:none; margin-bottom:30px; }
 .pricing-brand { font-size:22px; font-weight:1000; letter-spacing:-.08em; margin-bottom:32px; }
@@ -60,6 +60,11 @@
 .account-control .curated-button:hover { transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink); }
 .google-mark { width:18px; height:18px; flex:0 0 18px; }
 .signed-in-account { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:9px 12px; border-radius:999px; background:#d9c7ff; color:var(--ink); font-size:10px; letter-spacing:.04em; }
+.account-identity { background:var(--yellow); }
+.account-status { border-radius:9px; font-size:9px; }
+.account-status-admin { background:var(--mint); }
+.account-status-premium,.account-premium-button { background:var(--pink); }
+.account-trial-button { background:var(--mint); }
 .signed-in-account button { border:0; background:transparent; font-size:16px; line-height:1; padding:0 0 0 8px; }
 .account-confirm-modal { width:min(470px,100%); padding:30px 26px 26px; border:3px solid var(--ink); border-radius:22px; background:var(--paper); box-shadow:10px 10px 0 #050b17; text-align:center; animation:fade-in-up .3s ease both; }
 .account-confirm-modal h2 { margin:20px 0 10px; font-size:clamp(26px,5vw,38px); line-height:.98; letter-spacing:-.05em; }
@@ -367,13 +372,13 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .lobby-composite .spicy-check.locked::after { content:"PREMIUM"; position:absolute; top:-12px; right:-8px; z-index:2; padding:7px 12px; border:2px solid var(--ink); background:var(--yellow); color:var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:9px; font-weight:1000; letter-spacing:.1em; transform:rotate(4deg); clip-path:polygon(0 0,100% 0,100% 28%,94% 50%,100% 72%,100% 100%,0 100%,0 72%,6% 50%,0 28%); }
 .lobby-composite .lobby-grid .setting:has(.custom-setting) { display:none; }
 .lobby-composite .spicy-check .premium-lock { display:none; }
-.app-shell > .lobby-composite { position:relative; min-height:0; flex:1 1 auto; overflow-y:auto; padding:0 24px 40px; overscroll-behavior:contain; display:grid; grid-template-columns:430px 560px; grid-template-areas:"head head" "table deck" "filter deck"; justify-content:center; align-content:start; align-items:start; gap:24px; }
+.app-shell > .lobby-composite { position:relative; min-height:0; flex:1 1 auto; overflow-y:auto; padding:0 24px 40px; overscroll-behavior:contain; display:grid; grid-template-columns:430px 560px; grid-template-areas:"head head" "table deck" "filter deck"; justify-content:center; align-content:start; align-items:start; row-gap:10px; column-gap:24px; }
 .lobby-composite > .lobby, .lobby-composite > .deck-filter-lobby { display:contents; }
 .lobby-composite .lobby-head { grid-area:head; padding:7vh 24px 0; }
 .lobby-composite .lobby-grid { display:contents; }
 .lobby-composite .lobby-grid > .panel:first-child { grid-area:table; }
 .lobby-composite .lobby-grid > .panel:nth-child(2) { grid-area:deck; }
-.lobby-composite .deck-filter-panel { position:relative; max-width:none; margin:0; }
+.lobby-composite .deck-filter-panel { position:relative; max-width:none; margin:0; padding:18px 22px; }
 .deck-filter-panel .panel-title .sticker { position:absolute; top:-11px; right:-10px; z-index:1; transform:rotate(4deg); padding:7px 11px; border:2px solid var(--ink); border-radius:5px; background:var(--yellow); color:var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:10px; letter-spacing:.1em; }
 .lobby-composite .panel { width:100%; box-sizing:border-box; height:max-content; align-self:start; }
 .lobby-composite .people-list { min-height:0; }
