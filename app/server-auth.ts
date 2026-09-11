@@ -6,7 +6,7 @@ const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
 let schemaReady: Promise<void> | null = null;
 
 export type AdminUser = { id: string; email: string; displayName: string; role: "admin" };
-export type CurrentUser = { id: string; email: string; displayName: string; role: "user" | "admin"; plan: "free" | "premium"; subscriptionStatus: "inactive" | "active" | "past_due" | "canceled"; subscriptionExpiresAt: string | null; trialStartedAt: string | null; trialEndsAt: string | null };
+export type CurrentUser = { id: string; email: string; displayName: string; role: "user" | "admin"; plan: "free" | "premium"; subscriptionStatus: "inactive" | "active" | "past_due" | "canceled"; subscriptionExpiresAt: string | null; trialStartedAt: string | null; trialEndsAt: string | null; stripeCustomerId: string | null; stripeSubscriptionId: string | null };
 
 export function adminCookieName() { return ADMIN_COOKIE; }
 
@@ -19,6 +19,8 @@ export function ensureIdentitySchema() {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_expires_at timestamptz`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_started_at timestamptz`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_ends_at timestamptz`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id text`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id text`;
     await sql`UPDATE users SET plan = 'premium', subscription_status = 'active', subscription_expires_at = NULL WHERE role = 'admin'`;
     await sql`CREATE TABLE IF NOT EXISTS auth_accounts (id text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, provider text NOT NULL, provider_account_id text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(provider, provider_account_id))`;
     await sql`CREATE TABLE IF NOT EXISTS admin_sessions (token_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now())`;
@@ -63,7 +65,7 @@ export async function getCurrentUser(request: Request) {
   const token = request.headers.get("cookie")?.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${USER_COOKIE}=`))?.slice(USER_COOKIE.length + 1) ?? "";
   if (!token) return null;
   await ensureIdentitySchema();
-  const rows = await sql`SELECT u.id, u.email, u.display_name AS "displayName", u.role, u.plan, u.subscription_status AS "subscriptionStatus", u.subscription_expires_at AS "subscriptionExpiresAt", u.trial_started_at AS "trialStartedAt", u.trial_ends_at AS "trialEndsAt" FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ${await hash(token)} AND s.expires_at > now() LIMIT 1`;
+  const rows = await sql`SELECT u.id, u.email, u.display_name AS "displayName", u.role, u.plan, u.subscription_status AS "subscriptionStatus", u.subscription_expires_at AS "subscriptionExpiresAt", u.trial_started_at AS "trialStartedAt", u.trial_ends_at AS "trialEndsAt", u.stripe_customer_id AS "stripeCustomerId", u.stripe_subscription_id AS "stripeSubscriptionId" FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ${await hash(token)} AND s.expires_at > now() LIMIT 1`;
   return (rows[0] as CurrentUser | undefined) ?? null;
 }
 
