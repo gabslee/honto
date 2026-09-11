@@ -299,7 +299,7 @@ function Lobby(props: { game: GameState; host: boolean; busy: boolean; copied: b
   const canCustomizeDeck = Boolean(game.room.canCustomizeDeck); const [selected, setSelected] = useState<string[]>(() => String(game.room.cardTypes ?? DECK_KEYS.join(",")).split(","));
   const [deckOpen, setDeckOpen] = useState(false);
   useEffect(() => { setSelected(String(game.room.cardTypes ?? DECK_KEYS.join(",")).split(",")); }, [game.room.cardTypes]);
-  useEffect(() => { if (window.matchMedia("(max-width: 800px)").matches) setDeckOpen(false); }, []);
+  useEffect(() => { setDeckOpen(false); }, [game.room.code]);
   useEffect(() => {
     const root = document.querySelector<HTMLElement>(".lobby-composite");
     if (!root) return;
