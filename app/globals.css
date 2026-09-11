@@ -4,6 +4,7 @@
 .account-control .curated-button:hover { transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink); }
 .google-mark { width:18px; height:18px; flex:0 0 18px; }
 .signed-in-account { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:9px 12px; border-radius:999px; background:var(--mint); color:var(--ink); font-size:10px; letter-spacing:.04em; }
+.signed-in-account button { border:0; background:transparent; font-size:16px; line-height:1; padding:0 0 0 8px; }
 * { box-sizing:border-box; }
 html { background:var(--paper); }
 body { margin:0; color:var(--ink); background:var(--paper); font-family:"Arial Rounded MT Bold","Trebuchet MS",Arial,sans-serif; }

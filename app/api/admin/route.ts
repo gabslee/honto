@@ -1,4 +1,4 @@
-import { adminCookie, clearAdminCookie, createAdminSession, database, ensureIdentitySchema, getAdminUser, hasAdminBootstrapToken } from "../../server-auth";
+import { adminCookie, clearAdminCookie, createAdminSession, database, ensureIdentitySchema, getAdminUser, getCurrentUser, hasAdminBootstrapToken } from "../../server-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -22,8 +22,8 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const user = await getAdminUser(request);
-  if (!user) return json({ error: "Admin authentication required." }, 401);
+  const user = await getAdminUser(request) ?? await getCurrentUser(request);
+  if (!user || user.role !== "admin") return json({ error: "Admin authentication required." }, 401);
   const sql = database();
   if (!sql) return json({ error: "DATABASE_URL is not configured." }, 503);
   try {

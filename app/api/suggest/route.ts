@@ -42,10 +42,10 @@ async function consumeAiAllowance(request: Request, body: Body) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
   if (!(await consumeAllowance("ip-hour", await usageKey(ip), new Date(Math.floor(now.getTime() / 3600000) * 3600000), IP_AI_HOURLY_LIMIT))) return false;
   if (!body.roomCode || !body.sessionToken) return true;
-  const rows = await usageSql`SELECT r.id, p.id AS player_id FROM rooms r JOIN players p ON p.room_id = r.id WHERE r.code = ${String(body.roomCode).trim().toUpperCase()} AND p.token = ${body.sessionToken} AND r.status = 'playing' LIMIT 1`;
-  const room = rows[0] as { id?: string; player_id?: string } | undefined;
+  const rows = await usageSql`SELECT r.id, p.id AS player_id, p.user_id FROM rooms r JOIN players p ON p.room_id = r.id WHERE r.code = ${String(body.roomCode).trim().toUpperCase()} AND p.token = ${body.sessionToken} AND r.status = 'playing' LIMIT 1`;
+  const room = rows[0] as { id?: string; player_id?: string; user_id?: string | null } | undefined;
   if (!room?.id || !room.player_id) return true;
-  if (!(await consumeAllowance("player-day", await usageKey(room.player_id), new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())), PLAYER_AI_DAILY_LIMIT))) return false;
+  if (!(await consumeAllowance("player-day", await usageKey(room.user_id ?? room.player_id), new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())), PLAYER_AI_DAILY_LIMIT))) return false;
   return consumeAllowance("room", room.id, new Date(0), ROOM_AI_LIMIT);
 }
 

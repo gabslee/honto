@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { ESTIMATE_QUESTIONS_BY_THEME, PREFERENCE_CARDS_BY_THEME, type CuratedTheme } from "../data/curated";
 import { ESTIMATE_QUESTIONS_BY_THEME_JA, PREFERENCE_CARDS_BY_THEME_JA } from "../data/curated-ja";
 import { makeRoomCode, normalizeRoomSettings } from "./game-contract";
+import { getCurrentUser } from "../app/server-auth";
 
 type CardType = "honto" | "question" | "wouldrather" | "preference" | "estimate" | "rps" | "both";
 type Locale = "en" | "ja";
@@ -30,6 +31,7 @@ function ensureSchema() {
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS locale text NOT NULL DEFAULT 'en'`;
     await sql`CREATE TABLE IF NOT EXISTS players (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, name text NOT NULL, token text UNIQUE NOT NULL, is_host boolean NOT NULL DEFAULT false, sips integer NOT NULL DEFAULT 0, joined_at timestamptz NOT NULL DEFAULT now())`;
     await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS wager text`;
+    await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS user_id text`;
     await sql`CREATE TABLE IF NOT EXISTS deck_cards (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, card_number integer NOT NULL, type text NOT NULL, actor_id text NOT NULL REFERENCES players(id), target_id text NOT NULL REFERENCES players(id), status text NOT NULL DEFAULT 'hidden', payload text NOT NULL DEFAULT '{}', secret text NOT NULL DEFAULT '{}', result text, created_at timestamptz NOT NULL DEFAULT now(), completed_at timestamptz, UNIQUE(room_id, card_number))`;
     await sql`ALTER TABLE deck_cards ADD COLUMN IF NOT EXISTS revealed_by text[] NOT NULL DEFAULT '{}'`;
     await sql`CREATE INDEX IF NOT EXISTS idx_deck_cards_room_status ON deck_cards(room_id, status, card_number)`;
@@ -151,6 +153,7 @@ async function finishCard(room: any) {
 export default async function handler(req: any, res: any) {
   try {
     await ensureSchema();
+    const currentUser = await getCurrentUser(new Request("https://honto.local", { headers: req.headers as HeadersInit }));
     const body = (req.body ?? {}) as Body;
     const query = req.query ?? {};
     if (req.method === "GET") {
@@ -165,7 +168,7 @@ export default async function handler(req: any, res: any) {
       const roomId = id(); const token = id();
       const locale = body.locale === "ja" ? "ja" : "en";
       await sql`INSERT INTO rooms (id, code, round_count, locale) VALUES (${roomId}, ${roomCode}, 12, ${locale})`;
-      await sql`INSERT INTO players (id, room_id, name, token, is_host) VALUES (${id()}, ${roomId}, ${name}, ${token}, true)`;
+      await sql`INSERT INTO players (id, room_id, name, token, is_host, user_id) VALUES (${id()}, ${roomId}, ${name}, ${token}, true, ${currentUser?.id ?? null})`;
       return json(res, { code: roomCode, token }, 201);
     }
     const roomCode = String(body.code ?? "").trim().toUpperCase();
@@ -177,7 +180,7 @@ export default async function handler(req: any, res: any) {
       const count = await sql`SELECT COUNT(*)::int AS total FROM players WHERE room_id = ${room.id}`;
       if ((count[0]?.total ?? 0) >= 2) return json(res, { error: "This room already has two players." }, 409);
       const token = id();
-      await sql`INSERT INTO players (id, room_id, name, token) VALUES (${id()}, ${room.id}, ${name}, ${token})`;
+      await sql`INSERT INTO players (id, room_id, name, token, user_id) VALUES (${id()}, ${room.id}, ${name}, ${token}, ${currentUser?.id ?? null})`;
       return json(res, { code: roomCode, token }, 201);
     }
 

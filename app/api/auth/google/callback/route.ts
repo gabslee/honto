@@ -30,7 +30,9 @@ export async function GET(request: Request) {
     const sql = database();
     if (!sql) throw new Error("DATABASE_URL is not configured");
     await ensureIdentitySchema();
-    const users = await sql`INSERT INTO users (id, email, display_name, role) VALUES (${crypto.randomUUID()}, ${profile.email.toLowerCase()}, ${(profile.name ?? profile.email).slice(0, 80)}, 'user') ON CONFLICT (email) DO UPDATE SET display_name = EXCLUDED.display_name, updated_at = now() RETURNING id`;
+    const email = profile.email.toLowerCase();
+    const role = process.env.HONTO_ADMIN_EMAIL?.trim().toLowerCase() === email ? "admin" : "user";
+    const users = await sql`INSERT INTO users (id, email, display_name, role) VALUES (${crypto.randomUUID()}, ${email}, ${(profile.name ?? profile.email).slice(0, 80)}, ${role}) ON CONFLICT (email) DO UPDATE SET display_name = EXCLUDED.display_name, role = CASE WHEN users.role = 'admin' OR EXCLUDED.role = 'admin' THEN 'admin' ELSE users.role END, updated_at = now() RETURNING id`;
     const userId = String(users[0].id);
     await sql`INSERT INTO auth_accounts (id, user_id, provider, provider_account_id) VALUES (${crypto.randomUUID()}, ${userId}, 'google', ${profile.sub}) ON CONFLICT (provider, provider_account_id) DO UPDATE SET user_id = EXCLUDED.user_id`;
     const session = await createUserSession(userId);
