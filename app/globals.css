@@ -351,11 +351,14 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .card-type-checks { margin-top:10px; }
 .card-type-check { min-height:36px; }
 .deck-filter-note { display:block; margin-top:10px; font:10px Arial,sans-serif; opacity:.65; }
-.app-shell > .lobby-composite { min-height:0; flex:1 1 auto; overflow-y:auto; padding-bottom:24px; overscroll-behavior:contain; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:26px; }
+.app-shell > .lobby-composite { min-height:0; flex:1 1 auto; overflow-y:auto; padding-bottom:24px; overscroll-behavior:contain; display:grid; grid-template-columns:.9fr 1.35fr .8fr; gap:26px; }
 .lobby-composite > .lobby, .lobby-composite > .deck-filter-lobby { display:contents; }
 .lobby-composite .lobby-head { grid-column:1/-1; padding:7vh 24px 0; }
 .lobby-composite .lobby-grid { display:contents; }
 .lobby-composite .deck-filter-panel { max-width:none; margin:0; }
+.deck-filter-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; border:0; background:transparent; padding:0; color:var(--ink); text-align:left; font-size:14px; font-weight:1000; line-height:1.2; cursor:pointer; }
+.deck-filter-toggle b { display:grid; place-items:center; width:24px; height:24px; border:2px solid var(--ink); border-radius:50%; background:var(--yellow); font:1000 18px/1 Arial,sans-serif; }
+.deck-filter-content { margin-top:14px; }
 @media (max-width:800px) {
   .prompt-row textarea.prompt-input { min-height:82px; }
   .topbar { grid-template-columns:minmax(0,1fr) auto; }
