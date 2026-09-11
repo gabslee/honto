@@ -410,18 +410,18 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .legal-page { min-height:100svh; overflow-y:auto; }
 
 @media (max-width:800px) {
-  .pricing-page { padding:12px 12px 14px; }
-  .pricing-page .pricing-back { margin-bottom:5px; }
-  .pricing-page .pricing-brand { margin-bottom:7px; font-size:18px; }
+  .pricing-page { padding:8px 12px 5px; }
+  .pricing-page .pricing-back { margin-bottom:3px; }
+  .pricing-page .pricing-brand { margin-bottom:4px; font-size:18px; }
   .pricing-page .pricing-brand b { width:18px; height:18px; font-size:12px; }
   .pricing-page .eyebrow { padding:5px 7px; font-size:8px; }
-  .pricing-page h1 { font-size:clamp(30px,8vw,40px); margin:7px auto 5px; }
-  .pricing-lead { max-width:360px; margin-bottom:8px; font-size:11px; line-height:1.25; }
+  .pricing-page h1 { font-size:clamp(30px,8vw,40px); margin:4px auto 4px; }
+  .pricing-lead { max-width:360px; margin-bottom:5px; font-size:11px; line-height:1.2; }
   .pricing-signin { margin:0 auto 7px; font-size:10px; }
   .terms-consent { max-width:380px; margin-bottom:3px; gap:5px; font-size:9px; line-height:1.15; }
   .terms-consent input { width:14px; height:14px; }
   .pricing-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; max-width:620px; }
-  .pricing-benefits { margin-bottom:10px; padding:10px 12px; box-shadow:3px 3px 0 var(--ink); }
+  .pricing-benefits { margin-bottom:7px; padding:8px 10px; box-shadow:3px 3px 0 var(--ink); }
   .pricing-benefits h2 { margin:4px 0 8px; font-size:15px; }
   .pricing-benefits ul { gap:6px 10px; }
   .pricing-benefits li { padding-left:7px; border-left-width:3px; }
@@ -429,7 +429,7 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .pricing-benefits li span { font-size:8px; line-height:1.2; }
   .trial-note { margin-top:8px; font-size:8px; }
   .billing-heading p { margin-top:3px; font-size:9px; }
-  .pricing-card { padding:11px 9px; border-radius:11px; box-shadow:3px 3px 0 var(--ink); }
+  .pricing-card { padding:9px 9px; border-radius:11px; box-shadow:3px 3px 0 var(--ink); }
   .pricing-card-featured { transform:none; }
   .pricing-tag { font-size:8px; letter-spacing:.08em; }
   .pricing-card h2 { margin:7px 0 5px; font-size:14px; }
