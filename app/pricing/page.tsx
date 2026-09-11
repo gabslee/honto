@@ -15,6 +15,8 @@ export default function PricingPage() {
       if (signedIn === null) return;
       if (signedIn === false) { window.location.href = "/api/auth/google/start"; return; }
       if (!accepted) throw new Error("Please check the Terms of Use and Privacy Policy before continuing.");
+      const consent = await fetch("/api/account/consent", { method: "POST" });
+      if (!consent.ok) throw new Error("Please accept the Terms of Use and Privacy Policy first.");
       const response = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ interval }) });
       const data = await response.json();
       if (response.status === 401) { window.location.href = "/api/auth/google/start"; return; }
