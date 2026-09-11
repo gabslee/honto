@@ -458,6 +458,12 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 }
 
 @media (max-width:600px) {
+  .game-stage .round-strip { gap:4px; margin-bottom:6px; }
+  .game-stage .score-rail { gap:5px; margin-bottom:8px; padding:0; }
+  .game-stage .score-rail > div { padding:3px 8px 3px 3px; }
+  .game-stage .score-rail .avatar { width:27px; height:27px; }
+  .game-stage .score-rail strong { font-size:9px; }
+  .game-stage .score-rail small { font-size:8px; }
   .game-stage:has(.estimate-card) { padding-top:10px; }
   .game-stage:has(.estimate-card) .round-strip { gap:4px; margin-bottom:6px; }
   .game-stage:has(.estimate-card) .round-strip .progress { margin-top:-2px; }
