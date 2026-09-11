@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { ESTIMATE_QUESTIONS_BY_THEME, PREFERENCE_CARDS_BY_THEME, type CuratedTheme } from "../data/curated";
 import { ESTIMATE_QUESTIONS_BY_THEME_JA, PREFERENCE_CARDS_BY_THEME_JA } from "../data/curated-ja";
+import { makeRoomCode, normalizeRoomSettings } from "./game-contract";
 
 type CardType = "honto" | "question" | "wouldrather" | "preference" | "estimate" | "rps" | "both";
 type Locale = "en" | "ja";
@@ -37,7 +38,7 @@ function ensureSchema() {
 }
 
 const id = () => crypto.randomUUID();
-const code = () => `${WORDS[Math.floor(Math.random() * WORDS.length)]}-${Math.floor(10 + Math.random() * 90)}`;
+const code = () => makeRoomCode(WORDS);
 const spinSips = () => 1 + Math.floor(Math.random() * 3);
 const spinHighSips = () => 2 + Math.floor(Math.random() * 3);
 const cleanName = (value?: string) => value?.trim().replace(/\s+/g, " ").slice(0, 24) ?? "";
@@ -113,7 +114,7 @@ async function state(roomCode: string, token: string) {
   const rooms = await sql`SELECT * FROM rooms WHERE code = ${roomCode}`;
   const room: any = rooms[0];
   if (!room) return null;
-  if (room.status !== "finished" && room.updated_at && Date.now() - new Date(room.updated_at).getTime() > ROOM_IDLE_MS) {
+  if (!["finished", "abandoned"].includes(room.status) && room.updated_at && Date.now() - new Date(room.updated_at).getTime() > ROOM_IDLE_MS) {
     await sql`UPDATE rooms SET status = 'finished', updated_at = now() WHERE id = ${room.id}`;
     room.status = "finished";
   }
@@ -183,6 +184,20 @@ export default async function handler(req: any, res: any) {
 
     const token = String(body.token ?? "");
     const { room, me, card } = await getContext(roomCode, token);
+    if (body.action === "leave") {
+      if (room.status === "lobby") {
+        await sql`DELETE FROM players WHERE id = ${me.id} AND room_id = ${room.id}`;
+        const remaining = await sql`SELECT id FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
+        if (!remaining.length) await sql`DELETE FROM rooms WHERE id = ${room.id}`;
+        else {
+          if (me.is_host) await sql`UPDATE players SET is_host = (id = ${remaining[0].id}) WHERE room_id = ${room.id}`;
+          await sql`UPDATE rooms SET updated_at = now() WHERE id = ${room.id}`;
+        }
+      } else if (room.status === "playing") {
+        await sql`UPDATE rooms SET status = 'abandoned', updated_at = now() WHERE id = ${room.id} AND status = 'playing'`;
+      }
+      return json(res, { left: true });
+    }
     const welcomeAck = Array.isArray(room.welcome_ack) ? room.welcome_ack : [];
     const welcomeComplete = welcomeAck.length >= 2;
     if (room.status === "playing" && !welcomeComplete && !["submitWager", "ackWelcome"].includes(String(body.action))) throw new Error("Both players need to confirm the Honto welcome first.");
@@ -210,11 +225,7 @@ export default async function handler(req: any, res: any) {
     }
     if (body.action === "configure") {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can change the room settings.");
-      const roundCount = Number.isInteger(body.roundCount) ? Math.max(6, Math.min(60, Number(body.roundCount))) : 12;
-      const selected = (body.themeCategory ?? "").split(",").map((item) => LEGACY_THEME_MAP[item.trim()]).filter((item): item is CuratedTheme => Boolean(item));
-      const themeCategory = [...new Set(selected)].join(",") || "safe";
-      const customTheme = typeof body.customTheme === "string" ? body.customTheme.trim().slice(0, 80) || null : null;
-      const locale = body.locale === "ja" ? "ja" : body.locale === "en" ? "en" : room.locale === "ja" ? "ja" : "en";
+      const { roundCount, themeCategory, customTheme, locale } = normalizeRoomSettings(room, body, LEGACY_THEME_MAP);
       await sql`UPDATE rooms SET round_count = ${roundCount}, theme_category = ${themeCategory}, custom_theme = ${customTheme}, locale = ${locale}, updated_at = now() WHERE id = ${room.id}`;
     }
     if (body.action === "start") {

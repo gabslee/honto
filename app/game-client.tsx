@@ -2,6 +2,7 @@
 
 import { createContext, FormEvent, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { questionLibrary, questionLibraryJa, type Locale } from "./i18n";
+import { loadRoomSession, removeRoomSession, saveRoomSession } from "./session-store";
 
 type ThemeKey = "general" | "life" | "relationships" | "spicy";
 type Player = { id: string; name: string; isHost: number; sips: number; joinedAt: string; hasWager: boolean; wager?: string | null };
@@ -15,7 +16,7 @@ type Card = {
   result: { correct?: boolean; guessedIndex?: number; choice?: "answer" | "skip"; wouldRatherIndex?: number; skipped?: boolean; skipById?: string | null; drinkerId?: string | null; spinById?: string | null; wheelStartedAt?: string; sips?: number; correctNumber?: number; wrongGuesses?: number[]; firstTry?: boolean; actorChoice?: RpsChoice; targetChoice?: RpsChoice; bothDrink?: boolean };
 };
 type GameState = {
-  room: { code: string; status: "lobby" | "playing" | "finished"; roundCount: number; currentRound: number; themeCategory: string; customTheme: string | null; welcomeAck: string[]; locale: Locale; startedAt: string | null };
+  room: { code: string; status: "lobby" | "playing" | "finished" | "abandoned"; roundCount: number; currentRound: number; themeCategory: string; customTheme: string | null; welcomeAck: string[]; locale: Locale; startedAt: string | null };
   players: Player[]; activeCard: Card | null; lastCard: Card | null; meId: string;
 };
 
@@ -105,16 +106,22 @@ export default function GameClient() {
     const savedLocale = localStorage.getItem("honto-locale");
     if (savedLocale === "ja" || savedLocale === "en") setLocale(savedLocale);
     const room = new URLSearchParams(location.search).get("room")?.toUpperCase() ?? "";
-    // A bare URL is always a fresh landing page. Never resurrect a previous room from storage without an explicit invite code.
-    if (!room) { sessionStorage.removeItem("honto-session"); localStorage.removeItem("honto-session"); setSession(null); setJoinCode(""); setMode("create"); return; }
-    const saved = sessionStorage.getItem("honto-session");
-    if (saved) try {
-      const parsed = JSON.parse(saved) as { code?: string; token?: string; savedAt?: number };
-      if (parsed.code && parsed.token && parsed.savedAt && Date.now() - parsed.savedAt < SESSION_TTL_MS && (!room || room === parsed.code)) setSession({ code: parsed.code, token: parsed.token });
-      else sessionStorage.removeItem("honto-session");
-    } catch { sessionStorage.removeItem("honto-session"); }
-    localStorage.removeItem("honto-session");
-    if (room) { setJoinCode(room); setMode("join"); }
+    if (!room) { setSession(null); setJoinCode(""); setMode("create"); return; }
+    const saved = loadRoomSession(localStorage, room, SESSION_TTL_MS);
+    if (saved) setSession(saved);
+    else {
+      const legacy = sessionStorage.getItem("honto-session");
+      if (legacy) try {
+        const parsed = JSON.parse(legacy) as { code?: string; token?: string; savedAt?: number };
+        if (parsed.code?.toUpperCase() === room && parsed.token && parsed.savedAt && Date.now() - parsed.savedAt < SESSION_TTL_MS) {
+          const migrated = { code: room, token: parsed.token };
+          saveRoomSession(localStorage, migrated, parsed.savedAt);
+          setSession(migrated);
+        }
+      } catch { /* ignore an invalid legacy session */ }
+      sessionStorage.removeItem("honto-session");
+    }
+    setJoinCode(room); setMode("join");
   }, []);
 
   const refresh = useCallback(async (quiet = false) => {
@@ -130,7 +137,7 @@ export default function GameClient() {
       if (!quiet) setError("");
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Connection error.";
-      if (/room not found|no longer available|session is not valid|invalid session/i.test(message)) { sessionStorage.removeItem("honto-session"); localStorage.removeItem("honto-session"); setSession(null); setGame(null); setDismissedReveal(null); }
+      if (/room not found|no longer available|session is not valid|invalid session/i.test(message)) { removeRoomSession(localStorage, session.code); sessionStorage.removeItem("honto-session"); setSession(null); setGame(null); setDismissedReveal(null); }
       if (!quiet) setError(message);
     }
   }, [session]);
@@ -150,8 +157,8 @@ export default function GameClient() {
     try {
       const data = await gameApi({ action: mode, name, code: joinCode, locale });
       const next = { code: data.code, token: data.token };
-      sessionStorage.setItem("honto-session", JSON.stringify({ ...next, savedAt: Date.now() }));
-      localStorage.removeItem("honto-session");
+      saveRoomSession(localStorage, next);
+      sessionStorage.removeItem("honto-session");
       history.replaceState({}, "", `?room=${encodeURIComponent(data.code)}`); setSession(next);
     } catch (cause) { setError(localizeError(cause instanceof Error ? cause.message : "We couldn't enter the room.", locale)); }
     finally { setBusy(false); }
@@ -166,8 +173,13 @@ export default function GameClient() {
     finally { mutationActive.current = false; setBusy(false); }
   }
 
-  function leave() {
-    sessionStorage.removeItem("honto-session"); localStorage.removeItem("honto-session"); history.replaceState({}, "", location.pathname);
+  async function leave() {
+    const current = session;
+    if (current) {
+      try { await gameApi({ action: "leave", ...current }); } catch { /* local exit must remain available offline */ }
+      removeRoomSession(localStorage, current.code);
+    }
+    sessionStorage.removeItem("honto-session"); history.replaceState({}, "", location.pathname);
     setSession(null); setGame(null); setDismissedReveal(null);
   }
 
@@ -175,9 +187,9 @@ export default function GameClient() {
   if (!game) return <main className="loading"><div className="stamp">HONTO?!</div><p>{locale === "ja" ? "デッキをシャッフル中…" : "Shuffling the deck…"}</p>{error && <p className="form-error">{error}</p>}</main>;
 
   const host = game.players.find((player) => player.id === game.meId)?.isHost;
-  const reveal = game.lastCard && game.lastCard.id !== dismissedReveal ? game.lastCard : null;
+  const reveal = game.room.status !== "abandoned" && game.lastCard && game.lastCard.id !== dismissedReveal ? game.lastCard : null;
   const copyInvite = async () => { await navigator.clipboard.writeText(`${location.origin}${location.pathname}?room=${game.room.code}`); setCopied(true); window.setTimeout(() => setCopied(false), 1600); };
-  const changeLocale = (next: Locale) => { setLocale(next); if (host && game.room.status === "lobby") void act("configure", { roundCount: game.room.roundCount, themeCategory: game.room.themeCategory, customTheme: game.room.customTheme, locale: next }); };
+  const changeLocale = (next: Locale) => { setLocale(next); if (host && game.room.status === "lobby") void act("configure", { locale: next }); };
 
   return <LocaleContext.Provider value={{ locale, setLocale }}><main className="app-shell">
     <header className="topbar"><button className="brand" onClick={leave}><span>HONTO?</span><b>!</b></button><div className="room-pill"><span className="live-dot"/>{locale === "ja" ? "ルーム" : "ROOM"} <strong>{game.room.code}</strong></div><div className="session-tools"><LanguageMenu onChange={changeLocale}/><button className="tiny-button" onClick={leave}>{locale === "ja" ? "退出" : "EXIT"}</button></div></header>
@@ -185,6 +197,7 @@ export default function GameClient() {
     {game.room.status === "lobby" && <Lobby game={game} host={Boolean(host)} busy={busy} copied={copied} copyInvite={copyInvite} act={act} />}
     {game.room.status === "playing" && <GameTable game={game} busy={busy} act={act} />}
     {game.room.status === "finished" && <Finished players={game.players} leave={leave} />}
+    {game.room.status === "abandoned" && <Abandoned leave={leave} />}
     {reveal && <Reveal card={reveal} players={game.players} meId={game.meId} close={() => setDismissedReveal(reveal.id)} spinWheel={() => act("startWheel")} />}
   </main></LocaleContext.Provider>;
 }
@@ -202,18 +215,21 @@ function Lobby({ game, host, busy, copied, copyInvite, act }: { game: GameState;
   const [selected, setSelected] = useState<ThemeKey[]>(() => storedThemes(game.room.themeCategory));
   const selectedRef = useRef(selected);
   const themeSaveQueue = useRef(Promise.resolve());
+  const pendingThemeSaves = useRef(0);
   useEffect(() => {
+    if (host && pendingThemeSaves.current > 0) return;
     const next = storedThemes(game.room.themeCategory);
     selectedRef.current = next;
     setSelected(next);
-  }, [game.room.themeCategory]);
-  const configure = (extra: Record<string, unknown>) => act("configure", { roundCount: game.room.roundCount, themeCategory: game.room.themeCategory, customTheme: game.room.customTheme, locale: game.room.locale, ...extra });
+  }, [game.room.themeCategory, host]);
+  const configure = (extra: Record<string, unknown>) => act("configure", extra);
   const toggleTheme = (key: ThemeKey) => {
     const current = selectedRef.current;
     const next = current.includes(key) ? current.filter((item) => item !== key) : [...current, key];
     selectedRef.current = next;
     setSelected(next);
-    themeSaveQueue.current = themeSaveQueue.current.then(() => configure({ themeCategory: next.join(",") })).then(() => undefined);
+    pendingThemeSaves.current += 1;
+    themeSaveQueue.current = themeSaveQueue.current.then(() => configure({ themeCategory: next.join(",") })).then(() => undefined).finally(() => { pendingThemeSaves.current -= 1; });
   };
   return <section className="lobby"><div className="lobby-head"><span className="eyebrow">{ja ? "カードをシャッフル中" : "SHUFFLING THE CARDS"}</span><h1>{ja ? <>デッキの準備は<em>ほぼ</em>完了です。</> : <>Your deck is <em>almost</em> ready.</>}</h1><p>{ja ? "一緒に遊ぶ人を1人招待してください。このテーブルは2人専用です。" : "Invite one person. This table has exactly two seats."}</p></div><div className="lobby-grid"><div className="panel"><div className="panel-title"><h2>{ja ? "テーブル" : "At the table"} <small className="room-name-tip" title={`${ja ? "ルーム" : "Room"} ${game.room.code}`}>{ja ? "ルーム" : "ROOM"} {game.room.code}</small></h2><span>{game.players.length}/2</span></div><div className="people-list">{game.players.map((player, index) => <div className="person" key={player.id}><span className={`avatar avatar-${index}`}>{player.name[0]}</span><div><strong>{player.name}</strong><small>{player.isHost ? (ja ? "ホスト" : "host") : (ja ? "参加済み" : "ready to play")}</small></div><i>●</i></div>)}</div><button className="invite-button" onClick={copyInvite}>{copied ? (ja ? "リンクをコピーしました ✓" : "LINK COPIED! ✓") : (ja ? "招待リンクをコピー" : "COPY INVITE LINK")}</button></div><div className="panel"><div className="panel-title"><h2>{ja ? "デッキ" : "The deck"}</h2><span className="sticker">{ja ? "7種類のカード" : "7 CARD TYPES"}</span></div><div className="setting"><label>{ja ? "カード枚数" : "Number of cards"}</label><div className="segmented">{[8, 12, 16, 24].map((count) => <button key={count} disabled={!host} className={game.room.roundCount === count ? "active" : ""} onClick={() => configure({ roundCount: count })}>{count}</button>)}</div></div><div className="setting"><label>{ja ? "テーマカテゴリ" : "Theme categories"}</label><p className="setting-hint">{ja ? "質問カードと心読みカードの内容を決めます。" : "These guide the question and preference cards."}</p><div className="subject-checks">{THEME_KEYS.map((key) => <label className={`subject-check ${key === "spicy" ? "spicy-check" : ""} ${selected.includes(key) ? "selected" : ""}`} key={key}><input type="checkbox" checked={selected.includes(key)} disabled={!host} onChange={() => toggleTheme(key)} /><span>{ja ? THEME_LABELS_JA[key] : THEME_LABELS[key]}</span></label>)}</div></div><div className="setting"><label>{ja ? "追加テーマ（任意）" : "Optional custom subject"}</label><input className="custom-setting" defaultValue={game.room.customTheme ?? ""} disabled={!host} placeholder={ja ? "例：旅行の思い出" : "e.g. our travel stories"} onBlur={(event) => configure({ customTheme: event.target.value })}/></div>{host ? <button className="primary-button start-button" disabled={busy || game.players.length !== 2} onClick={() => act("start")}>{game.players.length === 2 ? (ja ? "シャッフルして開始 →" : "SHUFFLE & START →") : (ja ? "2人目の参加を待っています…" : "WAITING FOR PLAYER TWO…")}</button> : <div className="host-note">{ja ? "ホストがデッキを設定しています。" : "The host is choosing the deck."}</div>}</div></div></section>;
 }
@@ -445,10 +461,15 @@ function Reveal({ card, players, meId, close, spinWheel }: { card: Card; players
   return <div className="modal-backdrop"><div className={`reveal-card ${viewerDrinks || card.type === "both" ? "wrong" : "correct"}`}><div className="result-mark">{icon}</div><span className="eyebrow">{eyebrow}</span>{hasWheel && <><div className="sip-wheel-stage wheel-result-stage"><i className="sip-wheel-pointer"/><div className={`${wheelClass} sip-wheel-static sip-wheel-final`} aria-label={ja ? `ルーレットの結果：${card.result.sips}シップ` : `Final wheel result: ${card.result.sips} sips`}><span className="sip-wheel-number one">{highSips ? 2 : 1}</span><span className="sip-wheel-number two">{highSips ? 3 : 2}</span><span className="sip-wheel-number three">{highSips ? 4 : 3}</span></div></div><div className="wheel-result"><span>{ja ? "ルーレットの結果" : "THE WHEEL SAYS"}</span><strong>{card.result.sips}</strong><small><SipMug/> {ja ? "シップ" : card.result.sips === 1 ? "SIP" : "SIPS"}</small></div></>}<h2>{(card.result.drinkerId || card.type === "both") && <SipMug/>} {title}</h2><blockquote>{detail}</blockquote><button className="primary-button" onClick={close}>{ja ? "次のカード →" : "NEXT CARD →"}</button></div></div>;
 }
 
-function Finished({ players, leave }: { players: Player[]; leave: () => void }) {
+function Abandoned({ leave }: { leave: () => void | Promise<void> }) {
+  const { locale } = useLocale(); const ja = locale === "ja";
+  return <section className="finished"><span className="eyebrow">{ja ? "ゲーム終了" : "TABLE CLOSED"}</span><h1>{ja ? "プレイヤーが退出しました。" : "A player left the table."}</h1><p>{ja ? "このゲームは安全に終了しました。新しいテーブルを作ってもう一度プレイできます。" : "This game was ended safely. Start a new table whenever you are ready to play again."}</p><button className="primary-button" onClick={() => void leave()}>{ja ? "新しいテーブル →" : "NEW TABLE →"}</button></section>;
+}
+
+function Finished({ players, leave }: { players: Player[]; leave: () => void | Promise<void> }) {
   const { locale } = useLocale(); const ja = locale === "ja";
   const sorted = useMemo(() => [...players].sort((a, b) => a.sips - b.sips), [players]);
   const tied = sorted.length === 2 && sorted[0].sips === sorted[1].sips;
   const winner = tied ? null : sorted[0]; const loser = tied ? null : sorted[1];
-  return <section className="finished"><span className="eyebrow">{ja ? "デッキが空になりました" : "THE DECK IS EMPTY"}</span><h1>{tied ? (ja ? "引き分けです！" : "It’s a tie!") : (ja ? "一番飲まなかったのは…" : "The lightest drinker was…")}</h1>{winner && <div className="winner">🏆<strong>{winner.name}</strong><span><SipMug/> {winner.sips} {ja ? "シップ" : winner.sips === 1 ? "sip" : "sips"}</span></div>}<div className="final-list">{sorted.map((player, index) => <div key={player.id}><b>{tied ? "=" : `#${index + 1}`}</b><span>{player.name}</span><small><SipMug/> {player.sips} {ja ? "シップ" : player.sips === 1 ? "sip" : "sips"}</small></div>)}</div><div className="wager-reveal"><span className="eyebrow">{ja ? "賭けを公開" : "THE WAGERS REVEALED"}</span>{winner && loser ? <><h2>{ja ? `${loser.name}のチャレンジ` : `${loser.name}’s challenge`}</h2><blockquote>“{winner.wager}”</blockquote><p>{ja ? `${winner.name}がゲーム前に書いたチャレンジです。` : `Written by ${winner.name} before the game began.`}</p></> : <><h2>{ja ? "負けた人はいません。" : "No loser this time."}</h2><p>{ja ? "引き分けなので、2人の秘密の賭けだけを公開します。" : "Since it’s a tie, both secret wagers are simply revealed."}</p></>}<div className="all-wagers">{players.map((player) => <div key={player.id}><strong>{player.name}</strong><span>“{player.wager}”</span></div>)}</div></div><button className="primary-button" onClick={leave}>{ja ? "新しいテーブル →" : "NEW TABLE →"}</button></section>;
+  return <section className="finished"><span className="eyebrow">{ja ? "デッキが空になりました" : "THE DECK IS EMPTY"}</span><h1>{tied ? (ja ? "引き分けです！" : "It’s a tie!") : (ja ? "一番飲まなかったのは…" : "The lightest drinker was…")}</h1>{winner && <div className="winner">🏆<strong>{winner.name}</strong><span><SipMug/> {winner.sips} {ja ? "シップ" : winner.sips === 1 ? "sip" : "sips"}</span></div>}<div className="final-list">{sorted.map((player, index) => <div key={player.id}><b>{tied ? "=" : `#${index + 1}`}</b><span>{player.name}</span><small><SipMug/> {player.sips} {ja ? "シップ" : player.sips === 1 ? "sip" : "sips"}</small></div>)}</div><div className="wager-reveal"><span className="eyebrow">{ja ? "賭けを公開" : "THE WAGERS REVEALED"}</span>{winner && loser ? <><h2>{ja ? `${loser.name}のチャレンジ` : `${loser.name}’s challenge`}</h2><blockquote>“{winner.wager}”</blockquote><p>{ja ? `${winner.name}がゲーム前に書いたチャレンジです。` : `Written by ${winner.name} before the game began.`}</p></> : <><h2>{ja ? "負けた人はいません。" : "No loser this time."}</h2><p>{ja ? "引き分けなので、2人の秘密の賭けだけを公開します。" : "Since it’s a tie, both secret wagers are simply revealed."}</p></>}<div className="all-wagers">{players.map((player) => <div key={player.id}><strong>{player.name}</strong><span>“{player.wager}”</span></div>)}</div></div><button className="primary-button" onClick={() => void leave()}>{ja ? "新しいテーブル →" : "NEW TABLE →"}</button></section>;
 }
