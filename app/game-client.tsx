@@ -134,15 +134,29 @@ export default function GameClient() {
     if (!session || !game) { setHeaderHidden(false); return; }
     const scroller = document.querySelector<HTMLElement>(".app-shell > .lobby-composite, .app-shell > .game-stage, .app-shell > .finished");
     if (!scroller) return;
+    setHeaderHidden(false);
+    const header = document.querySelector<HTMLElement>(".app-shell > .topbar");
+    const measureHeader = () => {
+      if (header) header.style.setProperty("--topbar-height", `${header.getBoundingClientRect().height}px`);
+    };
+    measureHeader();
+    const observer = new ResizeObserver(measureHeader);
+    if (header) observer.observe(header);
     let previous = scroller.scrollTop;
     const onScroll = () => {
-      const current = scroller.scrollTop;
-      if (current > previous + 5 && current > 24) setHeaderHidden(true);
-      else if (current < previous - 5) setHeaderHidden(false);
+      const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      const current = Math.max(0, Math.min(scroller.scrollTop, maximum));
+      // Reclaiming the header's space can clamp scrollTop at the bottom.
+      const baseline = Math.min(previous, maximum);
+      if (current > baseline + 5 && current > 24) setHeaderHidden(true);
+      else if (current < baseline - 5 || (current === 0 && baseline > 0)) setHeaderHidden(false);
       previous = current;
     };
     scroller.addEventListener("scroll", onScroll, { passive: true });
-    return () => scroller.removeEventListener("scroll", onScroll);
+    return () => {
+      scroller.removeEventListener("scroll", onScroll);
+      observer.disconnect();
+    };
   }, [session, game?.room.status]);
 
   useEffect(() => {

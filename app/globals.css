@@ -123,8 +123,8 @@ h1 em,h2 em { color:var(--red); font-style:normal; position:relative; }
 .doodle-one { left:-15px; top:120px; }.doodle-two { right:3vw; bottom:2vh; transform:rotate(9deg); }
 
 .app-shell { min-height:100svh; background:linear-gradient(#fff8ea,#ffefd0); }
-.topbar { height:74px; padding:0 4vw; background:#fffdf8; border-bottom:2px solid var(--ink); transition:transform .24s ease, box-shadow .24s ease; z-index:20; }
-.topbar-hidden { transform:translateY(-100%); box-shadow:0 3px 0 #17243d22; }
+.topbar { height:74px; padding:0 4vw; background:#fffdf8; border-bottom:2px solid var(--ink); transition:transform .24s ease, margin-bottom .24s ease; z-index:20; }
+.topbar-hidden { transform:translateY(-100%); margin-bottom:calc(-1 * var(--topbar-height, 74px)); pointer-events:none; }
 .brand { font-size:25px; }.brand b { font-size:27px; }
 .session-tools { display:flex; align-items:center; gap:14px; }.session-clock { font-size:10px; font-weight:900; letter-spacing:.08em; background:var(--mint); border:2px solid var(--ink); border-radius:99px; padding:7px 10px; }
 .room-pill { border:2px solid var(--ink); border-radius:99px; background:white; padding:8px 14px; font-size:11px; letter-spacing:.1em; }
@@ -405,6 +405,11 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .deck-filter-toggle b { display:grid; place-items:center; width:24px; height:24px; border:2px solid var(--ink); border-radius:50%; background:var(--yellow); font:1000 18px/1 Arial,sans-serif; }
 .deck-filter-toggle:hover { color:var(--ink); }
 .hero > .entry-card { align-self:start; transform:translateY(10px) rotate(1deg); }
+@media (min-width:801px) {
+  .hero > .entry-card { align-self:center; padding:22px 28px; transform:translateX(-24px) rotate(1deg); }
+  .entry-card .card-tabs { margin-bottom:20px; }
+  .entry-card small { margin-top:13px; }
+}
 .deck-filter-content { margin-top:14px; }
 .deck-filter-panel:has(.deck-filter-content) .deck-filter-content { margin-top:24px; }
 @media (max-width:800px) {
