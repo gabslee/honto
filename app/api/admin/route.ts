@@ -28,14 +28,18 @@ export async function GET(request: Request) {
   if (!sql) return json({ error: "DATABASE_URL is not configured." }, 503);
   try {
     await ensureIdentitySchema();
-    const [users, rooms, activeRooms, players, ai] = await Promise.all([
+    const [users, rooms, activeRooms, players, ai, userRows, roomRows, playerRows, aiRows] = await Promise.all([
       sql`SELECT COUNT(*)::int AS total FROM users`,
       sql`SELECT COUNT(*)::int AS total FROM rooms`,
       sql`SELECT COUNT(*)::int AS total FROM rooms WHERE status = 'playing'`,
       sql`SELECT COUNT(*)::int AS total FROM players`,
       sql`SELECT COALESCE(SUM(uses), 0)::int AS total FROM ai_usage`,
+      sql`SELECT id, email, display_name AS "displayName", role, created_at AS "createdAt" FROM users ORDER BY created_at DESC LIMIT 200`,
+      sql`SELECT id, code, status, round_count AS "roundCount", current_round AS "currentRound", created_at AS "createdAt", updated_at AS "updatedAt" FROM rooms ORDER BY created_at DESC LIMIT 200`,
+      sql`SELECT p.id, p.name, p.is_host AS "isHost", p.sips, p.joined_at AS "joinedAt", p.user_id AS "userId", r.code AS "roomCode" FROM players p JOIN rooms r ON r.id = p.room_id ORDER BY p.joined_at DESC LIMIT 300`,
+      sql`SELECT scope, scope_key AS "scopeKey", window_start AS "windowStart", uses, updated_at AS "updatedAt" FROM ai_usage ORDER BY updated_at DESC LIMIT 300`,
     ]);
-    return json({ user, metrics: { users: users[0]?.total ?? 0, rooms: rooms[0]?.total ?? 0, activeRooms: activeRooms[0]?.total ?? 0, players: players[0]?.total ?? 0, aiUses: ai[0]?.total ?? 0 } });
+    return json({ user, metrics: { users: users[0]?.total ?? 0, rooms: rooms[0]?.total ?? 0, activeRooms: activeRooms[0]?.total ?? 0, players: players[0]?.total ?? 0, aiUses: ai[0]?.total ?? 0 }, lists: { users: userRows, rooms: roomRows, activeRooms: roomRows.filter((room: any) => room.status === "playing"), players: playerRows, aiUses: aiRows } });
   } catch (error) {
     console.error("[admin] metrics failed", error);
     return json({ error: "Unable to load admin metrics." }, 503);
