@@ -1,6 +1,27 @@
 :root { --ink:#17243d; --paper:#fff7e8; --cream:#ffe8ba; --red:#f04444; --pink:#ff8eab; --yellow:#ffd644; --mint:#a8e6cf; --line:3px solid var(--ink); }
 .account-slot { width:72%; margin:14px auto 0; }
 .account-stack { display:flex; flex-direction:column; gap:8px; width:100%; }
+.pricing-page { min-height:100vh; padding:28px 22px 56px; color:var(--ink); background:var(--paper); text-align:center; }
+.pricing-back { display:inline-block; color:var(--ink); font-size:11px; font-weight:900; text-decoration:none; margin-bottom:30px; }
+.pricing-brand { font-size:22px; font-weight:1000; letter-spacing:-.08em; margin-bottom:32px; }
+.pricing-brand b { display:inline-grid; place-items:center; width:22px; height:22px; margin-left:2px; border:2px solid var(--ink); border-radius:50%; background:var(--yellow); font-size:15px; letter-spacing:0; }
+.pricing-page h1 { max-width:700px; margin:8px auto 12px; font-size:clamp(42px,8vw,76px); line-height:.9; letter-spacing:-.07em; }
+.pricing-page h1 em { color:var(--coral); font-style:normal; }
+.pricing-lead { max-width:520px; margin:0 auto 34px; font-size:15px; line-height:1.5; }
+.pricing-grid { display:grid; grid-template-columns:repeat(2,minmax(0,340px)); gap:18px; max-width:700px; margin:0 auto; text-align:left; }
+.pricing-card { position:relative; padding:25px; border:2px solid var(--ink); border-radius:14px; background:#fff; box-shadow:5px 5px 0 var(--ink); }
+.pricing-card-featured { background:var(--mint); transform:translateY(-5px); }
+.pricing-tag { font-size:10px; font-weight:1000; letter-spacing:.12em; }
+.pricing-card h2 { margin:16px 0 10px; font-size:22px; }
+.pricing-amount { display:flex; align-items:baseline; gap:7px; margin-bottom:14px; }
+.pricing-amount strong { font-size:34px; letter-spacing:-.05em; }
+.pricing-amount span { font-size:12px; font-weight:800; }
+.pricing-card p { min-height:44px; font-size:13px; line-height:1.4; }
+.pricing-card ul { min-height:128px; padding-left:18px; font-size:13px; line-height:1.8; }
+.pricing-card .primary-button { width:100%; }
+.pricing-error { max-width:600px; margin:28px auto 0; }
+.pricing-footnote { max-width:620px; margin:34px auto 0; font-size:11px; line-height:1.5; }
+@media (max-width:700px) { .pricing-grid { grid-template-columns:1fr; max-width:390px; } .pricing-card-featured { transform:none; } }
 .account-control { width:100%; min-height:36px; display:flex; align-items:center; justify-content:center; gap:7px; padding:8px 12px; border:2px solid var(--ink); border-radius:9px; background:var(--yellow); color:var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:9px; font-weight:1000; white-space:nowrap; text-decoration:none; }
 .account-control .curated-button:hover { transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink); }
 .google-mark { width:18px; height:18px; flex:0 0 18px; }
