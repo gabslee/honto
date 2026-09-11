@@ -177,7 +177,6 @@ export default async function handler(req: any, res: any) {
       const count = await sql`SELECT COUNT(*)::int AS total FROM players WHERE room_id = ${room.id}`;
       if ((count[0]?.total ?? 0) >= 2) return json(res, { error: "This room already has two players." }, 409);
       const token = id();
-      if (body.locale === "ja" || body.locale === "en") await sql`UPDATE rooms SET locale = ${body.locale}, updated_at = now() WHERE id = ${room.id} AND status = 'lobby'`;
       await sql`INSERT INTO players (id, room_id, name, token) VALUES (${id()}, ${room.id}, ${name}, ${token})`;
       return json(res, { code: roomCode, token }, 201);
     }

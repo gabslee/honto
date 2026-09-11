@@ -134,7 +134,6 @@ export default function GameClient() {
       if (!response.ok) throw new Error(data.error ?? "This room is no longer available.");
       if (mutationActive.current || requestEpoch !== mutationEpoch.current) return;
       setGame(data);
-      if (data.room?.locale === "ja" || data.room?.locale === "en") setLocale(data.room.locale);
       if (!quiet) setError("");
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Connection error.";
@@ -190,7 +189,7 @@ export default function GameClient() {
   const host = game.players.find((player) => player.id === game.meId)?.isHost;
   const reveal = game.room.status !== "abandoned" && game.lastCard && game.lastCard.id !== dismissedReveal ? game.lastCard : null;
   const copyInvite = async () => { await navigator.clipboard.writeText(`${location.origin}${location.pathname}?room=${game.room.code}`); setCopied(true); window.setTimeout(() => setCopied(false), 1600); };
-  const changeLocale = (next: Locale) => { setLocale(next); if (host && game.room.status === "lobby") void act("configure", { locale: next }); };
+  const changeLocale = (next: Locale) => { setLocale(next); };
 
   return <LocaleContext.Provider value={{ locale, setLocale, roomCode: session.code, sessionToken: session.token }}><main className="app-shell">
     <header className="topbar"><button className="brand" onClick={leave}><span>HONTO?</span><b>!</b></button><div className="room-pill"><span className="live-dot"/>{locale === "ja" ? "ルーム" : "ROOM"} <strong>{game.room.code}</strong></div><div className="session-tools"><LanguageMenu onChange={changeLocale}/><button className="tiny-button" onClick={leave}>{locale === "ja" ? "退出" : "EXIT"}</button></div></header>
