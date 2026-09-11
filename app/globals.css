@@ -312,6 +312,18 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .session-clock { max-width:112px; overflow:hidden; text-overflow:ellipsis; }
   .session-pause { width:30px; height:30px; }
 }
+
+/* Keep the actual game inside the mobile viewport. Long legal and pricing pages remain scrollable. */
+@media (max-width:800px) {
+  body:has(.app-shell) { height:100svh; overflow:hidden; }
+  .app-shell { height:100svh; min-height:0; overflow:hidden; display:flex; flex-direction:column; }
+  .app-shell > .topbar { flex:0 0 auto; }
+  .app-shell > .game-stage,
+  .app-shell > .lobby,
+  .app-shell > .finished { min-height:0; flex:1 1 auto; overflow-y:auto; overscroll-behavior:contain; padding-bottom:24px; }
+  .app-shell > .welcome-stage { overflow:hidden; display:grid; place-items:center; padding:12px 14px 20px; }
+  .welcome-stage .welcome-card { max-height:calc(100svh - 104px); overflow-y:auto; }
+}
 @media (prefers-reduced-motion:reduce) { * { animation:none!important; transition:none!important; } }
 
 /* Long AI topics stay readable instead of disappearing off the card. */
