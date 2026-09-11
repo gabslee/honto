@@ -2,7 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { ESTIMATE_QUESTIONS_BY_THEME, PREFERENCE_CARDS_BY_THEME, type CuratedTheme } from "../data/curated";
 import { ESTIMATE_QUESTIONS_BY_THEME_JA, PREFERENCE_CARDS_BY_THEME_JA } from "../data/curated-ja";
 import { makeRoomCode, normalizeRoomSettings } from "./game-contract";
-import { getCurrentUser } from "../app/server-auth";
+import { getCurrentUser, hasPremiumAccess, type CurrentUser } from "../app/server-auth";
 
 type CardType = "honto" | "question" | "wouldrather" | "preference" | "estimate" | "rps" | "both";
 type Locale = "en" | "ja";
@@ -112,7 +112,7 @@ function publicCard(row: any, meId: string, completed = false) {
   return card;
 }
 
-async function state(roomCode: string, token: string) {
+async function state(roomCode: string, token: string, currentUser: CurrentUser | null = null) {
   const rooms = await sql`SELECT * FROM rooms WHERE code = ${roomCode}`;
   const room: any = rooms[0];
   if (!room) return null;
@@ -128,7 +128,7 @@ async function state(roomCode: string, token: string) {
   const cardRows = room.status === "playing" ? await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.card_number = ${room.current_round} LIMIT 1` : [];
   const lastRows = await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.status = 'complete' ORDER BY c.card_number DESC LIMIT 1`;
   return {
-    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, welcomeAck: Array.isArray(room.welcome_ack) ? room.welcome_ack : [], locale: room.locale === "ja" ? "ja" : "en", startedAt: room.started_at },
+    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, welcomeAck: Array.isArray(room.welcome_ack) ? room.welcome_ack : [], locale: room.locale === "ja" ? "ja" : "en", startedAt: room.started_at, canUseSpicy: hasPremiumAccess(currentUser) },
     players, activeCard: publicCard(cardRows[0], me.id), lastCard: publicCard(lastRows[0], me.id, true), meId: me.id,
   };
 }
@@ -157,7 +157,7 @@ export default async function handler(req: any, res: any) {
     const body = (req.body ?? {}) as Body;
     const query = req.query ?? {};
     if (req.method === "GET") {
-      const result = await state(String(query.code ?? "").toUpperCase(), String(query.token ?? ""));
+      const result = await state(String(query.code ?? "").toUpperCase(), String(query.token ?? ""), currentUser);
       return result ? json(res, result) : json(res, { error: "Room not found." }, 404);
     }
     if (body.action === "create") {
@@ -234,6 +234,7 @@ export default async function handler(req: any, res: any) {
     if (body.action === "configure") {
       if (!me.is_host || room.status !== "lobby") throw new Error("Only the host can change the room settings.");
       const { roundCount, themeCategory, customTheme, locale } = normalizeRoomSettings(room, body, LEGACY_THEME_MAP);
+      if (themeCategory.split(",").includes("spicy") && !hasPremiumAccess(currentUser)) throw new Error("Spicy is a Premium theme. Start your Premium trial to unlock it.");
       await sql`UPDATE rooms SET round_count = ${roundCount}, theme_category = ${themeCategory}, custom_theme = ${customTheme}, locale = ${locale}, updated_at = now() WHERE id = ${room.id}`;
     }
     if (body.action === "start") {
@@ -390,7 +391,7 @@ export default async function handler(req: any, res: any) {
         if (updated[0]) { if (drinkerId) await sql`UPDATE players SET sips = sips + ${sips} WHERE id = ${drinkerId}`; await finishCard(room); }
       }
     }
-    return json(res, await state(roomCode, token));
+    return json(res, await state(roomCode, token, currentUser));
   } catch (error) {
     return json(res, { error: error instanceof Error ? error.message : "Unexpected error." }, 400);
   }
