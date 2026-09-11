@@ -1,9 +1,9 @@
 :root { --ink:#17243d; --paper:#fff7e8; --cream:#ffe8ba; --red:#f04444; --pink:#ff8eab; --yellow:#ffd644; --mint:#a8e6cf; --line:3px solid var(--ink); }
-.account-control { position:fixed; z-index:30; display:inline-flex; align-items:center; }
-.account-control .curated-button { width:100%; min-height:36px; display:flex; align-items:center; justify-content:center; gap:7px; padding:8px 12px; border:2px solid var(--ink); border-radius:9px; background:var(--yellow); color:var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:9px; font-weight:1000; white-space:nowrap; text-decoration:none; }
+.account-slot { width:72%; margin:14px auto 0; }
+.account-control { width:100%; min-height:36px; display:flex; align-items:center; justify-content:center; gap:7px; padding:8px 12px; border:2px solid var(--ink); border-radius:9px; background:var(--yellow); color:var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:9px; font-weight:1000; white-space:nowrap; text-decoration:none; }
 .account-control .curated-button:hover { transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink); }
 .google-mark { width:18px; height:18px; flex:0 0 18px; }
-.signed-in-account { max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:11px 16px; border:2px solid var(--ink); border-radius:999px; background:var(--mint); color:var(--ink); font-size:11px; font-weight:900; letter-spacing:.04em; box-shadow:3px 3px 0 var(--ink); }
+.signed-in-account { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:9px 12px; border-radius:999px; background:var(--mint); color:var(--ink); font-size:10px; letter-spacing:.04em; }
 * { box-sizing:border-box; }
 html { background:var(--paper); }
 body { margin:0; color:var(--ink); background:var(--paper); font-family:"Arial Rounded MT Bold","Trebuchet MS",Arial,sans-serif; }
