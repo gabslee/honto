@@ -9,6 +9,7 @@ import { createMultiplayerState, publicMultiplayer, reduceMultiplayer } from '..
 
 // Render the real TSX component with React; assertions cover visible choices and gates.
 const source = readFileSync(new URL('../app/multiplayer-client.tsx', import.meta.url), 'utf8');
+const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source + '\nexport { GroupFinished };', { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 const exports = {};
 new Function('require', 'exports', compiled)(createRequire(import.meta.url), exports);
@@ -28,6 +29,13 @@ test('the completed-game restart button invokes the server newTable action', () 
   };
   visit(tree);
   assert.equal(invoked, 'newTable');
+});
+
+test('long multiplayer results retain a dedicated vertical scroll area', () => {
+  assert.match(source, /multiplayer-result-stage/);
+  assert.match(css, /\.app-shell > \.multiplayer-stage[^}]*overflow-y:auto/);
+  assert.match(css, /\.app-shell > \.multiplayer-stage[^}]*touch-action:pan-y/);
+  assert.match(css, /\.app-shell > \.multiplayer-result-stage[^}]*padding-bottom/);
 });
 
 test('draw belongs to the author; anonymous players are not labeled disconnected', () => {
