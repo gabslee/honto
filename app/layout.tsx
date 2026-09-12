@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
-import "./multiplayer.css";
 import { getMessages } from "./i18n";
 
 export const viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };

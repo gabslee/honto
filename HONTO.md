@@ -2,7 +2,7 @@
 
 ## O que é o Honto?
 
-Honto é um card game online para duas pessoas no modo Free, com multiplayer para 3–6 pessoas quando o anfitrião é Premium. Os convidados podem ser Free. A mesa compartilha um único deck, com desafios, respostas e resultados sincronizados. As regras do multiplayer estão em [MULTIPLAYER.md](MULTIPLAYER.md); as seções abaixo descrevem o modo de duas pessoas.
+Honto é um card game online para duas pessoas. A mesa compartilha um único deck: em cada rodada, um jogador compra uma carta e os dois recebem o mesmo mini game. A carta define o desafio; as respostas, escolhas e resultados acontecem em tempo real para os dois jogadores.
 
 O nome vem de **honto (本当)**, palavra japonesa que significa “é verdade?”. A proposta é misturar conversa, blefe, leitura de personalidade e uma dose leve de competição. O jogo pode ser jogado com bebida alcoólica ou sem álcool.
 

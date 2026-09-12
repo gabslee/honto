@@ -2,12 +2,12 @@
 
 **Draw a card. Read each other. Who takes the sip?**
 
-HONTO?! is an online card game for two players, with Premium-hosted multiplayer for 3–6 people. Guests can join for free. Everyone shares one shuffled deck; secret answers stay server-side until the reveal. “Hontō?” (本当?) means “is it true?” in Japanese. See [MULTIPLAYER.md](MULTIPLAYER.md) for multiplayer rules, lifecycle, and architecture.
+HONTO?! is an online card game for exactly two players. Both devices share one shuffled deck with seven journeys: Two Lies, One Truth; Question or Sips; Would You Rather; Read My Mind; Number Estimate; Rock Paper Scissors; and Both Drink. Roles alternate on every card, secret answers stay server-side until the reveal, and “Hontō?” (本当?) means “is it true?” in Japanese.
 
 ## MVP
 
 - No-account entry by name, room code, or invite link
-- Two Free seats, or 3–6 participants with a Premium host
+- Exactly two seats and one synchronized deck
 - Balanced mix of the seven card types with alternating roles
 - Secret truth and numeric answers that are never sent to the guesser
 - AI-assisted questions and lies with local fallbacks
@@ -17,7 +17,7 @@ HONTO?! is an online card game for two players, with Premium-hosted multiplayer 
 
 ## Localization
 
-The game has English and Japanese interfaces and curated prompts. Multiplayer's additional themed prompts live in `data/multiplayer-prompts.ts`.
+English is the only supported language and the default locale today. All interface copy, built-in prompts, errors, and metadata live in `app/i18n.ts`. Add a locale to `supportedLocales`, provide its message catalog, and resolve the active locale at the route or room level to introduce another language without changing game components.
 
 ## Architecture
 
@@ -39,6 +39,4 @@ npm install
 npm run dev
 ```
 
-The active PostgreSQL schema is initialized in `api/game.ts` and `app/server-auth.ts`. The multiplayer migration is `drizzle/0004_multiplayer.sql`; earlier migration files describe the project's original schema and must not be applied blindly to PostgreSQL.
-
-Use Node 22.18+ and run `npm run test:unit` for behavior tests, including an isolated in-memory PostgreSQL lifecycle test. `npm test` runs these checks followed by the production build. Tests do not use production credentials or data.
+The schema lives in `db/schema.ts`, and versioned migrations live in `drizzle/`.
