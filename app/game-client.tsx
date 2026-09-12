@@ -4,6 +4,7 @@ import { createContext, FormEvent, useCallback, useContext, useEffect, useMemo, 
 import { createPortal } from "react-dom";
 import { questionLibrary, questionLibraryJa, type Locale } from "./i18n";
 import { loadRoomSession, removeRoomSession, saveRoomSession } from "./session-store";
+import { nextHeaderVisibility } from "./header-visibility";
 import { lobbyAccess, multiplayerDeckKeys } from "./multiplayer-lobby-rules";
 import { MultiplayerGame } from "./multiplayer-client";
 import type { publicMultiplayer } from "../api/multiplayer";
@@ -55,6 +56,8 @@ function LanguageMenu({ onChange, landing = false }: { onChange?: (locale: Local
 function AccountControl() {
   const [user, setUser] = useState<{ email: string; displayName?: string; role?: string; plan?: string; subscriptionStatus?: string; trialEndsAt?: string | null; stripeCustomerId?: string | null } | null>(null);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [portalError, setPortalError] = useState("");
   const [mount, setMount] = useState<HTMLElement | null>(null);
   useEffect(() => { void fetch("/api/auth/me", { cache: "no-store" }).then((response) => response.json()).then((data) => setUser(data.user ?? null)).catch(() => undefined); }, []);
   useEffect(() => {
@@ -71,8 +74,19 @@ function AccountControl() {
   }, [mount]);
   if (!mount) return null;
   const openCheckout = async (interval: "month" | "year") => { const response = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ interval }) }); const data = await response.json(); if (data.url) window.location.href = data.url; };
-  const openPortal = async () => { const response = await fetch("/api/billing/portal", { method: "POST" }); const data = await response.json(); if (data.url) window.location.href = data.url; };
-  if (Boolean(user)) return createPortal(<><div className="account-stack"><span className="account-control signed-in-account account-identity"><span>{user!.displayName ?? user!.email}</span><button type="button" aria-label="Sign out" onClick={() => setConfirmSignOut(true)}>×</button></span>{user!.role === "admin" ? <span className="account-control signed-in-account account-status account-status-admin">ADMIN · UNLIMITED</span> : user!.plan === "premium" || user!.subscriptionStatus === "active" ? user!.stripeCustomerId ? <button type="button" className="account-control curated-button account-premium-button" onClick={() => void openPortal()}>MANAGE PREMIUM</button> : <span className="account-control signed-in-account account-status account-status-premium">PREMIUM ACTIVE</span> : <button type="button" className="account-control curated-button account-trial-button" onClick={() => { window.location.href = "/pricing"; }}>START 7-DAY PREMIUM TRIAL</button>}</div>{confirmSignOut && <div className="modal-backdrop account-confirm-backdrop" role="presentation" onClick={() => setConfirmSignOut(false)}><section className="account-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="signout-title" onClick={(event) => event.stopPropagation()}><span className="eyebrow">HONTO · ACCOUNT</span><h2 id="signout-title">Do you want to disconnect from your account?</h2><p>Your account will stay safe, and you can sign in again anytime.</p><div className="account-confirm-actions"><button type="button" className="primary-button" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); setConfirmSignOut(false); setUser(null); }}>YES, DISCONNECT</button><button type="button" className="curated-button" onClick={() => setConfirmSignOut(false)}>NO, STAY SIGNED IN</button></div></section></div>}</>, mount);
+  const openPortal = async () => {
+    if (portalBusy) return;
+    setPortalBusy(true); setPortalError("");
+    try {
+      const response = await fetch("/api/billing/portal", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok || !data.url) throw new Error(data.error ?? "Unable to open the Premium portal.");
+      window.location.assign(data.url);
+    } catch (cause) {
+      setPortalError(cause instanceof Error ? cause.message : "Unable to open the Premium portal.");
+    } finally { setPortalBusy(false); }
+  };
+  if (Boolean(user)) return createPortal(<><div className="account-stack"><span className="account-control signed-in-account account-identity"><span>{user!.displayName ?? user!.email}</span><button type="button" aria-label="Sign out" onClick={() => setConfirmSignOut(true)}>×</button></span>{user!.role === "admin" ? <span className="account-control signed-in-account account-status account-status-admin">ADMIN · UNLIMITED</span> : user!.plan === "premium" || user!.subscriptionStatus === "active" ? user!.stripeCustomerId ? <button type="button" className="account-control curated-button account-premium-button" disabled={portalBusy} onClick={() => void openPortal()}>{portalBusy ? "OPENING…" : "MANAGE PREMIUM"}</button> : <span className="account-control signed-in-account account-status account-status-premium">PREMIUM ACTIVE</span> : <button type="button" className="account-control curated-button account-trial-button" onClick={() => { window.location.href = "/pricing"; }}>START 7-DAY PREMIUM TRIAL</button>}{portalError && <small className="account-portal-error" role="alert">{portalError}</small>}</div>{confirmSignOut && <div className="modal-backdrop account-confirm-backdrop" role="presentation" onClick={() => setConfirmSignOut(false)}><section className="account-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="signout-title" onClick={(event) => event.stopPropagation()}><span className="eyebrow">HONTO · ACCOUNT</span><h2 id="signout-title">Do you want to disconnect from your account?</h2><p>Your account will stay safe, and you can sign in again anytime.</p><div className="account-confirm-actions"><button type="button" className="primary-button" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); setConfirmSignOut(false); setUser(null); }}>YES, DISCONNECT</button><button type="button" className="curated-button" onClick={() => setConfirmSignOut(false)}>NO, STAY SIGNED IN</button></div></section></div>}</>, mount);
   const content = !user ? <div className="account-auth-buttons"><a className="account-control curated-button" aria-label="Sign in with Google" title="Sign in with Google" href="/api/auth/google/start"><svg className="google-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.35 12.27c0-.72-.06-1.42-.18-2.09H12v3.96h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.7 2.91-4.2 2.91-7.26Z"/><path fill="#34A853" d="M12 21.7c2.63 0 4.84-.87 6.45-2.37l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.7-1.72-5.47-4.03H3.29v2.53A9.74 9.74 0 0 0 12 21.7Z"/><path fill="#FBBC05" d="M6.53 13.77A5.85 5.85 0 0 1 6.22 12c0-.62.11-1.22.31-1.77V7.7H3.29A9.74 9.74 0 0 0 2.25 12c0 1.57.38 3.05 1.04 4.3l3.24-2.53Z"/><path fill="#EA4335" d="M12 6.2c1.43 0 2.72.49 3.73 1.45l2.8-2.8C16.84 3.25 14.63 2.3 12 2.3a9.74 9.74 0 0 0-8.71 5.4l3.24 2.53C7.3 7.92 9.46 6.2 12 6.2Z"/></svg></a><button type="button" className="account-control apple-auth-button" aria-label="Sign in with Apple — coming soon" title="Sign in with Apple — coming soon" disabled><svg className="apple-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.05 12.54c-.02-2.15 1.76-3.18 1.84-3.23a3.96 3.96 0 0 0-3.12-1.69c-1.31-.14-2.58.78-3.25.78-.68 0-1.72-.76-2.83-.74a4.17 4.17 0 0 0-3.5 2.14c-1.51 2.62-.38 6.49 1.06 8.62.72 1.04 1.56 2.2 2.67 2.16 1.08-.04 1.49-.69 2.61-2.1.82-1.2 1.16-2.36 1.18-2.42a3.75 3.75 0 0 1-2.28-3.5ZM14.9 6.22a3.78 3.78 0 0 0 .86-2.73 3.84 3.84 0 0 0-2.48 1.28 3.59 3.59 0 0 0-.88 2.62 3.18 3.18 0 0 0 2.5-1.17Z"/></svg></button></div> : <span className="account-control signed-in-account account-identity">{user.displayName ?? user.email}</span>;
   return createPortal(content, mount);
 }
@@ -138,6 +152,7 @@ export default function GameClient() {
     if (!session || !game) { setHeaderHidden(false); return; }
     const scroller = document.querySelector<HTMLElement>(".app-shell > .lobby-composite, .app-shell > .game-stage, .app-shell > .finished");
     if (!scroller) return;
+    const mobile = window.matchMedia("(max-width: 800px)");
     setHeaderHidden(false);
     const header = document.querySelector<HTMLElement>(".app-shell > .topbar");
     const measureHeader = () => {
@@ -150,15 +165,15 @@ export default function GameClient() {
     const onScroll = () => {
       const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
       const current = Math.max(0, Math.min(scroller.scrollTop, maximum));
-      // Reclaiming the header's space can clamp scrollTop at the bottom.
-      const baseline = Math.min(previous, maximum);
-      if (current > baseline + 5 && current > 24) setHeaderHidden(true);
-      else if (current < baseline - 5 || (current === 0 && baseline > 0)) setHeaderHidden(false);
+      setHeaderHidden((hidden) => nextHeaderVisibility({ mobile: mobile.matches, current, previous, maximum, hidden }));
       previous = current;
     };
+    const onViewportChange = () => { previous = scroller.scrollTop; if (!mobile.matches) setHeaderHidden(false); };
     scroller.addEventListener("scroll", onScroll, { passive: true });
+    mobile.addEventListener("change", onViewportChange);
     return () => {
       scroller.removeEventListener("scroll", onScroll);
+      mobile.removeEventListener("change", onViewportChange);
       observer.disconnect();
     };
   }, [session, game?.room.status]);
