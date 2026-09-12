@@ -382,11 +382,11 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .lobby-composite .spicy-check.locked::after { content:"PREMIUM"; position:absolute; top:-12px; right:-8px; z-index:2; padding:7px 12px; border:2px solid var(--ink); background:var(--yellow); color:var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:9px; font-weight:1000; letter-spacing:.1em; transform:rotate(4deg); clip-path:polygon(0 0,100% 0,100% 28%,94% 50%,100% 72%,100% 100%,0 100%,0 72%,6% 50%,0 28%); }
 .lobby-composite .lobby-grid .setting:has(.custom-setting) { display:none; }
 .lobby-composite .spicy-check .premium-lock { display:none; }
-.app-shell > .lobby-composite { position:relative; min-height:0; flex:1 1 auto; overflow-y:auto; padding:0 24px 40px; overscroll-behavior:contain; display:grid; grid-template-columns:430px 560px; grid-template-areas:"head head" "table deck" "filter deck"; justify-content:center; align-content:start; align-items:start; row-gap:8px; column-gap:24px; }
+.app-shell > .lobby-composite { position:relative; min-height:0; flex:1 1 auto; overflow-y:auto; padding:0 24px 40px; overscroll-behavior:contain; display:grid; grid-template-columns:minmax(280px,430px) minmax(330px,560px); grid-template-areas:"head head" "table deck" "mode deck" "filter deck"; justify-content:center; align-content:start; align-items:start; row-gap:8px; column-gap:24px; }
 .lobby-composite > .lobby, .lobby-composite > .deck-filter-lobby { display:contents; }
 /* Keep the table row intrinsic; the spanning deck can only grow the last row. */
 @media (min-width:801px) {
-  .app-shell > .lobby-composite { grid-template-rows:max-content max-content minmax(max-content,1fr); row-gap:22px; }
+  .app-shell > .lobby-composite { grid-template-rows:max-content max-content max-content minmax(max-content,1fr); row-gap:22px; }
 }
 .lobby-composite .lobby-head { grid-area:head; padding:7vh 24px 0; }
 .lobby-composite .lobby-grid { display:contents; }
@@ -400,6 +400,19 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .deck-filter-panel .panel-title .sticker { display:none; }
 .lobby-composite .panel { width:100%; box-sizing:border-box; height:max-content; align-self:start; }
 .lobby-composite .people-list { min-height:0; }
+.lobby-composite .multiplayer-mode-panel { grid-area:mode; padding:20px 22px; }
+.multiplayer-mode-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.multiplayer-mode-heading h2 { margin:0 0 5px; font-size:20px; }
+.multiplayer-mode-heading small { font-size:9px; font-weight:900; letter-spacing:.08em; }
+.multiplayer-mode-panel p { font:13px/1.5 Arial,sans-serif; margin:12px 0 0; }
+.multiplayer-mode-panel > small { display:block; font:11px/1.5 Arial,sans-serif; margin-top:10px; }
+.multiplayer-mode-panel a { display:inline-block; margin-top:12px; color:var(--ink); font-size:10px; font-weight:900; }
+.multiplayer-mode-switch { flex:0 0 60px; width:60px; height:34px; padding:3px; border:2px solid var(--ink); border-radius:20px; background:#e8e1d6; }
+.multiplayer-mode-switch span { display:grid; place-items:center; width:24px; height:24px; background:#fffdf8; border:2px solid var(--ink); border-radius:50%; font-size:12px; transition:transform .18s ease; }
+.multiplayer-mode-switch[aria-checked="true"] { background:var(--mint); }
+.multiplayer-mode-switch[aria-checked="true"] span { transform:translateX(25px); }
+.multiplayer-mode-switch:disabled { opacity:.65; }
+.avatar-2 { background:var(--pink); }.avatar-3 { background:#c8b4ef; }.avatar-4 { background:#a9d5ff; }.avatar-5 { background:#ffc89e; }
 .lobby-auth-buttons { position:absolute; top:16px; right:24px; display:flex; gap:8px; z-index:3; }
 .lobby-auth-button { position:relative; display:grid; place-items:center; width:90px; height:36px; padding:3px; border:2px solid var(--ink); border-radius:8px; background:var(--yellow); color:var(--ink); box-shadow:3px 3px 0 var(--ink); }
 .lobby-auth-button .google-mark,.lobby-auth-button .apple-mark { width:30px; height:30px; }
@@ -492,7 +505,7 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .legal-page { min-height:100svh; overflow-y:auto; }
 
 @media (max-width:800px) {
-  .app-shell > .lobby-composite { display:grid; grid-template-columns:1fr; grid-template-areas:"head" "table" "filter" "deck"; overflow-y:auto; padding:0 0 24px; row-gap:22px; }
+  .app-shell > .lobby-composite { display:grid; grid-template-columns:1fr; grid-template-areas:"head" "table" "mode" "filter" "deck"; overflow-y:auto; padding:0 0 24px; row-gap:22px; }
   .lobby-composite > .lobby, .lobby-composite > .deck-filter-lobby { display:contents; }
   .lobby-composite .lobby-head { padding:7vh 24px 0; }
   .lobby-composite .lobby-grid { display:contents; }
