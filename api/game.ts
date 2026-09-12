@@ -2,7 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { ESTIMATE_QUESTIONS_BY_THEME, PREFERENCE_CARDS_BY_THEME, type CuratedTheme } from "../data/curated";
 import { ESTIMATE_QUESTIONS_BY_THEME_JA, PREFERENCE_CARDS_BY_THEME_JA } from "../data/curated-ja";
 import { makeRoomCode, normalizeRoomSettings } from "./game-contract";
-import { getCurrentUser, hasPremiumAccess, type CurrentUser } from "../app/server-auth";
+import { ensureIdentitySchema, getCurrentUser, hasPremiumAccess, type CurrentUser } from "../app/server-auth";
 import { assertMultiplayerHost, assertRoomCapacity, assertMultiplayerStart, mutateWithRetry } from "./multiplayer-service";
 import { createMultiplayerState, reduceMultiplayer, publicMultiplayer, type MultiplayerCard } from "./multiplayer";
 import { multiplayerPrompts } from "../data/multiplayer-prompts";
@@ -41,6 +41,7 @@ function ensureSchema() {
     await sql`CREATE TABLE IF NOT EXISTS players (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, name text NOT NULL, token text UNIQUE NOT NULL, is_host boolean NOT NULL DEFAULT false, sips integer NOT NULL DEFAULT 0, joined_at timestamptz NOT NULL DEFAULT now())`;
     await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS wager text`;
     await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS user_id text`;
+    await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS locale text NOT NULL DEFAULT 'en'`;
     await sql`CREATE TABLE IF NOT EXISTS deck_cards (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, card_number integer NOT NULL, type text NOT NULL, actor_id text NOT NULL REFERENCES players(id), target_id text NOT NULL REFERENCES players(id), status text NOT NULL DEFAULT 'hidden', payload text NOT NULL DEFAULT '{}', secret text NOT NULL DEFAULT '{}', result text, created_at timestamptz NOT NULL DEFAULT now(), completed_at timestamptz, UNIQUE(room_id, card_number))`;
     await sql`ALTER TABLE deck_cards ADD COLUMN IF NOT EXISTS revealed_by text[] NOT NULL DEFAULT '{}'`;
     await sql`CREATE INDEX IF NOT EXISTS idx_deck_cards_room_status ON deck_cards(room_id, status, card_number)`;
@@ -97,21 +98,25 @@ async function buildDeck(roomId: string, roundCount: number, players: any[], the
   const cards = [];
   const types = makeDeckTypes(roundCount, normalizedCardTypes(cardTypes));
   const themes = normalizedThemes(themeCategory);
-  const questions = shuffle(themes.flatMap((theme) => (locale === "ja" ? ESTIMATE_QUESTIONS_BY_THEME_JA[theme] : ESTIMATE_QUESTIONS_BY_THEME[theme])));
-  const preferences = shuffle(themes.flatMap((theme) => (locale === "ja" ? PREFERENCE_CARDS_BY_THEME_JA[theme] : PREFERENCE_CARDS_BY_THEME[theme])));
+  const questions = shuffle(themes.flatMap((theme) => ESTIMATE_QUESTIONS_BY_THEME[theme].map((en, i) => ({ en, ja: ESTIMATE_QUESTIONS_BY_THEME_JA[theme][i] }))));
+  const preferences = shuffle(themes.flatMap((theme) => PREFERENCE_CARDS_BY_THEME[theme].map((en, i) => ({ en, ja: PREFERENCE_CARDS_BY_THEME_JA[theme][i] }))));
   for (let index = 0; index < roundCount; index += 1) {
     const actor = players[index % 2];
     const target = players[(index + 1) % 2];
     const type = types[index];
-    const payload = type === "estimate" ? { question: questions[index % questions.length], wrongGuesses: [] } : type === "preference" ? preferences[index % preferences.length] : {};
+    const question = questions[index % questions.length];
+    const preference = preferences[index % preferences.length];
+    const payload = type === "estimate" ? { question: question[locale], localized: { en: { question: question.en }, ja: { question: question.ja } }, wrongGuesses: [] } : type === "preference" ? { ...preference[locale], localized: { en: preference.en, ja: preference.ja } } : {};
     cards.push({ id: id(), room_id: roomId, card_number: index + 1, type, actor_id: actor.id, target_id: target.id, payload: JSON.stringify(payload) });
   }
   return cards;
 }
 
-function publicCard(row: any, meId: string, completed = false) {
+function publicCard(row: any, meId: string, completed = false, locale: Locale = "en") {
   if (!row) return null;
   const payload = parse(row.payload);
+  if (payload.localized?.[locale]) Object.assign(payload, payload.localized[locale]);
+  delete payload.localized;
   const card: any = {
     id: row.id, cardNumber: row.cardNumber, type: row.type, status: row.status, completedAt: row.completedAt ?? null,
     actorId: row.actorId, actorName: row.actorName, targetId: row.targetId, targetName: row.targetName,
@@ -138,15 +143,17 @@ async function state(roomCode: string, token: string, currentUser: CurrentUser |
   const meRows = await sql`SELECT id FROM players WHERE room_id = ${room.id} AND token = ${token}`;
   const me: any = meRows[0];
   if (!me) throw new Error("Your session is not valid for this room.");
-  const playerRows = await sql`SELECT id, name, is_host AS "isHost", sips, joined_at AS "joinedAt", wager, user_id AS "userId" FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
-  const group = room.multiplayer && room.group_state ? publicMultiplayer(room.group_state, me.id) : null;
+  if (currentUser?.id) await sql`UPDATE players SET user_id = ${currentUser.id} WHERE id = ${me.id} AND room_id = ${room.id} AND user_id IS NULL`;
+  const playerRows = await sql`SELECT p.id, p.name, p.is_host AS "isHost", p.sips, p.joined_at AS "joinedAt", p.wager, p.user_id AS "userId", p.locale, u.display_name AS "accountName" FROM players p LEFT JOIN users u ON u.id = p.user_id WHERE p.room_id = ${room.id} ORDER BY p.joined_at ASC`;
+  const myLocale = playerRows.find((player: any) => player.id === me.id)?.locale === "ja" ? "ja" : "en";
+  const group = room.multiplayer && room.group_state ? publicMultiplayer(room.group_state, me.id, myLocale) : null;
   if (group && room.status === "abandoned") Object.assign(group, { finished: true, phase: "finished", winners: [], losers: [], winningWager: null, endReason: group.endReason ?? "table_closed" });
-  const players = playerRows.map(({ wager, userId, ...player }: any) => ({ ...player, sips: group?.scores[player.id] ?? player.sips, connected: Boolean(userId), hasWager: Boolean(wager), ...(room.status === "finished" ? { wager: wager ?? null } : {}) }));
+  const players = playerRows.map(({ wager, userId, accountName, locale: _playerLocale, ...player }: any) => ({ ...player, sips: group?.scores[player.id] ?? player.sips, connected: Boolean(userId), accountName: player.id === me.id ? accountName ?? null : undefined, connectedProvider: player.id === me.id && userId ? "Google" : undefined, hasWager: Boolean(wager), ...(room.status === "finished" ? { wager: wager ?? null } : {}) }));
   const cardRows = room.status === "playing" ? await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.card_number = ${room.current_round} LIMIT 1` : [];
   const lastRows = await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.status = 'complete' ORDER BY c.card_number DESC LIMIT 1`;
   return {
-    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, cardTypes: room.multiplayer ? groupCardTypes(room.card_types).join(",") : normalizedCardTypes(room.card_types).join(","), welcomeAck: Array.isArray(room.welcome_ack) ? room.welcome_ack : [], locale: room.locale === "ja" ? "ja" : "en", startedAt: room.started_at, canUseSpicy: hasPremiumAccess(currentUser), canCustomizeDeck: hasPremiumAccess(currentUser), multiplayer: Boolean(room.multiplayer), maxPlayers: room.multiplayer ? 6 : 2, canHostMultiplayer: Boolean(hasPremiumAccess(currentUser) && playerRows.some((p: any) => p.id === me.id && p.isHost && p.userId === currentUser?.id)) },
-    players, group, activeCard: room.multiplayer ? null : publicCard(cardRows[0], me.id), lastCard: room.multiplayer ? null : publicCard(lastRows[0], me.id, true), meId: me.id,
+    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, cardTypes: room.multiplayer ? groupCardTypes(room.card_types).join(",") : normalizedCardTypes(room.card_types).join(","), welcomeAck: Array.isArray(room.welcome_ack) ? room.welcome_ack : [], locale: myLocale, startedAt: room.started_at, canUseSpicy: hasPremiumAccess(currentUser), canCustomizeDeck: hasPremiumAccess(currentUser), multiplayer: Boolean(room.multiplayer), maxPlayers: room.multiplayer ? 6 : 2, canHostMultiplayer: Boolean(hasPremiumAccess(currentUser) && playerRows.some((p: any) => p.id === me.id && p.isHost && p.userId === currentUser?.id)) },
+    players, group, activeCard: room.multiplayer ? null : publicCard(cardRows[0], me.id, false, myLocale), lastCard: room.multiplayer ? null : publicCard(lastRows[0], me.id, true, myLocale), meId: me.id,
   };
 }
 
@@ -176,12 +183,11 @@ function groupCardTypes(value?: string | null) {
 
 function groupDeck(room: any): MultiplayerCard[] {
   const themes = normalizedThemes(room.theme_category);
-  const ja = room.locale === "ja";
-  const preferences = shuffle(themes.flatMap(t => (ja ? PREFERENCE_CARDS_BY_THEME_JA[t] : PREFERENCE_CARDS_BY_THEME[t])));
-  const estimates = shuffle(themes.flatMap(t => (ja ? ESTIMATE_QUESTIONS_BY_THEME_JA[t] : ESTIMATE_QUESTIONS_BY_THEME[t])));
-  const prompts = multiplayerPrompts(ja ? "ja" : "en", themes);
-  const who = shuffle(prompts.who);
-  const surprise = prompts.surprise;
+  const preferences = shuffle(themes.flatMap(t => PREFERENCE_CARDS_BY_THEME[t].map((en, i) => ({ en, ja: PREFERENCE_CARDS_BY_THEME_JA[t][i] }))));
+  const estimates = shuffle(themes.flatMap(t => ESTIMATE_QUESTIONS_BY_THEME[t].map((en, i) => ({ en, ja: ESTIMATE_QUESTIONS_BY_THEME_JA[t][i] }))));
+  const promptsEn = multiplayerPrompts("en", themes); const promptsJa = multiplayerPrompts("ja", themes);
+  const who = shuffle(promptsEn.who.map((en, i) => ({ en, ja: promptsJa.who[i] })));
+  const surprise = promptsEn.surprise.map((en, i) => ({ en, ja: promptsJa.surprise[i] }));
   const cards: MultiplayerCard[] = [];
   let challenges = 0;
   const challengeTypes = shuffle<NonNullable<MultiplayerCard["challenge"]>>(["coin", "staring", "rps", "surprise"]);
@@ -190,12 +196,12 @@ function groupDeck(room: any): MultiplayerCard[] {
       if (cards.length >= Number(room.round_count)) break;
       const index = cards.length;
       const card: MultiplayerCard = { id: id(), type };
-      if (type === "preference") Object.assign(card, { prompt: preferences[index % preferences.length].question, options: preferences[index % preferences.length].options });
-      if (type === "estimate") card.prompt = estimates[index % estimates.length];
-      if (type === "who") card.prompt = who[index % who.length];
+      if (type === "preference") { const item = preferences[index % preferences.length]; Object.assign(card, { promptEn: item.en.question, optionsEn: item.en.options, promptJa: item.ja.question, optionsJa: item.ja.options }); }
+      if (type === "estimate") { const item = estimates[index % estimates.length]; Object.assign(card, { promptEn: item.en, promptJa: item.ja }); }
+      if (type === "who") { const item = who[index % who.length]; Object.assign(card, { promptEn: item.en, promptJa: item.ja }); }
       if (type === "challenge") {
         card.challenge = challengeTypes[challenges++ % 4];
-        if (card.challenge === "surprise") card.prompt = surprise[Math.floor(Math.random() * surprise.length)];
+        if (card.challenge === "surprise") { const item = surprise[Math.floor(Math.random() * surprise.length)]; Object.assign(card, { promptEn: item.en, promptJa: item.ja }); }
       }
       cards.push(card);
     }
@@ -280,6 +286,7 @@ async function groupMutation(roomCode: string, token: string, body: Body, user: 
 export default async function handler(req: any, res: any) {
   try {
     await ensureSchema();
+    await ensureIdentitySchema();
     const currentUser = await getCurrentUser(new Request("https://honto.local", { headers: req.headers as HeadersInit }));
     const body = (req.body ?? {}) as Body;
     const query = req.query ?? {};
@@ -295,7 +302,7 @@ export default async function handler(req: any, res: any) {
       const roomId = id(); const token = id();
       const locale = body.locale === "ja" ? "ja" : "en";
       await sql`INSERT INTO rooms (id, code, round_count, locale) VALUES (${roomId}, ${roomCode}, 12, ${locale})`;
-      await sql`INSERT INTO players (id, room_id, name, token, is_host, user_id) VALUES (${id()}, ${roomId}, ${name}, ${token}, true, ${currentUser?.id ?? null})`;
+      await sql`INSERT INTO players (id, room_id, name, token, is_host, user_id, locale) VALUES (${id()}, ${roomId}, ${name}, ${token}, true, ${currentUser?.id ?? null}, ${locale})`;
       return json(res, { code: roomCode, token }, 201);
     }
     const roomCode = String(body.code ?? "").trim().toUpperCase();
@@ -314,8 +321,8 @@ export default async function handler(req: any, res: any) {
       }, async (room: any) => {
         const inserted = await sql`WITH claimed AS (
           UPDATE rooms SET revision = revision + 1, updated_at = now() WHERE id = ${room.id} AND revision = ${room.revision} AND status = 'lobby' RETURNING id
-        ) INSERT INTO players (id, room_id, name, token, user_id)
-          SELECT ${playerId}, id, ${name}, ${token}, ${currentUser?.id ?? null} FROM claimed RETURNING id`;
+        ) INSERT INTO players (id, room_id, name, token, user_id, locale)
+          SELECT ${playerId}, id, ${name}, ${token}, ${currentUser?.id ?? null}, ${body.locale === "ja" ? "ja" : "en"} FROM claimed RETURNING id`;
         return inserted.length > 0;
       });
       return json(res, { code: roomCode, token }, 201);
@@ -323,6 +330,11 @@ export default async function handler(req: any, res: any) {
 
     const token = String(body.token ?? "");
     const { room, me, card } = await getContext(roomCode, token);
+    if (body.action === "setLocale") {
+      const locale = body.locale === "ja" ? "ja" : "en";
+      await sql`UPDATE players SET locale = ${locale} WHERE id = ${me.id} AND room_id = ${room.id}`;
+      return json(res, await state(roomCode, token, currentUser));
+    }
     if (room.multiplayer && ["leave", "removePlayer", "newTable", "start", "multiplayer", "submitWager", "ackWelcome"].includes(String(body.action))) {
       await groupMutation(roomCode, token, body, currentUser);
       if (body.action === "leave" || (body.action === "removePlayer" && body.playerId === me.id)) return json(res, { left: true });

@@ -221,3 +221,11 @@ test('actions issued before author departure cannot resurrect canceled card',()=
   for(const id of ['p1','p2','p3']) s=act(s,id,'next');
   assert.throws(()=>reduceMultiplayer(s,'p1',stale));
 });
+
+test('the same multiplayer card is localized independently for each viewer',()=>{
+  let state=createMultiplayerState({players:players(3),cards:[{id:'localized',type:'who',promptEn:'Who is ready?',promptJa:'準備ができたのは誰？'}]});
+  state=act(state,'p0','draw');
+  assert.equal(publicMultiplayer(state,'p0','en').card.prompt,'Who is ready?');
+  assert.equal(publicMultiplayer(state,'p1','ja').card.prompt,'準備ができたのは誰？');
+  assert.equal('promptJa' in publicMultiplayer(state,'p0','en').card,false);
+});

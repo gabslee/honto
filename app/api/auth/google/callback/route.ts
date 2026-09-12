@@ -1,4 +1,5 @@
 import { ensureIdentitySchema, createUserSession, userCookie, database } from "../../../../server-auth";
+import { googleReturnWithAuth } from "../../../../google-return.js";
 
 export const dynamic = "force-dynamic";
 
@@ -11,11 +12,15 @@ function redirect(request: Request, path: string, cookies: string | string[] = [
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const stateCookie = request.headers.get("cookie")?.split(";").map((part) => part.trim()).find((part) => part.startsWith("honto_google_state="))?.slice("honto_google_state=".length) ?? "";
+  const returnCookie = request.headers.get("cookie")?.split(";").map((part) => part.trim()).find((part) => part.startsWith("honto_google_return="))?.slice("honto_google_return=".length) ?? "";
   const clearState = "honto_google_state=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0";
-  if (!url.searchParams.get("code") || !stateCookie || stateCookie !== url.searchParams.get("state")) return redirect(request, "/?auth=invalid_state", clearState);
+  const clearReturn = "honto_google_return=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0";
+  const decodedReturn = (() => { try { return decodeURIComponent(returnCookie); } catch { return "/"; } })();
+  const withAuth = (result: string) => googleReturnWithAuth(decodedReturn, result);
+  if (!url.searchParams.get("code") || !stateCookie || stateCookie !== url.searchParams.get("state")) return redirect(request, withAuth("invalid_state"), [clearState, clearReturn]);
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return redirect(request, "/?auth=missing_config", clearState);
+  if (!clientId || !clientSecret) return redirect(request, withAuth("missing_config"), [clearState, clearReturn]);
   try {
     const origin = url.origin;
     const redirectUri = process.env.GOOGLE_REDIRECT_URI ?? `${origin}/api/auth/callback/google`;
@@ -36,9 +41,9 @@ export async function GET(request: Request) {
     const userId = String(users[0].id);
     await sql`INSERT INTO auth_accounts (id, user_id, provider, provider_account_id) VALUES (${crypto.randomUUID()}, ${userId}, 'google', ${profile.sub}) ON CONFLICT (provider, provider_account_id) DO UPDATE SET user_id = EXCLUDED.user_id`;
     const session = await createUserSession(userId);
-    return redirect(request, "/?auth=success", [userCookie(session), clearState]);
+    return redirect(request, withAuth("success"), [userCookie(session), clearState, clearReturn]);
   } catch (error) {
     console.error("[auth/google] callback failed", error);
-    return redirect(request, "/?auth=error", clearState);
+    return redirect(request, withAuth("error"), [clearState, clearReturn]);
   }
 }

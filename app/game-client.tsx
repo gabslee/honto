@@ -10,7 +10,7 @@ import { MultiplayerGame } from "./multiplayer-client";
 import type { publicMultiplayer } from "../api/multiplayer";
 
 type ThemeKey = "general" | "life" | "relationships" | "spicy";
-type Player = { id: string; name: string; isHost: number; sips: number; joinedAt: string; connected?: boolean; hasWager: boolean; wager?: string | null };
+type Player = { id: string; name: string; isHost: number; sips: number; joinedAt: string; connected?: boolean; accountName?: string | null; connectedProvider?: string; hasWager: boolean; wager?: string | null };
 type Card = {
   id: string; cardNumber: number; type: "hidden" | "honto" | "question" | "wouldrather" | "preference" | "estimate" | "rps" | "both"; completedAt?: string | null;
   status: "hidden" | "ready" | "guess" | "choose" | "complete";
@@ -273,7 +273,7 @@ export default function GameClient() {
   const host = game.players.find((player) => player.id === game.meId)?.isHost;
   const reveal = game.room.status !== "abandoned" && game.lastCard && game.lastCard.id !== dismissedReveal ? game.lastCard : null;
   const copyInvite = async () => { await navigator.clipboard.writeText(`${location.origin}${location.pathname}?room=${game.room.code}`); setCopied(true); window.setTimeout(() => setCopied(false), 1600); };
-  const changeLocale = (next: Locale) => { setLocale(next); };
+  const changeLocale = (next: Locale) => { setLocale(next); void act("setLocale", { locale: next }); };
 
   return <LocaleContext.Provider value={{ locale, setLocale, roomCode: session.code, sessionToken: session.token }}><main className="app-shell">
     <header className={`topbar ${headerHidden ? "topbar-hidden" : ""}`}><button className="brand" onClick={leave}><span>HONTO?</span><b>!</b></button><div className="room-pill"><strong>{game.room.code}</strong></div><div className="session-tools"><LanguageMenu onChange={changeLocale}/><button className="tiny-button" onClick={leave}>{locale === "ja" ? "退出" : "EXIT"}</button></div></header>
@@ -341,11 +341,23 @@ function Lobby(props: { game: GameState; host: boolean; busy: boolean; copied: b
     void fetch("/api/auth/me", { cache: "no-store" }).then((response) => response.json()).then((data) => {
       if (cancelled || data.user || root.querySelector(".lobby-google-button")) return;
     const link = document.createElement("a"); link.href = "/api/auth/google/start"; link.className = "lobby-auth-button lobby-google-button"; link.setAttribute("aria-label", "Sign in with Google"); link.innerHTML = '<svg class="google-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.35 12.27c0-.72-.06-1.42-.18-2.09H12v3.96h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.7 2.91-4.2 2.91-7.26Z"/><path fill="#34A853" d="M12 21.7c2.63 0 4.84-.87 6.45-2.37l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.7-1.72-5.47-4.03H3.29v2.53A9.74 9.74 0 0 0 12 21.7Z"/><path fill="#FBBC05" d="M6.53 13.77A5.85 5.85 0 0 1 6.22 12c0-.62.11-1.22.31-1.77V7.7H3.29A9.74 9.74 0 0 0 2.25 12c0 1.57.38 3.05 1.04 4.3l3.24-2.53Z"/><path fill="#EA4335" d="M12 6.2c1.43 0 2.72.49 3.73 1.45l2.8-2.8C16.84 3.25 14.63 2.3 12 2.3a9.74 9.74 0 0 0-8.71 5.4l3.24 2.53C7.3 7.92 9.46 6.2 12 6.2Z"/></svg>';
+    link.href = `/api/auth/google/start?return_to=${encodeURIComponent(`${location.pathname}?room=${game.room.code}`)}`;
     const apple = document.createElement("button"); apple.type = "button"; apple.disabled = true; apple.className = "lobby-auth-button lobby-apple-button"; apple.setAttribute("aria-label", "Sign in with Apple — coming soon"); apple.innerHTML = '<svg class="apple-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.665 13.544c-.028-3.169 2.584-4.703 2.704-4.775-1.474-2.155-3.765-2.45-4.573-2.48-1.938-.203-3.817 1.159-4.785 1.159-.985 0-2.513-1.14-4.14-1.105-2.096.032-4.056 1.245-5.145 3.128-2.244 3.892-.57 9.62 1.605 12.773 1.086 1.545 2.356 3.264 4.04 3.202 1.617-.067 2.226-1.027 4.179-1.027 1.896 0 2.488 1.027 4.173.988 1.733-.028 2.833-1.542 3.881-3.102 1.256-1.772 1.761-3.517 1.781-3.607-.041-.013-3.689-1.41-3.72-5.154ZM16.493 4.306c.86-1.043 1.447-2.474 1.282-3.906-1.24.049-2.735.828-3.631 1.856-.791.909-1.48 2.36-1.304 3.737 1.391.106 2.81-.707 3.653-1.687Z" transform="translate(-1 -1) scale(.92)"/></svg>';
     auth = document.createElement("div"); auth.className = "lobby-auth-buttons"; auth.append(link, apple); root.appendChild(auth);
     }).catch(() => undefined);
     return () => { cancelled = true; auth?.remove(); };
   }, []);
+  useEffect(() => {
+    const me = game.players.find((player) => player.id === game.meId);
+    const index = game.players.findIndex((player) => player.id === game.meId);
+    const details = document.querySelectorAll<HTMLElement>(".lobby-composite .people-list .person > div")[index];
+    if (!me?.connectedProvider || !details) return;
+    const badge = document.createElement("small");
+    badge.className = "connected-account-badge";
+    badge.textContent = `${me.connectedProvider}${me.accountName ? ` · ${me.accountName}` : ""}`;
+    details.appendChild(badge);
+    return () => badge.remove();
+  }, [game.meId, game.players]);
   const toggle = (key: string) => { if (!canCustomizeDeck) return; const next = selected.includes(key) ? selected.filter((item) => item !== key) : [...selected, key]; if (next.length < 3) return; setSelected(next); void props.act("configure", { cardTypes: next.join(",") }); };
   return <div className="lobby-composite"><LegacyLobby {...props}/><section className="panel multiplayer-mode-panel" aria-labelledby="multiplayer-mode-title"><div className="multiplayer-mode-heading"><div><h2 id="multiplayer-mode-title">{ja ? "マルチプレイヤー" : "Multiplayer"}</h2><small>PREMIUM · {ja ? "3〜6人" : "3–6 PLAYERS"}</small></div><button type="button" role="switch" aria-checked={multiplayer} aria-label={ja ? "マルチプレイヤーを有効にする" : "Enable multiplayer"} disabled={!access.canToggle} className="multiplayer-mode-switch" onClick={() => void props.act("configure", { multiplayer: !multiplayer })}><span aria-hidden="true">{!game.room.canHostMultiplayer && !multiplayer ? "🔒" : multiplayer ? "✓" : ""}</span></button></div><p>{multiplayer ? (ja ? "ホストがPremiumなら、ゲストは無料で参加できます。最低3人で開始できます。" : "Your guests join for free. Start when at least 3 players are ready.") : (ja ? "Premiumホストなら、最大6人のテーブルを開けます。" : "A Premium host can open the table to up to 6 players.")}</p>{multiplayer && game.players.length > 2 && props.host && <small>{ja ? "2人モードに戻すには、参加者を2人以下にしてください。" : "To return to two-player mode, first reduce the table to two players."}</small>}{props.host && !game.room.canHostMultiplayer && <a href="/pricing">{ja ? "Premiumを見る →" : "EXPLORE PREMIUM →"}</a>}</section><section className="lobby deck-filter-lobby"><div className="panel deck-filter-panel"><button type="button" className="deck-filter-toggle" aria-expanded={deckOpen} onClick={() => setDeckOpen((value) => !value)}><span>{ja ? "デッキをカスタマイズしますか？" : "Want to personalize your deck?"}</span><b>{deckOpen ? "−" : "+"}</b></button>{deckOpen && <div className="deck-filter-content"><div className="panel-title"><h2>{ja ? "カードの種類" : "Card types"}</h2><span className="sticker">{canCustomizeDeck ? "PREMIUM" : (ja ? "ロック中" : "PREMIUM")}</span></div><p className="setting-hint">{canCustomizeDeck ? (ja ? "使いたいカードだけを選べます。順番はシャッフルされます。" : "Choose the games you want. The order stays shuffled.") : (ja ? "Premiumで遊ぶカードを選べます。" : "Choose which games to play with Premium.")}</p><div className="subject-checks card-type-checks">{deckKeys.map((key) => <label className={`subject-check card-type-check ${selected.includes(key) ? "selected" : ""} ${!canCustomizeDeck ? "locked" : ""}`} key={key}><input type="checkbox" checked={selected.includes(key)} disabled={props.busy || !props.host || !canCustomizeDeck || (selected.length <= 3 && selected.includes(key))} onChange={() => toggle(key)}/><span>{deckLabel(key)}</span></label>)}</div><small className="deck-filter-note">{ja ? "最低3種類。枚数と順番は自動で決まります。" : "Choose at least 3 types. Counts and order stay automatic."}</small></div>}</div></section></div>;
 }

@@ -443,7 +443,10 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 @media(max-width:700px) { .account-page nav { align-items:flex-start; padding:18px 0; }.account-page nav>div { flex-direction:column; align-items:flex-end; gap:8px; }.account-grid { grid-template-columns:1fr; }.account-hero,.history-head { padding-top:45px; }.history-card { align-items:flex-start; flex-direction:column; }.history-score>div { grid-template-columns:42px 1fr; }.history-score span { grid-column:2; } }
 .lobby-auth-button:hover:not(:disabled) { transform:translate(1px,1px); box-shadow:2px 2px 0 var(--ink); }
 .lobby-apple-button { background:#050b17; color:#fff; border-color:#050b17; box-shadow:3px 3px 0 #fff; opacity:1; }
+.lobby-apple-button:disabled { opacity:1; }
+.lobby-apple-button:disabled .apple-mark { opacity:.55; }
 .lobby-apple-button::after { content:"SOON"; position:absolute; top:-9px; right:-9px; padding:3px 4px; border:1.5px solid var(--ink); border-radius:4px; background:var(--yellow); color:var(--ink); font-size:6px; font-weight:1000; letter-spacing:.08em; transform:rotate(7deg); }
+.connected-account-badge { width:max-content; margin-top:3px; padding:2px 5px; border:1px solid currentColor; border-radius:99px; color:#3568c9; font-size:7px!important; font-weight:900; letter-spacing:.04em; text-transform:none; }
 .deck-filter-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; border:0; background:transparent; padding:0; color:var(--ink); text-align:left; font-size:19px; font-weight:1000; line-height:1.2; cursor:pointer; }
 .deck-filter-toggle b { display:grid; place-items:center; width:24px; height:24px; border:2px solid var(--ink); border-radius:50%; background:var(--yellow); font:1000 18px/1 Arial,sans-serif; }
 .deck-filter-toggle:hover { color:var(--ink); }

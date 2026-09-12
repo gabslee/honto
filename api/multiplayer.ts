@@ -1,6 +1,6 @@
 /** Authoritative, immutable multiplayer transitions. Never send the private state to clients. */
 export type MultiplayerCardType = 'honto' | 'preference' | 'estimate' | 'wouldrather' | 'who' | 'challenge' | 'both';
-export type MultiplayerCard = { id: string; type: MultiplayerCardType; prompt?: string; options?: string[]; answer?: number; challenge?: 'coin' | 'staring' | 'rps' | 'surprise' };
+export type MultiplayerCard = { id: string; type: MultiplayerCardType; prompt?: string; options?: string[]; promptEn?: string; promptJa?: string; optionsEn?: string[]; optionsJa?: string[]; answer?: number; challenge?: 'coin' | 'staring' | 'rps' | 'surprise' };
 export type MultiplayerPlayer = { id: string; name: string };
 export type MultiplayerWheel = { id: string; playerIds: string[]; values: number[]; value: number | null; spunAt: number | null };
 export type MultiplayerAction = { type: string; cardId?: string; round?: number; prompt?: string; options?: string[]; answer?: number; value?: string | number | boolean; playerId?: string; wheelId?: string };
@@ -183,11 +183,16 @@ export function reduceMultiplayer(state: MultiplayerState, actorId: string, acti
   } else throw new Error('Unknown multiplayer action');
   return s;
 }
-export function publicMultiplayer(state: MultiplayerState, viewerId: string) {
+export function publicMultiplayer(state: MultiplayerState, viewerId: string, locale: 'en' | 'ja' = 'en') {
   requireRule(state.players.some(p => p.id === viewerId), 'Player is not in this match');
   const { cards, wagers, turnOrder, card: privateCard, ...visible } = structuredClone(state);
   void cards; void turnOrder;
   const card: Omit<MultiplayerCard, 'type'> & { type: MultiplayerCardType | 'hidden' } = state.phase === 'draw' ? { id: privateCard.id, type: 'hidden' } : privateCard;
+  if (card.type !== 'hidden') {
+    card.prompt = locale === 'ja' ? card.promptJa ?? card.prompt : card.promptEn ?? card.prompt;
+    card.options = locale === 'ja' ? card.optionsJa ?? card.options : card.optionsEn ?? card.options;
+    delete card.promptEn; delete card.promptJa; delete card.optionsEn; delete card.optionsJa;
+  }
   const reveal = state.phase === 'result' || state.finished;
   if (!reveal && viewerId !== state.authorId) delete card.answer;
   if (!reveal) {

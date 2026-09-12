@@ -26,6 +26,8 @@ test('multiplayer API PostgreSQL lifecycle, authorization and concurrent joins',
   process.env.DATABASE_URL = 'postgres://isolated-test';
   try {
     const { default: handler } = await import('../api/game.ts');
+    await db.query('CREATE TABLE users (id text PRIMARY KEY, display_name text)');
+    await db.query("INSERT INTO users (id, display_name) VALUES ('premium-owner', 'Premium Host'), ('premium-intruder', 'Intruder'), ('premium-duo', 'Duo Host'), ('premium-late', 'Reconnected Host')");
     async function api(body, user = null, method = 'POST') {
       let status; let result;
       const req = { method, body, query: body, headers: user ? { 'x-test-user': user } : {} };
@@ -39,13 +41,22 @@ test('multiplayer API PostgreSQL lifecycle, authorization and concurrent joins',
     assert.equal((await send('configure', { multiplayer: true }, 'premium-intruder')).status, 400);
     assert.equal((await send('configure', { multiplayer: true })).room.multiplayer, true);
     assert.equal((await send('start')).status, 400);
-    const joins = await Promise.all(Array.from({ length: 8 }, (_, i) => api({ action: 'join', code: host.code, name: `Guest ${i}` })));
+    const joins = await Promise.all(Array.from({ length: 8 }, (_, i) => api({ action: 'join', code: host.code, name: `Guest ${i}`, locale: i === 0 ? 'ja' : 'en' })));
     const guests = joins.filter(r => r.status === 201);
     assert.equal(guests.length, 5, JSON.stringify(joins));
     assert.equal((await send('configure', { multiplayer: false })).status, 400);
     const state = await api(host, 'premium-owner', 'GET');
     assert.equal(state.players.length, 6);
     assert.equal(state.room.canHostMultiplayer, true);
+    assert.equal(state.room.locale, 'en');
+    assert.equal(state.players.find(p => p.id === state.meId).connectedProvider, 'Google');
+    assert.equal(state.players.find(p => p.id === state.meId).accountName, 'Premium Host');
+    const japaneseGuest = await api(guests[0], null, 'GET');
+    assert.equal(japaneseGuest.room.locale, 'ja');
+    await api({ ...host, action: 'setLocale', locale: 'ja' }, 'premium-owner');
+    await api({ ...guests[0], action: 'setLocale', locale: 'en' });
+    assert.equal((await api(host, 'premium-owner', 'GET')).room.locale, 'ja');
+    assert.equal((await api(guests[0], null, 'GET')).room.locale, 'en');
     assert.equal(JSON.stringify(state).includes(host.token), false);
     assert.equal(JSON.stringify(state).includes('premium-owner'), false);
     const started = await send('start');
@@ -170,6 +181,12 @@ test('multiplayer API PostgreSQL lifecycle, authorization and concurrent joins',
     assert.equal(duoAfter.activeCard.type, 'hidden');
     assert.equal(duoAfter.room.currentRound, 2);
     assert.equal(duoGuestState.room.multiplayer, false);
+
+    const anonymousHost = await api({ action: 'create', name: 'Reconnect me' });
+    const rebound = await api(anonymousHost, 'premium-late', 'GET');
+    assert.equal(rebound.players.find(p => p.id === rebound.meId).connected, true);
+    assert.equal(rebound.players.find(p => p.id === rebound.meId).accountName, 'Reconnected Host');
+    assert.equal((await api({ ...anonymousHost, action: 'configure', multiplayer: true }, 'premium-late')).room.multiplayer, true, 'login binds the existing host token to the Premium account');
   } finally {
     hooks.deregister();
     if (oldUrl === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = oldUrl;
