@@ -6,6 +6,7 @@ import { getCurrentUser, hasPremiumAccess, type CurrentUser } from "../app/serve
 import { assertMultiplayerHost, assertRoomCapacity, assertMultiplayerStart, mutateWithRetry } from "./multiplayer-service";
 import { createMultiplayerState, reduceMultiplayer, publicMultiplayer, type MultiplayerCard } from "./multiplayer";
 import { multiplayerPrompts } from "../data/multiplayer-prompts";
+import { archiveFinishedMatch } from "../app/match-history";
 
 type CardType = "honto" | "question" | "wouldrather" | "preference" | "estimate" | "rps" | "both";
 type Locale = "en" | "ja";
@@ -164,6 +165,7 @@ async function finishCard(room: any) {
   const next = Number(room.current_round) + 1;
   const finished = next > Number(room.round_count);
   await sql`UPDATE rooms SET current_round = ${finished ? room.current_round : next}, status = ${finished ? "finished" : "playing"}, updated_at = now() WHERE id = ${room.id}`;
+  if (finished) await archiveFinishedMatch(room.id);
 }
 
 const GROUP_TYPES = ["honto", "wouldrather", "preference", "estimate", "who", "challenge", "both"] as const;
@@ -324,7 +326,9 @@ export default async function handler(req: any, res: any) {
     if (room.multiplayer && ["leave", "removePlayer", "newTable", "start", "multiplayer", "submitWager", "ackWelcome"].includes(String(body.action))) {
       await groupMutation(roomCode, token, body, currentUser);
       if (body.action === "leave" || (body.action === "removePlayer" && body.playerId === me.id)) return json(res, { left: true });
-      return json(res, await state(roomCode, token, currentUser));
+      const nextState = await state(roomCode, token, currentUser);
+      if (nextState?.room.status === "finished") await archiveFinishedMatch(room.id);
+      return json(res, nextState);
     }
     if (body.action === "multiplayer" || body.action === "removePlayer") throw new Error("This action requires a multiplayer room.");
     if (body.action === "leave") {

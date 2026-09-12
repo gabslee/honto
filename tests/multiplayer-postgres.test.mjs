@@ -14,7 +14,7 @@ test('multiplayer API PostgreSQL lifecycle, authorization and concurrent joins',
   const hooks = module.registerHooks({
     resolve(specifier, context, next) {
       if (specifier === '@neondatabase/serverless') return { url: 'data:text/javascript,export const neon=()=>globalThis.__hontoTestSql', shortCircuit: true };
-      if (specifier.endsWith('/server-auth')) return { url: 'data:text/javascript,export async function getCurrentUser(r){const id=r.headers.get("x-test-user");return id?{id,plan:id.startsWith("premium")?"premium":"free"}:null}export function hasPremiumAccess(u){return u?.plan==="premium"}', shortCircuit: true };
+      if (specifier.endsWith('/server-auth')) return { url: 'data:text/javascript,export async function getCurrentUser(r){const id=r.headers.get("x-test-user");return id?{id,plan:id.startsWith("premium")?"premium":"free"}:null}export function hasPremiumAccess(u){return u?.plan==="premium"}export function database(){return globalThis.__hontoTestSql}export async function ensureIdentitySchema(){}', shortCircuit: true };
       if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier)) {
         const ext = /(?:game-contract|multiplayer-service)$/.test(specifier) ? '.js' : '.ts';
         return next(new URL(specifier + ext, context.parentURL).href, context);

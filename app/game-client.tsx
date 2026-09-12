@@ -72,6 +72,15 @@ function AccountControl() {
     if (!icon) return;
     icon.innerHTML = '<path fill="currentColor" d="M19.665 13.544c-.028-3.169 2.584-4.703 2.704-4.775-1.474-2.155-3.765-2.45-4.573-2.48-1.938-.203-3.817 1.159-4.785 1.159-.985 0-2.513-1.14-4.14-1.105-2.096.032-4.056 1.245-5.145 3.128-2.244 3.892-.57 9.62 1.605 12.773 1.086 1.545 2.356 3.264 4.04 3.202 1.617-.067 2.226-1.027 4.179-1.027 1.896 0 2.488 1.027 4.173.988 1.733-.028 2.833-1.542 3.881-3.102 1.256-1.772 1.761-3.517 1.781-3.607-.041-.013-3.689-1.41-3.72-5.154ZM16.493 4.306c.86-1.043 1.447-2.474 1.282-3.906-1.24.049-2.735.828-3.631 1.856-.791.909-1.48 2.36-1.304 3.737 1.391.106 2.81-.707 3.653-1.687Z" transform="translate(-1 -1) scale(.92)"/>';
   }, [mount]);
+  useEffect(() => {
+    const identity = mount?.querySelector<HTMLElement>(".account-identity");
+    if (!identity || !user) return;
+    identity.tabIndex = 0; identity.setAttribute("role", "link"); identity.setAttribute("aria-label", "Open my Honto account");
+    const openAccount = (event: Event) => { if (!(event.target as Element).closest("button")) window.location.href = "/account"; };
+    const onKey = (event: Event) => { if ((event as KeyboardEvent).key === "Enter") window.location.href = "/account"; };
+    identity.addEventListener("click", openAccount); identity.addEventListener("keydown", onKey);
+    return () => { identity.removeEventListener("click", openAccount); identity.removeEventListener("keydown", onKey); };
+  }, [mount, user]);
   if (!mount) return null;
   const openCheckout = async (interval: "month" | "year") => { const response = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ interval }) }); const data = await response.json(); if (data.url) window.location.href = data.url; };
   const openPortal = async () => {
