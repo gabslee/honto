@@ -50,9 +50,14 @@ test('multiplayer API PostgreSQL lifecycle, authorization and concurrent joins',
     assert.equal(state.room.canHostMultiplayer, true);
     assert.equal(state.room.locale, 'en');
     assert.equal(state.players.find(p => p.id === state.meId).connectedProvider, 'Google');
+    assert.equal(state.players.find(p => p.id === state.meId).accountConnected, true);
     assert.equal(state.players.find(p => p.id === state.meId).accountName, 'Premium Host');
     const japaneseGuest = await api(guests[0], null, 'GET');
     assert.equal(japaneseGuest.room.locale, 'ja');
+    await db.query("UPDATE players SET last_seen_at = now() - interval '1 minute' WHERE id = $1", [japaneseGuest.meId]);
+    const presenceView = await api(host, 'premium-owner', 'GET');
+    assert.equal(presenceView.players.find(p => p.id === japaneseGuest.meId).connected, false);
+    assert.equal((await api(guests[0], null, 'GET')).players.find(p => p.id === japaneseGuest.meId).connected, true, 'a returning device becomes present immediately');
     await api({ ...host, action: 'setLocale', locale: 'ja' }, 'premium-owner');
     await api({ ...guests[0], action: 'setLocale', locale: 'en' });
     assert.equal((await api(host, 'premium-owner', 'GET')).room.locale, 'ja');
@@ -68,7 +73,9 @@ test('multiplayer API PostgreSQL lifecycle, authorization and concurrent joins',
     const sessions = [host, ...guests];
     for (const session of sessions) assert.equal((await api({ ...session, action: 'submitWager', wager: 'Tell a joke' })).status, 200);
     for (const session of sessions) assert.equal((await api({ ...session, action: 'ackWelcome' })).status, 200);
-    assert.equal((await send('multiplayer', { groupAction })).status, 200);
+    const drawRequestId = 'request-draw-card-0001';
+    assert.equal((await send('multiplayer', { groupAction, requestId: drawRequestId })).status, 200);
+    assert.equal((await send('multiplayer', { groupAction, requestId: drawRequestId })).status, 200, 'the same native action can be retried safely');
     assert.equal((await send('multiplayer', { groupAction })).status, 400, 'cannot draw twice');
     // Play the actual randomly dealt card through the API and PostgreSQL.
     // This exercises JSON persistence, scoring, wheel ownership and collective advance.
@@ -83,7 +90,7 @@ test('multiplayer API PostgreSQL lifecycle, authorization and concurrent joins',
     const author = live.group.authorId;
     if (live.group.phase === 'prepare') {
       const type = live.group.card.type;
-      await move(author, 'prepare', type === 'estimate' ? { answer: 42 } : type === 'preference' ? { answer: 1 } : { prompt: 'Choose the truth', options: type === 'wouldrather' ? ['A', 'B'] : ['A', 'B', 'C'], answer: 1 });
+      await move(author, 'prepare', type === 'estimate' ? { prompt: live.group.card.prompt, answer: 42 } : type === 'preference' ? { prompt: live.group.card.prompt, options: live.group.card.options, answer: 1 } : { prompt: 'Choose the truth', options: type === 'wouldrather' ? ['A', 'B'] : ['A', 'B', 'C'], answer: 1 });
     }
     if (live.group.phase === 'opponent') await move(author, 'chooseOpponent', { playerId: live.players.find(p => p.id !== author).id });
     if (live.group.phase === 'duel') {
@@ -185,6 +192,7 @@ test('multiplayer API PostgreSQL lifecycle, authorization and concurrent joins',
     const anonymousHost = await api({ action: 'create', name: 'Reconnect me' });
     const rebound = await api(anonymousHost, 'premium-late', 'GET');
     assert.equal(rebound.players.find(p => p.id === rebound.meId).connected, true);
+    assert.equal(rebound.players.find(p => p.id === rebound.meId).accountConnected, true);
     assert.equal(rebound.players.find(p => p.id === rebound.meId).accountName, 'Reconnected Host');
     assert.equal((await api({ ...anonymousHost, action: 'configure', multiplayer: true }, 'premium-late')).room.multiplayer, true, 'login binds the existing host token to the Premium account');
   } finally {

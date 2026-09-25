@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { ESTIMATE_QUESTIONS_BY_THEME, PREFERENCE_CARDS_BY_THEME, type CuratedTheme } from "../data/curated";
 import { ESTIMATE_QUESTIONS_BY_THEME_JA, PREFERENCE_CARDS_BY_THEME_JA } from "../data/curated-ja";
-import { makeRoomCode, normalizeRoomSettings } from "./game-contract";
+import { makeRoomCode, normalizeRoomSettings, replaceEstimateQuestion } from "./game-contract";
 import { ensureIdentitySchema, getCurrentUser, hasPremiumAccess, type CurrentUser } from "../app/server-auth";
 import { assertMultiplayerHost, assertRoomCapacity, assertMultiplayerStart, mutateWithRetry } from "./multiplayer-service";
 import { createMultiplayerState, reduceMultiplayer, publicMultiplayer, type MultiplayerCard } from "./multiplayer";
@@ -16,12 +16,13 @@ type Body = {
   themeCategory?: string; customTheme?: string | null; prompt?: string; statements?: string[];
   truthIndex?: number; guessedIndex?: number; question?: string; sips?: number;
   choice?: "answer" | "skip"; preferenceIndex?: number; correctNumber?: number; estimate?: number; rpsChoice?: RpsChoice; locale?: Locale; wager?: string; wouldRatherIndex?: number; cardTypes?: string;
-  multiplayer?: boolean; groupAction?: any; playerId?: string;
+  multiplayer?: boolean; groupAction?: any; playerId?: string; requestId?: string;
 };
 
 const WORDS = ["MOON", "MINT", "WAVE", "SAKE", "NEON", "MISO", "YUZU", "NORI", "KITSU", "MOMO", "SORA", "KUMA", "HOSHI", "RAMEN", "UMAMI"];
 const CARD_TYPES: CardType[] = ["honto", "question", "wouldrather", "preference", "estimate", "rps", "both"];
 const ROOM_IDLE_MS = 12 * 60 * 60 * 1000;
+const PLAYER_ONLINE_MS = 15_000;
 
 const sql = neon(process.env.DATABASE_URL ?? "");
 let schemaReady: Promise<void> | null = null;
@@ -42,6 +43,9 @@ function ensureSchema() {
     await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS wager text`;
     await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS user_id text`;
     await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS locale text NOT NULL DEFAULT 'en'`;
+    await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS last_seen_at timestamptz NOT NULL DEFAULT now()`;
+    await sql`CREATE TABLE IF NOT EXISTS room_action_receipts (room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, player_id text NOT NULL, request_id text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(room_id, player_id, request_id))`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_room_action_receipts_created ON room_action_receipts(created_at)`;
     await sql`CREATE TABLE IF NOT EXISTS deck_cards (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, card_number integer NOT NULL, type text NOT NULL, actor_id text NOT NULL REFERENCES players(id), target_id text NOT NULL REFERENCES players(id), status text NOT NULL DEFAULT 'hidden', payload text NOT NULL DEFAULT '{}', secret text NOT NULL DEFAULT '{}', result text, created_at timestamptz NOT NULL DEFAULT now(), completed_at timestamptz, UNIQUE(room_id, card_number))`;
     await sql`ALTER TABLE deck_cards ADD COLUMN IF NOT EXISTS revealed_by text[] NOT NULL DEFAULT '{}'`;
     await sql`CREATE INDEX IF NOT EXISTS idx_deck_cards_room_status ON deck_cards(room_id, status, card_number)`;
@@ -140,15 +144,15 @@ async function state(roomCode: string, token: string, currentUser: CurrentUser |
     const expired = await sql`UPDATE rooms SET status = ${room.multiplayer ? "abandoned" : "finished"}, revision = revision + 1, updated_at = now() WHERE id = ${room.id} AND revision = ${room.revision} RETURNING status`;
     if (expired.length) room.status = expired[0].status;
   }
-  const meRows = await sql`SELECT id FROM players WHERE room_id = ${room.id} AND token = ${token}`;
+  const meRows = await sql`UPDATE players SET last_seen_at = now() WHERE room_id = ${room.id} AND token = ${token} RETURNING id`;
   const me: any = meRows[0];
   if (!me) throw new Error("Your session is not valid for this room.");
   if (currentUser?.id) await sql`UPDATE players SET user_id = ${currentUser.id} WHERE id = ${me.id} AND room_id = ${room.id} AND user_id IS NULL`;
-  const playerRows = await sql`SELECT p.id, p.name, p.is_host AS "isHost", p.sips, p.joined_at AS "joinedAt", p.wager, p.user_id AS "userId", p.locale, u.display_name AS "accountName" FROM players p LEFT JOIN users u ON u.id = p.user_id WHERE p.room_id = ${room.id} ORDER BY p.joined_at ASC`;
+  const playerRows = await sql`SELECT p.id, p.name, p.is_host AS "isHost", p.sips, p.joined_at AS "joinedAt", p.last_seen_at AS "lastSeenAt", p.wager, p.user_id AS "userId", p.locale, u.display_name AS "accountName" FROM players p LEFT JOIN users u ON u.id = p.user_id WHERE p.room_id = ${room.id} ORDER BY p.joined_at ASC`;
   const myLocale = playerRows.find((player: any) => player.id === me.id)?.locale === "ja" ? "ja" : "en";
   const group = room.multiplayer && room.group_state ? publicMultiplayer(room.group_state, me.id, myLocale) : null;
   if (group && room.status === "abandoned") Object.assign(group, { finished: true, phase: "finished", winners: [], losers: [], winningWager: null, endReason: group.endReason ?? "table_closed" });
-  const players = playerRows.map(({ wager, userId, accountName, locale: _playerLocale, ...player }: any) => ({ ...player, sips: group?.scores[player.id] ?? player.sips, connected: Boolean(userId), accountName: player.id === me.id ? accountName ?? null : undefined, connectedProvider: player.id === me.id && userId ? "Google" : undefined, hasWager: Boolean(wager), ...(room.status === "finished" ? { wager: wager ?? null } : {}) }));
+  const players = playerRows.map(({ wager, userId, accountName, locale: _playerLocale, ...player }: any) => ({ ...player, sips: group?.scores[player.id] ?? player.sips, connected: Date.now() - new Date(player.lastSeenAt).getTime() <= PLAYER_ONLINE_MS, accountConnected: Boolean(userId), accountName: player.id === me.id ? accountName ?? null : undefined, connectedProvider: player.id === me.id && userId ? "Google" : undefined, hasWager: Boolean(wager), ...(room.status === "finished" ? { wager: wager ?? null } : {}) }));
   const cardRows = room.status === "playing" ? await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.card_number = ${room.current_round} LIMIT 1` : [];
   const lastRows = await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.status = 'complete' ORDER BY c.card_number DESC LIMIT 1`;
   return {
@@ -210,11 +214,14 @@ function groupDeck(room: any): MultiplayerCard[] {
 }
 
 async function groupMutation(roomCode: string, token: string, body: Body, user: CurrentUser | null) {
+  const requestId = typeof body.requestId === "string" && /^[a-zA-Z0-9-]{8,80}$/.test(body.requestId) ? body.requestId : null;
   return mutateWithRetry(async () => {
     const context = await getContext(roomCode, token);
     const players = await sql`SELECT * FROM players WHERE room_id = ${context.room.id} ORDER BY joined_at ASC, id ASC`;
-    return { ...context, players };
-  }, ({ room, me, players }: any) => {
+    const receipts = requestId ? await sql`SELECT 1 FROM room_action_receipts WHERE room_id = ${context.room.id} AND player_id = ${context.me.id} AND request_id = ${requestId} LIMIT 1` : [];
+    return { ...context, players, replay: receipts.length > 0 };
+  }, ({ room, me, players, replay }: any) => {
+    if (replay) return { replay: true };
     const action = body.action;
     if (!room.multiplayer) throw new Error("This is not a multiplayer room.");
     let snapshot = room.group_state;
@@ -258,8 +265,9 @@ async function groupMutation(roomCode: string, token: string, body: Body, user: 
       snapshot = reduceMultiplayer({ ...snapshot, wagers: Object.fromEntries(players.map((p: any) => [p.id, p.wager ?? ""])) }, me.id, body.groupAction);
       if (snapshot.finished) status = "finished";
     } else throw new Error("Invalid multiplayer action.");
-    return { snapshot, status, removeId, wager, ackId, reset: action === "start" || action === "newTable", start: action === "start" };
+    return { snapshot, status, removeId, wager, ackId, reset: action === "start" || action === "newTable", start: action === "start", replay: false };
   }, async ({ room, me }: any, next: any) => {
+    if (next.replay) return true;
     // Claim the revision and apply every dependent mutation in one PostgreSQL statement.
     // Other joins/settings/actions also claim this revision, so a stale snapshot cannot win.
     const rows = await sql`WITH claimed AS (
@@ -268,7 +276,13 @@ async function groupMutation(roomCode: string, token: string, body: Body, user: 
         welcome_ack = CASE WHEN ${next.reset} THEN '{}'::text[] ELSE ARRAY(SELECT DISTINCT a FROM unnest(array_remove(welcome_ack, ${next.removeId}::text) || CASE WHEN ${next.ackId}::text IS NULL THEN '{}'::text[] ELSE ARRAY[${next.ackId}]::text[] END) a) END,
         current_round = ${next.snapshot ? Number(next.snapshot.currentIndex ?? 0) + 1 : 1},
         started_at = CASE WHEN ${next.start} THEN now() WHEN ${next.reset} THEN NULL ELSE started_at END
-      WHERE id = ${room.id} AND revision = ${room.revision} AND EXISTS (SELECT 1 FROM players WHERE id = ${me.id} AND room_id = ${room.id}) RETURNING id
+      WHERE id = ${room.id} AND revision = ${room.revision}
+        AND (${requestId}::text IS NULL OR NOT EXISTS (SELECT 1 FROM room_action_receipts WHERE room_id = ${room.id} AND player_id = ${me.id} AND request_id = ${requestId}))
+        AND EXISTS (SELECT 1 FROM players WHERE id = ${me.id} AND room_id = ${room.id}) RETURNING id
+    ), receipt AS (
+      INSERT INTO room_action_receipts (room_id, player_id, request_id)
+      SELECT id, ${me.id}, ${requestId} FROM claimed WHERE ${requestId}::text IS NOT NULL
+      ON CONFLICT DO NOTHING RETURNING room_id
     ), removed AS (
       DELETE FROM players WHERE room_id IN (SELECT id FROM claimed) AND id = ${next.removeId} RETURNING id
     ), reset_players AS (
@@ -428,7 +442,7 @@ export default async function handler(req: any, res: any) {
     if (body.action === "start") {
       await mutateWithRetry(async () => getContext(roomCode, token), async ({ room, me }: any) => {
         if (!me.is_host || room.status !== "lobby" || room.multiplayer) throw new Error("Only the host can start this two-player game.");
-        const players = await sql`SELECT id FROM players WHERE room_id = ${room.id} ORDER BY joined_at ASC`;
+        const players = await sql`SELECT id FROM players WHERE room_id = ${room.id} ORDER BY is_host DESC, joined_at ASC, id ASC`;
         if (players.length !== 2) throw new Error("Honto needs exactly two players.");
         return buildDeck(room.id, Number(room.round_count), players, room.theme_category, room.locale === "ja" ? "ja" : "en", room.card_types);
       }, async ({ room }: any, cards: any) => {
@@ -570,14 +584,14 @@ export default async function handler(req: any, res: any) {
       const question = String(body.question ?? parse(card.payload).question ?? "").trim().replace(/\s+/g, " ").slice(0, 220);
       if (!Number.isInteger(correctNumber) || correctNumber < 0 || correctNumber > 1000000) throw new Error("Enter a whole number between 0 and 1,000,000.");
       if (question.length < 3) throw new Error("Write a number question before locking your answer.");
-      const payload = { ...parse(card.payload), question, options: estimateOptions(correctNumber), wrongGuesses: [] };
+      const payload = { ...replaceEstimateQuestion(parse(card.payload), question), options: estimateOptions(correctNumber) };
       await sql`UPDATE deck_cards SET status = 'guess', payload = ${JSON.stringify(payload)}, secret = ${JSON.stringify({ correctNumber })} WHERE id = ${card.id} AND status = 'ready'`;
     }
     if (body.action === "nextEstimate") {
       if (!card || card.type !== "estimate" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("Only the player answering can choose the next estimate.");
       const payload = parse(card.payload); const themes = normalizedThemes(room.theme_category); const pool = shuffle(themes.flatMap((theme) => (room.locale === "ja" ? ESTIMATE_QUESTIONS_BY_THEME_JA[theme] : ESTIMATE_QUESTIONS_BY_THEME[theme])));
       const currentQuestion = typeof payload.question === "string" ? payload.question : ""; const nextQuestion = pool.find((question) => question !== currentQuestion) ?? pool[0] ?? currentQuestion;
-      await sql`UPDATE deck_cards SET payload = ${JSON.stringify({ ...payload, question: nextQuestion, options: undefined, wrongGuesses: [] })}, secret = '{}' WHERE id = ${card.id} AND status = 'ready'`;
+      await sql`UPDATE deck_cards SET payload = ${JSON.stringify(replaceEstimateQuestion(payload, nextQuestion))}, secret = '{}' WHERE id = ${card.id} AND status = 'ready'`;
     }
     if (body.action === "guessEstimate") {
       if (!card || card.type !== "estimate" || card.status !== "guess" || card.target_id !== me.id) throw new Error("This estimate is not yours to guess.");

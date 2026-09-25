@@ -5,12 +5,13 @@ import { createPortal } from "react-dom";
 import { questionLibrary, questionLibraryJa, type Locale } from "./i18n";
 import { loadRoomSession, removeRoomSession, saveRoomSession } from "./session-store";
 import { nextHeaderVisibility } from "./header-visibility";
+import { connectionLabel, roomPollDelay } from "./sync-policy";
 import { lobbyAccess, multiplayerDeckKeys } from "./multiplayer-lobby-rules";
 import { MultiplayerGame } from "./multiplayer-client";
 import type { publicMultiplayer } from "../api/multiplayer";
 
 type ThemeKey = "general" | "life" | "relationships" | "spicy";
-type Player = { id: string; name: string; isHost: number; sips: number; joinedAt: string; connected?: boolean; accountName?: string | null; connectedProvider?: string; hasWager: boolean; wager?: string | null };
+type Player = { id: string; name: string; isHost: number; sips: number; joinedAt: string; lastSeenAt?: string; connected?: boolean; accountConnected?: boolean; accountName?: string | null; connectedProvider?: string; hasWager: boolean; wager?: string | null };
 type Card = {
   id: string; cardNumber: number; type: "hidden" | "honto" | "question" | "wouldrather" | "preference" | "estimate" | "rps" | "both"; completedAt?: string | null;
   status: "hidden" | "ready" | "guess" | "choose" | "complete";
@@ -154,6 +155,8 @@ export default function GameClient() {
   const [copied, setCopied] = useState(false);
   const [dismissedReveal, setDismissedReveal] = useState<string | null>(null);
   const [headerHidden, setHeaderHidden] = useState(false);
+  const [networkOnline, setNetworkOnline] = useState(true);
+  const [refreshFailed, setRefreshFailed] = useState(false);
   const mutationEpoch = useRef(0);
   const mutationActive = useRef(false);
 
@@ -218,9 +221,11 @@ export default function GameClient() {
       if (!response.ok) throw new Error(data.error ?? "This room is no longer available.");
       if (mutationActive.current || requestEpoch !== mutationEpoch.current) return;
       setGame(data);
+      setRefreshFailed(false);
       if (!quiet) setError("");
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Connection error.";
+      setRefreshFailed(true);
       if (/room not found|no longer available|session is not valid|invalid session/i.test(message)) { removeRoomSession(localStorage, session.code); sessionStorage.removeItem("honto-session"); setSession(null); setGame(null); setDismissedReveal(null); }
       if (!quiet) setError(message);
     }
@@ -232,9 +237,25 @@ export default function GameClient() {
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {
     if (!session) return;
-    const timer = window.setInterval(() => void refresh(true), 1800);
-    return () => window.clearInterval(timer);
-  }, [session, refresh]);
+    let timer: number | undefined;
+    let cancelled = false;
+    const schedule = () => {
+      if (cancelled) return;
+      const delay = roomPollDelay(game?.room.status, document.visibilityState === "visible");
+      if (delay !== null) timer = window.setTimeout(async () => { await refresh(true); schedule(); }, delay);
+    };
+    const resume = () => {
+      setNetworkOnline(navigator.onLine);
+      if (document.visibilityState === "visible" && navigator.onLine) void refresh(true);
+      if (timer) window.clearTimeout(timer);
+      schedule();
+    };
+    window.addEventListener("online", resume);
+    window.addEventListener("offline", resume);
+    document.addEventListener("visibilitychange", resume);
+    schedule();
+    return () => { cancelled = true; if (timer) window.clearTimeout(timer); window.removeEventListener("online", resume); window.removeEventListener("offline", resume); document.removeEventListener("visibilitychange", resume); };
+  }, [session, game?.room.status, refresh]);
 
   async function enter(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
@@ -252,7 +273,8 @@ export default function GameClient() {
     if (!session) return null;
     mutationActive.current = true; mutationEpoch.current += 1;
     setBusy(true); setError("");
-    try { const data = await gameApi({ action, ...session, ...extras }); setGame(data); return data; }
+    const requestId = crypto.randomUUID();
+    try { const data = await gameApi({ action, ...session, ...extras, requestId }); setGame(data); setRefreshFailed(false); return data; }
     catch (cause) { setError(localizeError(cause instanceof Error ? cause.message : "Something went wrong.", locale)); return null; }
     finally { mutationActive.current = false; setBusy(false); }
   }
@@ -274,10 +296,12 @@ export default function GameClient() {
   const reveal = game.room.status !== "abandoned" && game.lastCard && game.lastCard.id !== dismissedReveal ? game.lastCard : null;
   const copyInvite = async () => { await navigator.clipboard.writeText(`${location.origin}${location.pathname}?room=${game.room.code}`); setCopied(true); window.setTimeout(() => setCopied(false), 1600); };
   const changeLocale = (next: Locale) => { setLocale(next); void act("setLocale", { locale: next }); };
+  const connection = connectionLabel({ online: networkOnline, refreshing: false, failed: refreshFailed });
 
   return <LocaleContext.Provider value={{ locale, setLocale, roomCode: session.code, sessionToken: session.token }}><main className="app-shell">
     <header className={`topbar ${headerHidden ? "topbar-hidden" : ""}`}><button className="brand" onClick={leave}><span>HONTO?</span><b>!</b></button><div className="room-pill"><strong>{game.room.code}</strong></div><div className="session-tools"><LanguageMenu onChange={changeLocale}/><button className="tiny-button" onClick={leave}>{locale === "ja" ? "退出" : "EXIT"}</button></div></header>
     {error && <div className="toast error-toast">{error}<button onClick={() => setError("")}>×</button></div>}
+    {connection !== "online" && <div className={`connection-banner ${connection}`} role="status">{connection === "offline" ? (locale === "ja" ? "オフラインです。接続が戻ると再開します。" : "You are offline. The table will resume when your connection returns.") : (locale === "ja" ? "テーブルに再接続中…" : "Reconnecting to the table…")}</div>}
     {game.room.status === "lobby" && <Lobby game={game} host={Boolean(host)} busy={busy} copied={copied} copyInvite={copyInvite} act={act} />}
     {game.group && session && (game.room.status === "playing" || game.room.status === "finished" || game.room.status === "abandoned") && <MultiplayerGame group={game.group} players={game.players} meId={game.meId} busy={busy} act={act} locale={locale} roomCode={session.code} sessionToken={session.token} welcomeAck={game.room.welcomeAck} canRestart={Boolean(host && game.room.canHostMultiplayer)} />}
     {game.room.status === "playing" && !game.group && <GameTable game={game} busy={busy} act={act} />}

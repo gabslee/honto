@@ -21,3 +21,13 @@ export function normalizeRoomSettings(room, body, themeMap) {
   const locale = body.locale === "ja" ? "ja" : body.locale === "en" ? "en" : room.locale === "ja" ? "ja" : "en";
   return { roundCount, themeCategory, customTheme, locale };
 }
+
+/**
+ * Once an estimate question is changed, it is shared verbatim by both players.
+ * Keeping the deck's original localized copy would make publicCard overwrite the
+ * new question with the initial suggestion for viewers in that locale.
+ */
+export function replaceEstimateQuestion(payload, question) {
+  const { localized: _localized, options: _options, ...current } = payload ?? {};
+  return { ...current, question, wrongGuesses: [] };
+}
