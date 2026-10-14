@@ -1,5 +1,6 @@
 import { QUESTION_LIBRARY_BY_THEME, THEME_CUES } from "../data/curated";
 import { QUESTION_LIBRARY_BY_THEME_JA } from "../data/curated-ja";
+import { deckPrompts } from "../data/long-distance-decks";
 
 export const supportedLocales = ["en", "ja", "pt-BR"] as const;
 export type Locale = (typeof supportedLocales)[number];
@@ -61,8 +62,9 @@ const legacyQuestionLibrary = {
 } as const;
 
 export const themeCategories = THEME_CUES;
-export const questionLibrary = QUESTION_LIBRARY_BY_THEME;
-export const questionLibraryJa = QUESTION_LIBRARY_BY_THEME_JA;
+export const questionLibrary = { ...QUESTION_LIBRARY_BY_THEME, ...deckPrompts("en") };
+export const questionLibraryJa = { ...QUESTION_LIBRARY_BY_THEME_JA, ...deckPrompts("ja") };
+export const questionLibraryPt = { ...QUESTION_LIBRARY_BY_THEME, ...deckPrompts("pt-BR") };
 
 export const messages = {
   en: {
