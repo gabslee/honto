@@ -1,7 +1,7 @@
 import { QUESTION_LIBRARY_BY_THEME, THEME_CUES } from "../data/curated";
 import { QUESTION_LIBRARY_BY_THEME_JA } from "../data/curated-ja";
 
-export const supportedLocales = ["en", "ja"] as const;
+export const supportedLocales = ["en", "ja", "pt-BR"] as const;
 export type Locale = (typeof supportedLocales)[number];
 export const defaultLocale: Locale = "en";
 
@@ -67,9 +67,9 @@ export const questionLibraryJa = QUESTION_LIBRARY_BY_THEME_JA;
 export const messages = {
   en: {
     meta: {
-      title: "HONTO?! — A shared card game for two",
-      description: "Draw from a shared deck of bluffs, questions, secret preferences, and number estimates made for two players.",
-      socialDescription: "Draw a card. Read each other. Who takes the next sip?",
+      title: "HONTO?! — Date night for long-distance couples",
+      description: "Play together over a video call. Create a private room, share the link with your partner, and feel closer one card at a time.",
+      socialDescription: "A date-night card game for long-distance couples.",
     },
     errors: {
       generic: "Something went wrong.",
@@ -87,15 +87,17 @@ export const messages = {
     session: "SESSION", pause: "PAUSE", resume: "RESUME", paused: "PAUSED",
     minutesShort: "min",
     landing: {
-      kicker: "ONLINE PARTY GAME ・ 2–8 PLAYERS",
-      headlineStart: "Do you really know",
-      headlineEmphasis: "this person",
-      body: "Tell two lies, hide one truth, and find out who is taking the next sip.",
-      steps: ["TELL", "BLUFF", "SIP"],
+      nav: "A DATE-NIGHT DECK FOR TWO",
+      kicker: "THE DATE NIGHT FOR LONG-DISTANCE COUPLES",
+      headlineStart: "Feel closer,",
+      headlineEmphasis: "wherever you are.",
+      body: "Open Honto on your video call and discover new sides of each other, one card at a time.",
       createTab: "Create room", joinTab: "Join room", nameLabel: "WHAT SHOULD WE CALL YOU?",
       namePlaceholder: "Your name or nickname", codeLabel: "ROOM CODE", busy: "One second…",
-      createCta: "SET THE TABLE →", joinCta: "JOIN THE GAME →",
-      note: "No account needed. Bring any drink — alcoholic or not.",
+      createCta: "START A ROOM →", joinCta: "JOIN YOUR PARTNER →",
+      note: "No account needed. One of you creates a room, then shares the link.",
+      pricingCta: "SEE PREMIUM & PRICING →",
+      price: "Premium for both of you: 7-day free trial, then $4.99/month or $39.99/year per couple.",
       footer: "MEANS “IS IT TRUE?” IN JAPANESE.",
     },
     lobby: {
@@ -137,9 +139,44 @@ export const messages = {
   },
   ja: {
     meta: {
-      title: "HONTO?! — 2人で遊ぶ共有カードゲーム",
-      description: "ブラフ、質問、心読み、数字当てを楽しむ2人用カードゲーム。",
-      socialDescription: "カードを引いて、相手を知ろう。次に飲むのは誰？",
+      title: "HONTO?! — 遠距離カップルのデートナイト",
+      description: "ビデオ通話をしながら2人で遊べるカードゲーム。ルームを作り、パートナーにリンクを送るだけ。",
+      socialDescription: "遠距離カップルのためのデートナイトカードゲーム。",
+    },
+    landing: {
+      nav: "2人のためのデートナイトカード",
+      kicker: "遠距離カップルのためのデートナイト",
+      headlineStart: "離れていても、",
+      headlineEmphasis: "もっと近くに。",
+      body: "ビデオ通話をしながらHontoを開いて、カードをめくるたびにお互いの新しい一面を見つけよう。",
+      createTab: "ルームを作る", joinTab: "ルームに参加", nameLabel: "名前を入力",
+      namePlaceholder: "名前またはニックネーム", codeLabel: "ルームコード", busy: "少々お待ちください…",
+      createCta: "ルームを始める →", joinCta: "パートナーと参加 →",
+      note: "アカウントは不要です。どちらかがルームを作り、リンクを共有するだけ。",
+      pricingCta: "PREMIUMと料金を見る →",
+      price: "2人で使えるPremium：7日間無料、その後はカップル単位で月額$4.99または年額$39.99。",
+      footer: "HONTOは日本語で「本当？」という意味です。",
+    },
+  },
+  "pt-BR": {
+    meta: {
+      title: "HONTO?! — Um jogo de cartas para casais",
+      description: "Uma noite de encontro a distância para vocês jogarem juntos por chamada de vídeo.",
+      socialDescription: "Virem uma carta e descubram algo novo um sobre o outro.",
+    },
+    landing: {
+      nav: "UM DATE A DOIS",
+      kicker: "O DATE DOS CASAIS À DISTÂNCIA",
+      headlineStart: "Mais perto,",
+      headlineEmphasis: "não importa a distância.",
+      body: "Abram o Honto durante a chamada de vídeo e descubram novos lados um do outro, uma carta de cada vez.",
+      createTab: "Criar sala", joinTab: "Entrar na sala", nameLabel: "COMO PODEMOS CHAMAR VOCÊ?",
+      namePlaceholder: "Seu nome ou apelido", codeLabel: "CÓDIGO DA SALA", busy: "Só um instante…",
+      createCta: "COMEÇAR UMA SALA →", joinCta: "JOGAR COM SEU AMOR →",
+      note: "Não precisa criar conta. Uma pessoa abre a sala e compartilha o link.",
+      pricingCta: "VER PREMIUM E PREÇOS →",
+      price: "Premium para o casal: 7 dias grátis; depois, US$ 4,99/mês ou US$ 39,99/ano por casal.",
+      footer: "HONTO SIGNIFICA “É VERDADE?” EM JAPONÊS.",
     },
   },
 } as const;
