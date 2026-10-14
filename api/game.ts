@@ -256,6 +256,7 @@ async function groupMutation(roomCode: string, token: string, body: Body, user: 
       if (status !== "lobby") throw new Error("The game has already started.");
       assertMultiplayerHost(me, user?.id, hasPremiumAccess(user));
       assertMultiplayerStart(players.length);
+      console.info("[multiplayer] match started", { roomId: room.id, playerCount: players.length, userId: user?.id ?? null });
       snapshot = createMultiplayerState({ players: players.map((p: any) => ({ id: p.id, name: p.name })), cards: groupDeck(room) });
       status = "playing";
     } else if (action === "multiplayer") {

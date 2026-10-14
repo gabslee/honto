@@ -43,6 +43,7 @@
     "drizzle.config.ts",
     "examples/**/*.ts",
     "vite.config.ts",
-    "build"
+    "build",
+    "marketing"
   ]
 }
