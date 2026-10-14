@@ -18,7 +18,7 @@ export function normalizeRoomSettings(room, body, themeMap) {
   const customTheme = Object.prototype.hasOwnProperty.call(body, "customTheme")
     ? typeof body.customTheme === "string" ? body.customTheme.trim().slice(0, 80) || null : null
     : room.custom_theme;
-  const locale = body.locale === "ja" ? "ja" : body.locale === "en" ? "en" : room.locale === "ja" ? "ja" : "en";
+  const locale = body.locale === "ja" || body.locale === "pt-BR" || body.locale === "en" ? body.locale : room.locale === "ja" || room.locale === "pt-BR" ? room.locale : "en";
   return { roundCount, themeCategory, customTheme, locale };
 }
 
