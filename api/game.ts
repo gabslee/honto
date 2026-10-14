@@ -1,4 +1,4 @@
-import { neon } from "@neondatabase/serverless";
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { ESTIMATE_QUESTIONS_BY_THEME, PREFERENCE_CARDS_BY_THEME, type CuratedTheme } from "../data/curated";
 import { ESTIMATE_QUESTIONS_BY_THEME_JA, PREFERENCE_CARDS_BY_THEME_JA } from "../data/curated-ja";
 import { makeRoomCode, normalizeRoomSettings, replaceEstimateQuestion } from "./game-contract";
@@ -24,7 +24,10 @@ const CARD_TYPES: CardType[] = ["honto", "question", "wouldrather", "preference"
 const ROOM_IDLE_MS = 12 * 60 * 60 * 1000;
 const PLAYER_ONLINE_MS = 15_000;
 
-const sql = neon(process.env.DATABASE_URL ?? "");
+const databaseUrl = process.env.DATABASE_URL;
+const sql = databaseUrl
+  ? neon(databaseUrl)
+  : (() => { throw new Error("DATABASE_URL is not configured."); }) as unknown as NeonQueryFunction<false, false>;
 let schemaReady: Promise<void> | null = null;
 
 function ensureSchema() {
