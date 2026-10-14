@@ -82,6 +82,7 @@ export const messages = {
     },
     prompts: themeCategories.general,
     common: { back: "Back", exit: "Exit", you: "you", sip: "sip", sips: "sips" },
+    auth: { google: "Continue with Google", apple: "Continue with Apple" },
     loading: "Setting the table…",
     room: "ROOM",
     round: "ROUND",
@@ -145,6 +146,7 @@ export const messages = {
       description: "ビデオ通話をしながら2人で遊べるカードゲーム。ルームを作り、パートナーにリンクを送るだけ。",
       socialDescription: "遠距離カップルのためのデートナイトカードゲーム。",
     },
+    auth: { google: "Googleで続ける", apple: "Appleで続ける" },
     landing: {
       nav: "2人のためのデートナイトカード",
       kicker: "遠距離カップルのためのデートナイト",
@@ -166,6 +168,7 @@ export const messages = {
       description: "Uma noite de encontro a distância para vocês jogarem juntos por chamada de vídeo.",
       socialDescription: "Virem uma carta e descubram algo novo um sobre o outro.",
     },
+    auth: { google: "Continuar com o Google", apple: "Continuar com a Apple" },
     landing: {
       nav: "UM DATE A DOIS",
       kicker: "O DATE DOS CASAIS À DISTÂNCIA",

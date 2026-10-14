@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  return <GameClient />;
+  return <GameClient appleConfigured={Boolean(process.env.APPLE_CLIENT_ID)} />;
 }

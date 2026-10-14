@@ -49,7 +49,7 @@ const CARD_META_JA: Record<keyof typeof CARD_META, { label: string }> = {
 };
 type RpsChoice = "rock" | "paper" | "scissors";
 
-const LocaleContext = createContext<{ locale: Locale; setLocale: (locale: Locale) => void; roomCode?: string; sessionToken?: string }>({ locale: "en", setLocale: () => undefined });
+const LocaleContext = createContext<{ locale: Locale; setLocale: (locale: Locale) => void; roomCode?: string; sessionToken?: string; appleConfigured: boolean }>({ locale: "en", setLocale: () => undefined, appleConfigured: false });
 function useLocale() { return useContext(LocaleContext); }
 function LanguageMenu({ onChange, landing = false }: { onChange?: (locale: Locale) => void; landing?: boolean } = {}) {
   const { locale, setLocale } = useLocale(); const [open, setOpen] = useState(false); const ja = locale === "ja";
@@ -58,6 +58,8 @@ function LanguageMenu({ onChange, landing = false }: { onChange?: (locale: Local
   return <div className={landing ? "language-picker" : "language-menu"}><button type="button" className="language-trigger" aria-haspopup="listbox" aria-expanded={open} aria-label={ja ? "言語を選択" : locale === "pt-BR" ? "Escolher idioma" : "Choose language"} onClick={() => setOpen((current) => !current)}><span aria-hidden="true">{landing ? (ja ? "言語" : locale === "pt-BR" ? "IDIOMA" : "LANGUAGE") : "文"}</span><strong>{localeLabel}</strong><i aria-hidden="true">⌄</i></button>{open && <div className="language-options" role="listbox" aria-label={ja ? "言語" : locale === "pt-BR" ? "Idioma" : "Language"}><button type="button" role="option" aria-selected={locale === "en"} className={locale === "en" ? "selected" : ""} onClick={() => choose("en")}>EN</button><button type="button" role="option" aria-selected={locale === "ja"} className={locale === "ja" ? "selected" : ""} onClick={() => choose("ja")}>日本語</button><button type="button" role="option" aria-selected={locale === "pt-BR"} className={locale === "pt-BR" ? "selected" : ""} onClick={() => choose("pt-BR")}>PT-BR</button></div>}</div>;
 }
 function AccountControl() {
+  const { locale, appleConfigured } = useLocale();
+  const authMessages = getMessages(locale).auth;
   const [user, setUser] = useState<{ email: string; displayName?: string; role?: string; plan?: string; subscriptionStatus?: string; trialEndsAt?: string | null; stripeCustomerId?: string | null } | null>(null);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [portalBusy, setPortalBusy] = useState(false);
@@ -100,7 +102,7 @@ function AccountControl() {
     } finally { setPortalBusy(false); }
   };
   if (Boolean(user)) return createPortal(<><div className="account-stack"><span className="account-control signed-in-account account-identity"><span>{user!.displayName ?? user!.email}</span><button type="button" aria-label="Sign out" onClick={() => setConfirmSignOut(true)}>×</button></span>{user!.role === "admin" ? <span className="account-control signed-in-account account-status account-status-admin">ADMIN · UNLIMITED</span> : user!.plan === "premium" || user!.subscriptionStatus === "active" ? user!.stripeCustomerId ? <button type="button" className="account-control curated-button account-premium-button" disabled={portalBusy} onClick={() => void openPortal()}>{portalBusy ? "OPENING…" : "MANAGE PREMIUM"}</button> : <span className="account-control signed-in-account account-status account-status-premium">PREMIUM ACTIVE</span> : <button type="button" className="account-control curated-button account-trial-button" onClick={() => { window.location.href = "/pricing"; }}>START 7-DAY PREMIUM TRIAL</button>}{portalError && <small className="account-portal-error" role="alert">{portalError}</small>}</div>{confirmSignOut && <div className="modal-backdrop account-confirm-backdrop" role="presentation" onClick={() => setConfirmSignOut(false)}><section className="account-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="signout-title" onClick={(event) => event.stopPropagation()}><span className="eyebrow">HONTO · ACCOUNT</span><h2 id="signout-title">Do you want to disconnect from your account?</h2><p>Your account will stay safe, and you can sign in again anytime.</p><div className="account-confirm-actions"><button type="button" className="primary-button" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); setConfirmSignOut(false); setUser(null); }}>YES, DISCONNECT</button><button type="button" className="curated-button" onClick={() => setConfirmSignOut(false)}>NO, STAY SIGNED IN</button></div></section></div>}</>, mount);
-  const content = !user ? <div className="account-auth-buttons"><a className="account-control curated-button" aria-label="Sign in with Google" title="Sign in with Google" href="/api/auth/google/start"><svg className="google-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.35 12.27c0-.72-.06-1.42-.18-2.09H12v3.96h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.7 2.91-4.2 2.91-7.26Z"/><path fill="#34A853" d="M12 21.7c2.63 0 4.84-.87 6.45-2.37l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.7-1.72-5.47-4.03H3.29v2.53A9.74 9.74 0 0 0 12 21.7Z"/><path fill="#FBBC05" d="M6.53 13.77A5.85 5.85 0 0 1 6.22 12c0-.62.11-1.22.31-1.77V7.7H3.29A9.74 9.74 0 0 0 2.25 12c0 1.57.38 3.05 1.04 4.3l3.24-2.53Z"/><path fill="#EA4335" d="M12 6.2c1.43 0 2.72.49 3.73 1.45l2.8-2.8C16.84 3.25 14.63 2.3 12 2.3a9.74 9.74 0 0 0-8.71 5.4l3.24 2.53C7.3 7.92 9.46 6.2 12 6.2Z"/></svg></a><button type="button" className="account-control apple-auth-button" aria-label="Sign in with Apple — coming soon" title="Sign in with Apple — coming soon" disabled><svg className="apple-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.05 12.54c-.02-2.15 1.76-3.18 1.84-3.23a3.96 3.96 0 0 0-3.12-1.69c-1.31-.14-2.58.78-3.25.78-.68 0-1.72-.76-2.83-.74a4.17 4.17 0 0 0-3.5 2.14c-1.51 2.62-.38 6.49 1.06 8.62.72 1.04 1.56 2.2 2.67 2.16 1.08-.04 1.49-.69 2.61-2.1.82-1.2 1.16-2.36 1.18-2.42a3.75 3.75 0 0 1-2.28-3.5ZM14.9 6.22a3.78 3.78 0 0 0 .86-2.73 3.84 3.84 0 0 0-2.48 1.28 3.59 3.59 0 0 0-.88 2.62 3.18 3.18 0 0 0 2.5-1.17Z"/></svg></button></div> : <span className="account-control signed-in-account account-identity">{user.displayName ?? user.email}</span>;
+  const content = !user ? <div className="account-auth-buttons"><a className="account-control curated-button" aria-label={authMessages.google} href="/api/auth/google/start"><svg className="google-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.35 12.27c0-.72-.06-1.42-.18-2.09H12v3.96h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.7 2.91-4.2 2.91-7.26Z"/><path fill="#34A853" d="M12 21.7c2.63 0 4.84-.87 6.45-2.37l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.7-1.72-5.47-4.03H3.29v2.53A9.74 9.74 0 0 0 12 21.7Z"/><path fill="#FBBC05" d="M6.53 13.77A5.85 5.85 0 0 1 6.22 12c0-.62.11-1.22.31-1.77V7.7H3.29A9.74 9.74 0 0 0 2.25 12c0 1.57.38 3.05 1.04 4.3l3.24-2.53Z"/><path fill="#EA4335" d="M12 6.2c1.43 0 2.72.49 3.73 1.45l2.8-2.8C16.84 3.25 14.63 2.3 12 2.3a9.74 9.74 0 0 0-8.71 5.4l3.24 2.53C7.3 7.92 9.46 6.2 12 6.2Z"/></svg><span>{authMessages.google}</span></a>{appleConfigured && <a className="account-control apple-auth-button" aria-label={authMessages.apple} href="/api/auth/apple/start"><svg className="apple-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.05 12.54c-.02-2.15 1.76-3.18 1.84-3.23a3.96 3.96 0 0 0-3.12-1.69c-1.31-.14-2.58.78-3.25.78-.68 0-1.72-.76-2.83-.74a4.17 4.17 0 0 0-3.5 2.14c-1.51 2.62-.38 6.49 1.06 8.62.72 1.04 1.56 2.2 2.67 2.16 1.08-.04 1.49-.69 2.61-2.1.82-1.2 1.16-2.36 1.18-2.42a3.75 3.75 0 0 1-2.28-3.5ZM14.9 6.22a3.78 3.78 0 0 0 .86-2.73 3.84 3.84 0 0 0-2.48 1.28 3.59 3.59 0 0 0-.88 2.62 3.18 3.18 0 0 0 2.5-1.17Z"/></svg><span>{authMessages.apple}</span></a>}</div> : <span className="account-control signed-in-account account-identity">{user.displayName ?? user.email}</span>;
   return createPortal(content, mount);
 }
 
@@ -146,7 +148,7 @@ function localizeError(message: string, locale: Locale) {
   return translations[message] ?? message;
 }
 
-export default function GameClient() {
+export default function GameClient({ appleConfigured = false }: { appleConfigured?: boolean }) {
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [mode, setMode] = useState<"create" | "join">("create");
@@ -292,7 +294,7 @@ export default function GameClient() {
     setSession(null); setGame(null); setDismissedReveal(null);
   }
 
-  if (!session) return <LocaleContext.Provider value={{ locale, setLocale, roomCode: undefined, sessionToken: undefined }}><AccountControl/><Landing name={name} setName={setName} joinCode={joinCode} setJoinCode={setJoinCode} mode={mode} setMode={setMode} enter={enter} busy={busy} error={error} /></LocaleContext.Provider>;
+  if (!session) return <LocaleContext.Provider value={{ locale, setLocale, roomCode: undefined, sessionToken: undefined, appleConfigured }}><AccountControl/><Landing name={name} setName={setName} joinCode={joinCode} setJoinCode={setJoinCode} mode={mode} setMode={setMode} enter={enter} busy={busy} error={error} /></LocaleContext.Provider>;
   if (!game) return <main className="loading"><div className="stamp">HONTO?!</div><p>{locale === "ja" ? "デッキをシャッフル中…" : "Shuffling the deck…"}</p>{error && <p className="form-error">{error}</p>}</main>;
 
   const host = game.players.find((player) => player.id === game.meId)?.isHost;
@@ -301,7 +303,7 @@ export default function GameClient() {
   const changeLocale = (next: Locale) => { setLocale(next); void act("setLocale", { locale: next }); };
   const connection = connectionLabel({ online: networkOnline, refreshing: false, failed: refreshFailed });
 
-  return <LocaleContext.Provider value={{ locale, setLocale, roomCode: session.code, sessionToken: session.token }}><main className="app-shell">
+  return <LocaleContext.Provider value={{ locale, setLocale, roomCode: session.code, sessionToken: session.token, appleConfigured }}><main className="app-shell">
     <header className={`topbar ${headerHidden ? "topbar-hidden" : ""}`}><button className="brand" onClick={leave}><span>HONTO?</span><b>!</b></button><div className="room-pill"><strong>{game.room.code}</strong></div><div className="session-tools"><LanguageMenu onChange={changeLocale}/><button className="tiny-button" onClick={leave}>{locale === "ja" ? "退出" : "EXIT"}</button></div></header>
     {error && <div className="toast error-toast">{error}<button onClick={() => setError("")}>×</button></div>}
     {connection !== "online" && <div className={`connection-banner ${connection}`} role="status">{connection === "offline" ? (locale === "ja" ? "オフラインです。接続が戻ると再開します。" : "You are offline. The table will resume when your connection returns.") : (locale === "ja" ? "テーブルに再接続中…" : "Reconnecting to the table…")}</div>}
@@ -360,7 +362,7 @@ function LegacyLobby({ game, host, busy, copied, copyInvite, act }: { game: Game
 }
 
 function Lobby(props: { game: GameState; host: boolean; busy: boolean; copied: boolean; copyInvite: () => void; act: (action: string, extras?: Record<string, unknown>) => Promise<unknown> }) {
-  const { locale } = useLocale(); const ja = locale === "ja"; const { game } = props;
+  const { locale, appleConfigured } = useLocale(); const ja = locale === "ja"; const { game } = props;
   const multiplayer = Boolean(game.room.multiplayer);
   const deckKeys = multiplayer ? multiplayerDeckKeys : [...DECK_KEYS];
   const access = lobbyAccess({ multiplayer, count: game.players.length, isHost: props.host, premium: Boolean(game.room.canHostMultiplayer), busy: props.busy });
@@ -378,11 +380,15 @@ function Lobby(props: { game: GameState; host: boolean; busy: boolean; copied: b
       if (cancelled || data.user || root.querySelector(".lobby-google-button")) return;
     const link = document.createElement("a"); link.href = "/api/auth/google/start"; link.className = "lobby-auth-button lobby-google-button"; link.setAttribute("aria-label", "Sign in with Google"); link.innerHTML = '<svg class="google-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.35 12.27c0-.72-.06-1.42-.18-2.09H12v3.96h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.7 2.91-4.2 2.91-7.26Z"/><path fill="#34A853" d="M12 21.7c2.63 0 4.84-.87 6.45-2.37l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.7-1.72-5.47-4.03H3.29v2.53A9.74 9.74 0 0 0 12 21.7Z"/><path fill="#FBBC05" d="M6.53 13.77A5.85 5.85 0 0 1 6.22 12c0-.62.11-1.22.31-1.77V7.7H3.29A9.74 9.74 0 0 0 2.25 12c0 1.57.38 3.05 1.04 4.3l3.24-2.53Z"/><path fill="#EA4335" d="M12 6.2c1.43 0 2.72.49 3.73 1.45l2.8-2.8C16.84 3.25 14.63 2.3 12 2.3a9.74 9.74 0 0 0-8.71 5.4l3.24 2.53C7.3 7.92 9.46 6.2 12 6.2Z"/></svg>';
     link.href = `/api/auth/google/start?return_to=${encodeURIComponent(`${location.pathname}?room=${game.room.code}`)}`;
-    const apple = document.createElement("button"); apple.type = "button"; apple.disabled = true; apple.className = "lobby-auth-button lobby-apple-button"; apple.setAttribute("aria-label", "Sign in with Apple — coming soon"); apple.innerHTML = '<svg class="apple-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.665 13.544c-.028-3.169 2.584-4.703 2.704-4.775-1.474-2.155-3.765-2.45-4.573-2.48-1.938-.203-3.817 1.159-4.785 1.159-.985 0-2.513-1.14-4.14-1.105-2.096.032-4.056 1.245-5.145 3.128-2.244 3.892-.57 9.62 1.605 12.773 1.086 1.545 2.356 3.264 4.04 3.202 1.617-.067 2.226-1.027 4.179-1.027 1.896 0 2.488 1.027 4.173.988 1.733-.028 2.833-1.542 3.881-3.102 1.256-1.772 1.761-3.517 1.781-3.607-.041-.013-3.689-1.41-3.72-5.154ZM16.493 4.306c.86-1.043 1.447-2.474 1.282-3.906-1.24.049-2.735.828-3.631 1.856-.791.909-1.48 2.36-1.304 3.737 1.391.106 2.81-.707 3.653-1.687Z" transform="translate(-1 -1) scale(.92)"/></svg>';
-    auth = document.createElement("div"); auth.className = "lobby-auth-buttons"; auth.append(link, apple); root.appendChild(auth);
+    auth = document.createElement("div"); auth.className = "lobby-auth-buttons"; auth.append(link);
+    if (appleConfigured) {
+      const apple = document.createElement("a"); apple.href = `/api/auth/apple/start?return_to=${encodeURIComponent(`${location.pathname}?room=${game.room.code}`)}`; apple.className = "lobby-auth-button lobby-apple-button"; apple.setAttribute("aria-label", getMessages(locale).auth.apple); apple.innerHTML = '<svg class="apple-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.665 13.544c-.028-3.169 2.584-4.703 2.704-4.775-1.474-2.155-3.765-2.45-4.573-2.48-1.938-.203-3.817 1.159-4.785 1.159-.985 0-2.513-1.14-4.14-1.105-2.096.032-4.056 1.245-5.145 3.128-2.244 3.892-.57 9.62 1.605 12.773 1.086 1.545 2.356 3.264 4.04 3.202 1.617-.067 2.226-1.027 4.179-1.027 1.896 0 2.488 1.027 4.173.988 1.733-.028 2.833-1.542 3.881-3.102 1.256-1.772 1.761-3.517 1.781-3.607-.041-.013-3.689-1.41-3.72-5.154ZM16.493 4.306c.86-1.043 1.447-2.474 1.282-3.906-1.24.049-2.735.828-3.631 1.856-.791.909-1.48 2.36-1.304 3.737 1.391.106 2.81-.707 3.653-1.687Z" transform="translate(-1 -1) scale(.92)"/></svg>';
+      auth.append(apple);
+    }
+    root.appendChild(auth);
     }).catch(() => undefined);
     return () => { cancelled = true; auth?.remove(); };
-  }, []);
+  }, [appleConfigured, game.room.code, locale]);
   useEffect(() => {
     const me = game.players.find((player) => player.id === game.meId);
     const index = game.players.findIndex((player) => player.id === game.meId);

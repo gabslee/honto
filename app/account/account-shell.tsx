@@ -6,5 +6,5 @@ export function AccountShell({ children }: { children: ReactNode }) {
 }
 
 export function SignInRequired() {
-  return <AccountShell><section className="account-hero"><span className="eyebrow">HONTO · ACCOUNT</span><h1>Sign in to see your Honto.</h1><p>Your match history is attached to your Google account.</p><a className="primary-button account-cta" href="/api/auth/google/start">SIGN IN WITH GOOGLE →</a></section></AccountShell>;
+  return <AccountShell><section className="account-hero"><span className="eyebrow">HONTO · ACCOUNT</span><h1>Sign in to see your Honto.</h1><p>Your match history is attached to your Honto account.</p><div className="account-page-auth"><a className="primary-button account-cta" href="/api/auth/google/start">CONTINUE WITH GOOGLE →</a>{process.env.APPLE_CLIENT_ID && <a className="primary-button account-cta apple-auth-button" href="/api/auth/apple/start">CONTINUE WITH APPLE</a>}</div></section></AccountShell>;
 }
