@@ -46,3 +46,47 @@ export function dateResultTitle({ loserName, both, points, locale = "en" }) {
   if (both) return locale === "ja" ? `二人でラブタスク（${points}${label}）！` : locale === "pt-BR" ? `Os dois fazem a tarefa do amor (${points} ${label})!` : `You both do the love task (${points} ${label})!`;
   return locale === "ja" ? `${loserName}のラブタスク（${points}${label}）。` : locale === "pt-BR" ? `${loserName} cumpre a tarefa do amor (${points} ${label}).` : `${loserName} owes a love task (${points} ${label}).`;
 }
+
+// Rewrites any drinking wording into the no-alcohol date-mode equivalent (en, pt-BR, ja).
+const keepCase = (match, replacement) => (match === match.toUpperCase() && /[A-Z]/.test(match) ? replacement.toUpperCase() : /^[A-Z]/.test(match) ? replacement[0].toUpperCase() + replacement.slice(1) : replacement);
+const DATE_RULES = [
+  [/🍺|🥃|🍻/g, "💗"],
+  [/Skip & sip!/gi, "Skip & love task!"],
+  [/\bno drinks\b/gi, "no drinks"],
+  [/\bcheers\b/gi, "high five"],
+  [/\bwill both drink the result\b/gi, (m) => keepCase(m, "will both do the love task together")],
+  [/\btakes the next sip\b/gi, (m) => keepCase(m, "does the next love task")],
+  [/\b(takes?|take) (\d+) sips?\b/gi, (m, verb, n) => keepCase(m, `${/^take$/i.test(verb) ? "earn" : "earns"} ${n} love-task ${n === "1" ? "point" : "points"}`)],
+  [/\btake the sips\b/gi, (m) => keepCase(m, "take a love task")],
+  [/\bboth (of you )?drink\b/gi, (m, of) => keepCase(m, `both ${of ?? ""}do a love task`)],
+  [/\beveryone drinks\b/gi, (m) => keepCase(m, "everyone does a love task")],
+  [/\bdrinks\b/gi, (m) => keepCase(m, "does a love task")],
+  [/\bdrink\b/gi, (m) => keepCase(m, "do a love task")],
+  [/\bsip wheel\b/gi, (m) => keepCase(m, "love wheel")],
+  [/\bsips\b/gi, (m) => keepCase(m, "points")],
+  [/\bsip\b/gi, (m) => keepCase(m, "point")],
+  // pt-BR
+  [/\bgoles\b/gi, (m) => keepCase(m, "pontos")],
+  [/\bgole\b/gi, (m) => keepCase(m, "ponto")],
+  [/\bbebem\b/gi, (m) => keepCase(m, "fazem uma tarefa do amor")],
+  [/\bbebe\b/gi, (m) => keepCase(m, "faz uma tarefa do amor")],
+  [/\bbeber\b/gi, (m) => keepCase(m, "fazer uma tarefa do amor")],
+  // ja
+  [/シップルーレット/g, "ラブルーレット"],
+  [/シップ飲む/g, "ポイントのラブタスク"],
+  [/シップ/g, "ポイント"],
+  [/飲みます/g, "ラブタスクをします"],
+  [/飲んで/g, "ラブタスクをして"],
+  [/飲む/g, "ラブタスク"],
+  [/乾杯/g, "ハイタッチ"],
+];
+
+export function dateify(text) {
+  if (typeof text !== "string") return text;
+  return DATE_RULES.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), text);
+}
+
+let dateModeActive = false;
+/** Set by the game shell on every render; `w()` then rewrites drinking copy while date mode is on. */
+export function setDateModeActive(value) { dateModeActive = Boolean(value); }
+export function w(text) { return dateModeActive ? dateify(text) : text; }

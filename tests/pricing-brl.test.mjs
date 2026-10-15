@@ -38,3 +38,16 @@ test("checkout uses the Vercel IP country; pages and legal text show BRL", async
   const pricing = await readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
   assert.match(pricing, /x-vercel-ip-country/);
 });
+
+import { priceLabels } from "../app/pricing-config.js";
+test("price labels stay consistent with the page locale", () => {
+  assert.deepEqual(priceLabels("BRL", "pt-BR"), { month: "R$ 14,90", year: "R$ 99,00", yearlySavings: "R$ 79,80" });
+  assert.deepEqual(priceLabels("BRL", "en"), { month: "R$14.90", year: "R$99.00", yearlySavings: "R$79.80" });
+  assert.deepEqual(priceLabels("USD", "en"), { month: "US$4.99", year: "US$29.99", yearlySavings: "US$29.89" });
+});
+
+test("pricing page is localized for en, pt-BR and ja", async () => {
+  const src = await readFile(new URL("../app/pricing/pricing-client.tsx", import.meta.url), "utf8");
+  for (const text of ["START YEARLY →", "ASSINAR ANUAL →", "年額で始める →", "Pagamento somente com cartão."]) assert.ok(src.includes(text), text);
+  assert.doesNotMatch(src, /"\/ mês" : "\/ month"/);
+});
