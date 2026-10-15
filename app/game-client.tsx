@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { getMessages, testimonials, questionLibrary, questionLibraryJa, questionLibraryPt, type Locale } from "./i18n";
 import { SPICY_AGE_STORAGE_KEY, spicyDeckAccess } from "./deck-access";
 import { dateResultTitle, dateTaskFor, pointsLabel } from "./date-mode.js";
+import { deckPrompts } from "../data/long-distance-decks";
 import { loadRoomSession, removeRoomSession, saveRoomSession } from "./session-store";
 import { nextHeaderVisibility } from "./header-visibility";
 import { connectionLabel, roomPollDelay } from "./sync-policy";
@@ -316,6 +317,7 @@ export default function GameClient({ appleConfigured = false }: { appleConfigure
     {connection !== "online" && <div className={`connection-banner ${connection}`} role="status">{connection === "offline" ? (locale === "ja" ? "オフラインです。接続が戻ると再開します。" : "You are offline. Your game will resume when your connection returns.") : (locale === "ja" ? "パートナーと再接続中…" : "Reconnecting to your partner…")}</div>}
     {game.room.status === "lobby" && <Lobby game={game} host={Boolean(host)} busy={busy} copied={copied} copyInvite={copyInvite} act={act} />}
     {!game.room.multiplayer && game.room.status !== "playing" && game.players.length <= 2 && <DailyCardPanel code={session.code} token={session.token} />}
+    {!game.room.multiplayer && game.room.status !== "playing" && game.players.length <= 2 && <CoupleHistoryPanel code={session.code} token={session.token} />}
     {game.group && session && (game.room.status === "playing" || game.room.status === "finished" || game.room.status === "abandoned") && <MultiplayerGame group={game.group} players={game.players} meId={game.meId} busy={busy} act={act} locale={locale} roomCode={session.code} sessionToken={session.token} welcomeAck={game.room.welcomeAck} canRestart={Boolean(host && game.room.canHostMultiplayer)} />}
     {game.room.status === "playing" && !game.group && <GameTable game={game} busy={busy} act={act} />}
     {game.room.status === "finished" && !game.group && !reveal && <Finished players={game.players} restart={() => act("newTable")} />}
@@ -342,6 +344,28 @@ function DailyCardPanel({ code, token }: { code: string; token: string }) {
       : <p className="setting-hint">{t("Answer saved. Waiting for your partner…", "Resposta salva. Esperando seu amor…", "回答を保存しました。パートナーを待っています…")}</p>}</div>; })}
     {daily && !daily.premium && <p className="setting-hint"><a href="/pricing">{t("Premium: 3 cards a day, for both of you", "Premium: 3 cartas por dia, para vocês dois", "Premiumなら1日3枚、二人とも")}</a></p>}
     {daily && daily.premium && !daily.adultConfirmed && <button className="curated-button" disabled={busy} onClick={() => { if (window.confirm(t("Add Spicy 18+ cards to your Card of the Day? Confirm you are both 18 or older.", "Adicionar cartas Picante 18+ à carta do dia? Confirme que vocês dois têm 18 anos ou mais.", "今日のカードにスパイシー18+を追加しますか？二人とも18歳以上であることを確認してください。"))) void call("dailyConfirmAdult", { confirm18: true }); }}>{t("Include Spicy 18+ cards", "Incluir cartas Picante 18+", "スパイシー18+を含める")}</button>}
+  </section>;
+}
+
+type CoupleHistory = { reunionDate: string | null; daysUntilReunion: number | null; today: string; moments: { type: string; prompt: string; answer: string | null; at: string }[]; daily: { day: string; slot: number; deck: string; index: number; answers: { name: string; answer: string; mine: boolean }[] }[] };
+function CoupleHistoryPanel({ code, token }: { code: string; token: string }) {
+  const { locale } = useLocale(); const ja = locale === "ja"; const pt = locale === "pt-BR";
+  const t = (en: string, p: string, j: string) => ja ? j : pt ? p : en;
+  const [history, setHistory] = useState<CoupleHistory | null>(null); const [error, setError] = useState(""); const [open, setOpen] = useState(false); const [busy, setBusy] = useState(false);
+  const timeZone = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
+  const call = useCallback(async (action: string, extras: Record<string, unknown> = {}) => { setBusy(true); setError(""); try { const data = await gameApi({ action, code, token, timeZone, ...extras }); setHistory(data.history); } catch (cause) { setError(cause instanceof Error ? cause.message : "Something went wrong."); } finally { setBusy(false); } }, [code, token, timeZone]);
+  useEffect(() => { void call("history"); }, [call]);
+  const days = history?.daysUntilReunion;
+  return <section className="panel couple-history-panel" aria-labelledby="couple-history-title"><div className="panel-title"><h2 id="couple-history-title">{t("Our story", "Nossa história", "ふたりの記録")}</h2></div>
+    <div className="reunion-countdown">{days === null || days === undefined ? <p>{t("When do you meet again?", "Quando vocês se reencontram?", "次に会うのはいつ？")}</p> : days > 0 ? <p><strong>{days}</strong> {t(days === 1 ? "day until we meet again" : "days until we meet again", days === 1 ? "dia para o reencontro" : "dias para o reencontro", "日で再会")}</p> : days === 0 ? <p><strong>{t("Today is the day! 💗", "É hoje! 💗", "今日会える！💗")}</strong></p> : <p>{t("Set your next reunion date.", "Marquem a data do próximo reencontro.", "次の再会日を決めよう。")}</p>}
+      <label>{t("Reunion date", "Data do reencontro", "再会の日")} <input type="date" disabled={busy} defaultValue={history?.reunionDate ?? ""} key={history?.reunionDate ?? "none"} onChange={(event) => void call("setReunion", { reunionDate: event.target.value || null })}/></label></div>
+    {error && <p className="form-error">{error}</p>}
+    <button type="button" className="curated-button" onClick={() => setOpen(!open)}>{open ? t("HIDE HISTORY", "ESCONDER HISTÓRICO", "記録を閉じる") : t(`SEE OUR ANSWERS (${(history?.daily.length ?? 0) + (history?.moments.length ?? 0)})`, `VER NOSSAS RESPOSTAS (${(history?.daily.length ?? 0) + (history?.moments.length ?? 0)})`, `ふたりの回答を見る（${(history?.daily.length ?? 0) + (history?.moments.length ?? 0)}）`)}</button>
+    {open && history && <div className="history-list">
+      {history.daily.map((entry) => { const text = deckPrompts(ja ? "ja" : pt ? "pt-BR" : "en")[entry.deck as keyof ReturnType<typeof deckPrompts>]?.[entry.index] ?? ""; return <article key={`d-${entry.day}-${entry.slot}`}><small>{t("Card of the Day", "Carta do dia", "今日のカード")} · {entry.day}</small><h3>{text}</h3>{entry.answers.map((answer) => <p key={answer.name + answer.answer}><b>{answer.name}:</b> {answer.answer}</p>)}</article>; })}
+      {history.moments.map((moment, index) => <article key={`m-${index}-${moment.at}`}><small>{t("Game", "Jogo", "ゲーム")} · {new Date(moment.at).toLocaleDateString(locale)}</small><h3>{moment.prompt}</h3>{moment.answer && <p>→ {moment.answer}</p>}</article>)}
+      {!history.daily.length && !history.moments.length && <p className="setting-hint">{t("Your answers from games and daily cards will show up here.", "As respostas dos jogos e das cartas do dia aparecem aqui.", "ゲームや今日のカードの回答がここに表示されます。")}</p>}
+    </div>}
   </section>;
 }
 

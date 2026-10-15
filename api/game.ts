@@ -8,6 +8,7 @@ import { createMultiplayerState, reduceMultiplayer, publicMultiplayer, type Mult
 import { multiplayerPrompts } from "../data/multiplayer-prompts";
 import { archiveFinishedMatch } from "../app/match-history";
 import { handleDaily } from "./daily-card";
+import { handleHistory, snapshotMoments } from "./couple-history";
 import { normalizeDrinkMode } from "../app/date-mode.js";
 import { deckRequiresPremium } from "../app/deck-access.js";
 
@@ -190,6 +191,7 @@ async function getContext(roomCode: string, token: string) {
 async function finishCard(room: any) {
   const next = Number(room.current_round) + 1;
   const finished = next > Number(room.round_count);
+  if (finished) await snapshotMoments(sql, room);
   await sql`UPDATE rooms SET current_round = ${finished ? room.current_round : next}, status = ${finished ? "finished" : "playing"}, updated_at = now() WHERE id = ${room.id}`;
   if (finished) await archiveFinishedMatch(room.id);
 }
@@ -363,6 +365,11 @@ export default async function handler(req: any, res: any) {
     if (typeof body.action === "string" && ["daily", "dailyAnswer", "dailyConfirmAdult"].includes(body.action)) {
       return json(res, await handleDaily(sql, room, me, body as Record<string, any>, currentUser));
     }
+    if (typeof body.action === "string" && ["history", "setReunion"].includes(body.action)) {
+      return json(res, await handleHistory(sql, room, me, body as Record<string, any>));
+    }
+    // Save completed cards to the couple history before a new deck replaces them.
+    if (body.action === "start" || body.action === "newTable") await snapshotMoments(sql, room);
     if (body.action === "setLocale") {
       const locale: Locale = body.locale === "ja" || body.locale === "pt-BR" ? body.locale : "en";
       await sql`UPDATE players SET locale = ${locale} WHERE id = ${me.id} AND room_id = ${room.id}`;
