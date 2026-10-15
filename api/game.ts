@@ -9,6 +9,7 @@ import { multiplayerPrompts } from "../data/multiplayer-prompts";
 import { archiveFinishedMatch } from "../app/match-history";
 import { handleDaily } from "./daily-card";
 import { handleHistory, snapshotMoments } from "./couple-history";
+import { rememberPartnerKey } from "./couple";
 import { normalizeDrinkMode } from "../app/date-mode.js";
 import { deckRequiresPremium } from "../app/deck-access.js";
 
@@ -362,6 +363,7 @@ export default async function handler(req: any, res: any) {
 
     const token = String(body.token ?? "");
     const { room, me, card } = await getContext(roomCode, token);
+    if (!room.multiplayer) await rememberPartnerKey(sql, room, me, (body as Record<string, unknown>).partnerKey);
     if (typeof body.action === "string" && ["daily", "dailyAnswer", "dailyConfirmAdult"].includes(body.action)) {
       return json(res, await handleDaily(sql, room, me, body as Record<string, any>, currentUser));
     }

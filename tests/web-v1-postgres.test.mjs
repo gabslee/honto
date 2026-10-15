@@ -36,10 +36,11 @@ test('daily card, no-drinking mode and couple history over the real API SQL', as
     // Free couple: host with an account, partner joins by link with no account.
     const host = await api({ action: 'create', name: 'Ana' }, 'free-host');
     assert.equal(host.status, 201);
+    const partnerKey = 'pk-ben-browser-0000000000000001';
     const partner = await api({ action: 'join', code: host.code, name: 'Ben' });
     assert.ok(partner.token);
     const asHost = (action, extra = {}) => api({ action, code: host.code, token: host.token, timeZone: 'America/Sao_Paulo', ...extra }, 'free-host');
-    const asPartner = (action, extra = {}) => api({ action, code: host.code, token: partner.token, timeZone: 'Asia/Tokyo', ...extra });
+    const asPartner = (action, extra = {}) => api({ action, code: host.code, token: partner.token, partnerKey, timeZone: 'Asia/Tokyo', ...extra });
 
     // State fetch links the host's account to the room player.
     await api({ code: host.code, token: host.token }, 'free-host');
@@ -95,6 +96,28 @@ test('daily card, no-drinking mode and couple history over the real API SQL', as
     assert.equal(history.moments[0].answer, 'Mountains');
     await db.query("DELETE FROM deck_cards WHERE room_id = $1", [room.id]);
     assert.equal((await asPartner('history')).history.moments.length, 1);
+
+    // A new room by the same pair (host account + partner browser key) continues history and reunion date.
+    const coupleId = history.coupleId;
+    assert.ok(coupleId && !coupleId.startsWith('room:'), 'stable couple id once both identities are known');
+    const host2 = await api({ action: 'create', name: 'Ana' }, 'free-host');
+    const partner2 = await api({ action: 'join', code: host2.code, name: 'Ben' });
+    await api({ code: host2.code, token: host2.token }, 'free-host');
+    const h2 = (await api({ action: 'history', code: host2.code, token: partner2.token, partnerKey, timeZone: 'Asia/Tokyo' })).history;
+    assert.equal(h2.coupleId, coupleId);
+    assert.equal(h2.reunionDate, future);
+    assert.equal(h2.daily.length, 1);
+    assert.equal(h2.moments.length, 1);
+    const d2 = (await api({ action: 'daily', code: host2.code, token: host2.token, timeZone: 'America/Sao_Paulo' }, 'free-host')).daily;
+    assert.equal(d2.cards.find((c) => c.day === card.day && c.slot === 1)?.revealed, true, 'same daily card and answers in the new room');
+    // A different partner browser with the same host is a different couple.
+    const host3 = await api({ action: 'create', name: 'Ana' }, 'free-host');
+    const other = await api({ action: 'join', code: host3.code, name: 'Cam' });
+    await api({ code: host3.code, token: host3.token }, 'free-host');
+    const h3 = (await api({ action: 'history', code: host3.code, token: other.token, partnerKey: 'pk-cam-browser-0000000000000002' })).history;
+    assert.notEqual(h3.coupleId, coupleId);
+    assert.equal(h3.daily.length, 0);
+    assert.equal(h3.reunionDate, null);
 
     // Premium couple: 3 cards/day and adult cards only after the 18+ confirmation.
     const pHost = await api({ action: 'create', name: 'Cy' }, 'premium-host');

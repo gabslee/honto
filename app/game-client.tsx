@@ -6,6 +6,7 @@ import { getMessages, testimonials, questionLibrary, questionLibraryJa, question
 import { SPICY_AGE_STORAGE_KEY, spicyDeckAccess } from "./deck-access";
 import { dateResultTitle, dateTaskFor, pointsLabel, setDateModeActive, w } from "./date-mode.js";
 import { deckPrompts } from "../data/long-distance-decks";
+import { PARTNER_KEY_COOKIE, PARTNER_KEY_STORAGE } from "./couple-identity.js";
 import { loadRoomSession, removeRoomSession, saveRoomSession } from "./session-store";
 import { nextHeaderVisibility } from "./header-visibility";
 import { connectionLabel, roomPollDelay } from "./sync-policy";
@@ -130,8 +131,17 @@ function aiFallbackNotice(locale: Locale, reason?: string) {
   if (reason === "invalid_response") return locale === "ja" ? "AIの回答が不完全だったため、内蔵の候補を表示しています。もう一度試せます。" : "AI returned an incomplete answer, so these are built-in suggestions. You can try again.";
   return locale === "ja" ? "AIに接続できなかったため、内蔵の候補を表示しています。" : "AI could not be reached, so these are built-in suggestions.";
 }
+function partnerKey() {
+  // Stable, account-free couple id for the partner's browser (localStorage + cookie).
+  try {
+    let key = localStorage.getItem(PARTNER_KEY_STORAGE);
+    if (!key) { key = crypto.randomUUID(); localStorage.setItem(PARTNER_KEY_STORAGE, key); }
+    document.cookie = `${PARTNER_KEY_COOKIE}=${key}; path=/; max-age=31536000; samesite=lax`;
+    return key;
+  } catch { return undefined; }
+}
 async function gameApi(body: Record<string, unknown>) {
-  const response = await fetch("/api/game", { method: "POST", cache: "no-store", headers: { "content-type": "application/json", "cache-control": "no-cache" }, body: JSON.stringify(body) });
+  const response = await fetch("/api/game", { method: "POST", cache: "no-store", headers: { "content-type": "application/json", "cache-control": "no-cache" }, body: JSON.stringify({ ...body, partnerKey: partnerKey() }) });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? "Something went wrong.");
   return data;
