@@ -20,6 +20,8 @@ export function ensureCoupleSchema(sql: Sql) {
     await sql`ALTER TABLE daily_answers ADD COLUMN IF NOT EXISTS couple_id text`;
     await sql`ALTER TABLE daily_answers ADD COLUMN IF NOT EXISTS role text`;
     await sql`ALTER TABLE daily_answers ADD COLUMN IF NOT EXISTS author_name text`;
+    await sql`CREATE TABLE IF NOT EXISTS couple_photos (id text PRIMARY KEY, couple_id text NOT NULL, room_id text, role text NOT NULL, author_name text NOT NULL, url text NOT NULL, pathname text NOT NULL, phrase_key text, phrase text NOT NULL, content_type text NOT NULL, size_bytes integer NOT NULL, created_at timestamptz NOT NULL DEFAULT now())`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_couple_photos_couple ON couple_photos(couple_id, created_at DESC)`;
     await sql`ALTER TABLE couple_moments ADD COLUMN IF NOT EXISTS couple_id text`;
     // Migration: anything created before couples existed belongs to a room-scoped couple.
     await sql`INSERT INTO couples (id, reunion_date, adult_confirmed_at) SELECT 'room:' || r.id, r.reunion_date, r.daily_adult_confirmed_at FROM rooms r WHERE r.couple_id IS NULL AND (EXISTS (SELECT 1 FROM daily_cards c WHERE c.room_id = r.id) OR EXISTS (SELECT 1 FROM couple_moments m WHERE m.room_id = r.id) OR r.reunion_date IS NOT NULL OR r.daily_adult_confirmed_at IS NOT NULL) ON CONFLICT (id) DO NOTHING`;
@@ -47,6 +49,7 @@ async function mergeCouple(sql: Sql, from: string, into: string) {
   await sql`UPDATE daily_cards c SET couple_id = ${into} WHERE c.couple_id = ${from} AND NOT EXISTS (SELECT 1 FROM daily_cards x WHERE x.couple_id = ${into} AND x.day = c.day AND x.slot = c.slot)`;
   await sql`UPDATE daily_answers a SET couple_id = ${into} WHERE a.couple_id = ${from} AND NOT EXISTS (SELECT 1 FROM daily_answers x WHERE x.couple_id = ${into} AND x.day = a.day AND x.slot = a.slot AND x.role = a.role)`;
   await sql`UPDATE couple_moments SET couple_id = ${into} WHERE couple_id = ${from}`;
+  await sql`UPDATE couple_photos SET couple_id = ${into} WHERE couple_id = ${from}`;
 }
 
 /** Returns the couple row for this 2-player room, creating/linking it as needed. */

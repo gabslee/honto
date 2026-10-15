@@ -10,6 +10,7 @@ import { archiveFinishedMatch } from "../app/match-history";
 import { handleDaily } from "./daily-card";
 import { handleHistory, snapshotMoments } from "./couple-history";
 import { rememberPartnerKey } from "./couple";
+import { handlePhoto } from "./photo-moments";
 import { normalizeDrinkMode } from "../app/date-mode.js";
 import { deckRequiresPremium } from "../app/deck-access.js";
 
@@ -369,6 +370,9 @@ export default async function handler(req: any, res: any) {
     }
     if (typeof body.action === "string" && ["history", "setReunion"].includes(body.action)) {
       return json(res, await handleHistory(sql, room, me, body as Record<string, unknown>));
+    }
+    if (typeof body.action === "string" && ["photoUpload", "photoLatest"].includes(body.action)) {
+      return json(res, await handlePhoto(sql, room, me, body as Record<string, unknown>, req.photoUpload), body.action === "photoUpload" ? 201 : 200);
     }
     // Save completed cards to the couple history before a new deck replaces them.
     if (body.action === "start" || body.action === "newTable") await snapshotMoments(sql, room);

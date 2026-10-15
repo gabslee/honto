@@ -31,6 +31,9 @@ export function ensureIdentitySchema() {
     await sql`CREATE TABLE IF NOT EXISTS ai_usage (scope text NOT NULL, scope_key text NOT NULL, window_start timestamptz NOT NULL, uses integer NOT NULL DEFAULT 0, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(scope, scope_key, window_start))`;
     await sql`CREATE INDEX IF NOT EXISTS idx_ai_usage_updated_at ON ai_usage(updated_at)`;
     await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS user_id text REFERENCES users(id)`;
+    // Mobile bearer tokens: kind 'user' (signed-in account) or 'device' (account-free partner, couple-scoped via partner_key).
+    await sql`CREATE TABLE IF NOT EXISTS mobile_tokens (token_hash text PRIMARY KEY, kind text NOT NULL, user_id text REFERENCES users(id) ON DELETE CASCADE, partner_key text, room_id text, platform text, created_at timestamptz NOT NULL DEFAULT now(), last_used_at timestamptz, expires_at timestamptz NOT NULL, revoked_at timestamptz)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_mobile_tokens_user ON mobile_tokens(user_id)`;
   })();
   return schemaReady;
 }
@@ -62,8 +65,45 @@ export async function createUserSession(userId: string) {
   return token;
 }
 
+export function bearerToken(request: Request) {
+  const value = request.headers.get("authorization") ?? "";
+  return value.toLowerCase().startsWith("bearer ") ? value.slice(7).trim() : "";
+}
+
+/** Long-lived (365 days), revocable mobile token. Only its hash is stored. */
+export async function createMobileToken(options: { kind: "user" | "device"; userId?: string | null; partnerKey?: string | null; roomId?: string | null; platform?: string | null }) {
+  if (!sql) throw new Error("DATABASE_URL is not configured.");
+  await ensureIdentitySchema();
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const token = `hm_${options.kind === "user" ? "u" : "d"}_${Buffer.from(bytes).toString("base64url")}`;
+  await sql`INSERT INTO mobile_tokens (token_hash, kind, user_id, partner_key, room_id, platform, expires_at) VALUES (${await hash(token)}, ${options.kind}, ${options.userId ?? null}, ${options.partnerKey ?? null}, ${options.roomId ?? null}, ${options.platform ?? null}, now() + interval '365 days')`;
+  return token;
+}
+
+export type MobileToken = { kind: "user" | "device"; userId: string | null; partnerKey: string | null; roomId: string | null };
+export async function getMobileToken(request: Request): Promise<MobileToken | null> {
+  const token = bearerToken(request);
+  if (!sql || !token.startsWith("hm_")) return null;
+  await ensureIdentitySchema();
+  const rows = await sql`UPDATE mobile_tokens SET last_used_at = now() WHERE token_hash = ${await hash(token)} AND revoked_at IS NULL AND expires_at > now() RETURNING kind, user_id AS "userId", partner_key AS "partnerKey", room_id AS "roomId"`;
+  return (rows[0] as MobileToken | undefined) ?? null;
+}
+
+export async function revokeMobileToken(request: Request) {
+  const token = bearerToken(request);
+  if (!sql || !token) return false;
+  await ensureIdentitySchema();
+  const rows = await sql`UPDATE mobile_tokens SET revoked_at = now() WHERE token_hash = ${await hash(token)} AND revoked_at IS NULL RETURNING kind`;
+  return rows.length > 0;
+}
+
 export async function getCurrentUser(request: Request) {
   if (!sql) return null;
+  const mobile = bearerToken(request) ? await getMobileToken(request) : null;
+  if (mobile?.kind === "user" && mobile.userId) {
+    const rows = await sql`SELECT u.id, u.email, u.display_name AS "displayName", u.role, u.plan, u.subscription_status AS "subscriptionStatus", u.subscription_expires_at AS "subscriptionExpiresAt", u.trial_started_at AS "trialStartedAt", u.trial_ends_at AS "trialEndsAt", u.stripe_customer_id AS "stripeCustomerId", u.stripe_subscription_id AS "stripeSubscriptionId", u.terms_accepted_at AS "termsAcceptedAt", u.terms_version AS "termsVersion" FROM users u WHERE u.id = ${mobile.userId} LIMIT 1`;
+    return (rows[0] as CurrentUser | undefined) ?? null;
+  }
   const token = request.headers.get("cookie")?.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${USER_COOKIE}=`))?.slice(USER_COOKIE.length + 1) ?? "";
   if (!token) return null;
   await ensureIdentitySchema();
