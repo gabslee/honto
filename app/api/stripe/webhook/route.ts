@@ -1,4 +1,5 @@
-import { saveStripeSubscription, stripeSecret, userByStripeId } from "../../../stripe";
+import { isSpicyAddonPurchase, SPICY_ADDON_PRODUCT } from "../../../spicy-addon.js";
+import { saveSpicyAddonPurchase, saveStripeSubscription, stripeSecret, userByStripeId } from "../../../stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,11 @@ export async function POST(request: Request) {
   const metadataUserId = String(object.metadata?.user_id ?? object.subscription_details?.metadata?.user_id ?? "");
   const customerId = typeof object.customer === "string" ? object.customer : null;
   const subscriptionId = typeof object.subscription === "string" ? object.subscription : (typeof object.id === "string" && object.id.startsWith("sub_") ? object.id : null);
+  // One-time add-on purchases must never be treated as a Premium subscription.
+  if (object.metadata?.product === SPICY_ADDON_PRODUCT || object.mode === "payment") {
+    if (event.type === "checkout.session.completed" && metadataUserId && isSpicyAddonPurchase(object)) await saveSpicyAddonPurchase(metadataUserId, customerId);
+    return Response.json({ received: true });
+  }
   const userId = metadataUserId || await userByStripeId(customerId, subscriptionId);
   if (userId && (event.type === "checkout.session.completed" || event.type?.startsWith("customer.subscription."))) {
     const status = event.type === "checkout.session.completed" ? "active" : String(object.status ?? "active");

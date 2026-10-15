@@ -1,9 +1,11 @@
 // Server-side content rules for AI generated cards.
-// Adult content is only allowed when the room's saved deck (server state) includes Spicy 18+.
+// Adult content is only allowed when the room's saved deck (server state) includes a Spicy 18+ deck
+// (the Premium "spicy" deck or the "spicyLdr" add-on).
+const ADULT_DECKS = ["spicy", "spicyLdr"];
 
 export function deckAllowsAdultContent(themeCategory) {
   if (typeof themeCategory !== "string") return false;
-  return themeCategory.split(",").map((key) => key.trim()).includes("spicy");
+  return themeCategory.split(",").map((key) => key.trim()).some((key) => ADULT_DECKS.includes(key));
 }
 
 export const SAFE_FOR_WORK_INSTRUCTION = "This deck is NOT the Spicy 18+ deck. Keep everything strictly safe for work and suitable for a general audience: no sex, sexual acts, nudity, bedroom or hookup stories, sexual body parts, fetishes, sexual innuendo, or explicit romance. Light everyday romance such as dates, crushes, or missing each other is fine. If the player's truth is sexual or explicit, do not mirror that tone: write wholesome everyday lies instead.";
@@ -37,6 +39,6 @@ export function anySexualContent(items) {
 // Never forward an adult category unless the server-side deck allows it.
 export function allowedCategories(requested, adultAllowed) {
   const list = Array.isArray(requested) ? requested : typeof requested === "string" ? requested.split(",") : [];
-  const filtered = list.map((key) => String(key).trim()).filter(Boolean).filter((key) => adultAllowed || key !== "spicy");
+  const filtered = list.map((key) => String(key).trim()).filter(Boolean).filter((key) => adultAllowed || !ADULT_DECKS.includes(key));
   return filtered.length ? filtered : ["general"];
 }
