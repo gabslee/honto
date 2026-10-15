@@ -6,6 +6,7 @@ import { ensureCoupleSchema, resolveCouple } from "./couple";
 import { dailyCardText } from "./daily-card";
 
 type Sql = NeonQueryFunction<false, false>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic SQL rows
 type Row = Record<string, any>;
 const parse = (value: unknown) => { try { return typeof value === "string" ? JSON.parse(value) : (value ?? {}); } catch { return {}; } };
 

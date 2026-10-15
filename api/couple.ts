@@ -35,7 +35,7 @@ export function ensureCoupleSchema(sql: Sql) {
 }
 
 /** Remember the partner's browser key (set when they join via the link). Never overwrites an existing key. */
-export async function rememberPartnerKey(sql: Sql, room: any, me: any, partnerKey: unknown) {
+export async function rememberPartnerKey(sql: Sql, room: Record<string, unknown>, me: Record<string, unknown>, partnerKey: unknown) {
   if (me.is_host || !validPartnerKey(partnerKey) || me.partner_key) return;
   await ensureCoupleSchema(sql);
   await sql`UPDATE players SET partner_key = ${partnerKey} WHERE id = ${me.id} AND room_id = ${room.id} AND partner_key IS NULL`;
@@ -50,19 +50,19 @@ async function mergeCouple(sql: Sql, from: string, into: string) {
 }
 
 /** Returns the couple row for this 2-player room, creating/linking it as needed. */
-export async function resolveCouple(sql: Sql, room: any) {
+export async function resolveCouple(sql: Sql, room: Record<string, unknown>) {
   await ensureCoupleSchema(sql);
   const players = await sql`SELECT id, is_host, user_id, partner_key FROM players WHERE room_id = ${room.id}`;
-  const key = coupleKeyFor(players as any[]);
-  const current = (await sql`SELECT couple_id FROM rooms WHERE id = ${room.id}`)[0] as any;
+  const key = coupleKeyFor(players as Record<string, unknown>[]);
+  const current = (await sql`SELECT couple_id FROM rooms WHERE id = ${room.id}`)[0] as { couple_id?: string } | undefined;
   let target: string;
   if (key) {
     const found = await sql`SELECT id FROM couples WHERE host_user_id = ${key.hostUserId} AND partner_key = ${key.partnerKey}`;
-    if (found[0]) target = (found[0] as any).id;
+    if (found[0]) target = String(found[0].id);
     else {
       target = crypto.randomUUID();
       await sql`INSERT INTO couples (id, host_user_id, partner_key) VALUES (${target}, ${key.hostUserId}, ${key.partnerKey}) ON CONFLICT DO NOTHING`;
-      target = ((await sql`SELECT id FROM couples WHERE host_user_id = ${key.hostUserId} AND partner_key = ${key.partnerKey}`)[0] as any).id;
+      target = ((await sql`SELECT id FROM couples WHERE host_user_id = ${key.hostUserId} AND partner_key = ${key.partnerKey}`)[0] as { id: string }).id;
     }
   } else {
     target = current?.couple_id ?? roomCoupleId(room.id);

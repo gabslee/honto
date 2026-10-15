@@ -365,10 +365,10 @@ export default async function handler(req: any, res: any) {
     const { room, me, card } = await getContext(roomCode, token);
     if (!room.multiplayer) await rememberPartnerKey(sql, room, me, (body as Record<string, unknown>).partnerKey);
     if (typeof body.action === "string" && ["daily", "dailyAnswer", "dailyConfirmAdult"].includes(body.action)) {
-      return json(res, await handleDaily(sql, room, me, body as Record<string, any>, currentUser));
+      return json(res, await handleDaily(sql, room, me, body as Record<string, unknown>, currentUser));
     }
     if (typeof body.action === "string" && ["history", "setReunion"].includes(body.action)) {
-      return json(res, await handleHistory(sql, room, me, body as Record<string, any>));
+      return json(res, await handleHistory(sql, room, me, body as Record<string, unknown>));
     }
     // Save completed cards to the couple history before a new deck replaces them.
     if (body.action === "start" || body.action === "newTable") await snapshotMoments(sql, room);
