@@ -699,3 +699,17 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .sip-picker { justify-content:space-between; }
   .sip-choice { flex:1; }
 }
+
+/* Long-distance positioning: how-it-works + honest social proof */
+.ldr-proof { max-width:1220px; width:100%; margin:0 auto 40px; padding:56px 0 8px; border-top:2px solid var(--ink); position:relative; z-index:1; }
+.ldr-proof h2 { font-size:clamp(32px,4vw,54px); line-height:.98; letter-spacing:-.05em; margin:14px 0 30px; max-width:760px; }
+.ldr-steps { list-style:none; padding:0; margin:0 0 30px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+.ldr-steps li { background:#fff; border:2px solid var(--ink); border-radius:18px; padding:22px; box-shadow:5px 5px 0 var(--ink); }
+.ldr-steps b { display:block; font-size:12px; letter-spacing:.14em; color:var(--red); }
+.ldr-steps strong { display:block; font-size:22px; margin:8px 0 6px; letter-spacing:-.03em; }
+.ldr-steps p { font-family:Arial,sans-serif; font-size:15px; line-height:1.45; margin:0; }
+.ldr-facts { list-style:none; padding:0; margin:0; display:flex; flex-wrap:wrap; gap:10px; }
+.ldr-facts li { border:1.5px solid var(--ink); border-radius:999px; padding:8px 14px; font:900 11px/1.2 Arial,sans-serif; letter-spacing:.04em; background:var(--paper); }
+.ldr-testimonials { margin-top:32px; display:grid; gap:14px; }
+.ldr-testimonials figure { margin:0; border-left:3px solid var(--ink); padding-left:16px; }
+@media (max-width:760px) { .ldr-steps { grid-template-columns:1fr; } .ldr-proof { padding-top:40px; } }
