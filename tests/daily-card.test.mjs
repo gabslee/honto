@@ -70,5 +70,5 @@ test("server: room token identity, 2 players only, limits and adult confirmation
 test("entry points on the landing and the room", async () => {
   const client = await readFile(new URL("../app/game-client.tsx", import.meta.url), "utf8");
   assert.match(client, /id="card-of-the-day"/);
-  assert.match(client, /<DailyCardPanel code=\{session\.code\} token=\{session\.token\}/);
+  assert.match(client, /<DailyCardPanel (key=\{`[^`]*`\} )?code=\{session\.code\} token=\{session\.token\}/);
 });
