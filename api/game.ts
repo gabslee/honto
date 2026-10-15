@@ -7,6 +7,7 @@ import { assertMultiplayerHost, assertRoomCapacity, assertMultiplayerStart, muta
 import { createMultiplayerState, reduceMultiplayer, publicMultiplayer, type MultiplayerCard } from "./multiplayer";
 import { multiplayerPrompts } from "../data/multiplayer-prompts";
 import { archiveFinishedMatch } from "../app/match-history";
+import { handleDaily } from "./daily-card";
 import { deckRequiresPremium } from "../app/deck-access.js";
 
 type CardType = "honto" | "question" | "wouldrather" | "preference" | "estimate" | "rps" | "both";
@@ -357,6 +358,9 @@ export default async function handler(req: any, res: any) {
 
     const token = String(body.token ?? "");
     const { room, me, card } = await getContext(roomCode, token);
+    if (typeof body.action === "string" && ["daily", "dailyAnswer", "dailyConfirmAdult"].includes(body.action)) {
+      return json(res, await handleDaily(sql, room, me, body as Record<string, any>, currentUser));
+    }
     if (body.action === "setLocale") {
       const locale: Locale = body.locale === "ja" || body.locale === "pt-BR" ? body.locale : "en";
       await sql`UPDATE players SET locale = ${locale} WHERE id = ${me.id} AND room_id = ${room.id}`;
