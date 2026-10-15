@@ -3,8 +3,13 @@ import { ensureIdentitySchema } from "./server-auth";
 
 export const stripeApi = "https://api.stripe.com/v1";
 export const stripeSecret = () => process.env.STRIPE_SECRET_KEY ?? "";
-export const stripeMonthlyPrice = () => process.env.STRIPE_MONTHLY_PRICE_ID ?? "price_1UEbQpRQHXAQ6ftMKfSBbsdS";
-export const stripeYearlyPrice = () => process.env.STRIPE_YEARLY_PRICE_ID ?? process.env.STRIPE_ANNUAL_PRICE_ID ?? "price_1UEbQnRQHXAQ6ftMIfFeBVd9";
+import { resolvePriceId } from "./pricing-config.js";
+export const stripeMonthlyPrice = () => resolvePriceId("month", "USD", process.env);
+export const stripeYearlyPrice = () => resolvePriceId("year", "USD", process.env);
+// BRL: STRIPE_MONTHLY_PRICE_ID_BRL / STRIPE_YEARLY_PRICE_ID_BRL, defaulting to the live BRL prices.
+export const stripeMonthlyPriceBrl = () => resolvePriceId("month", "BRL", process.env);
+export const stripeYearlyPriceBrl = () => resolvePriceId("year", "BRL", process.env);
+export const priceFor = (interval: "month" | "year", currency: "USD" | "BRL") => resolvePriceId(interval, currency, process.env);
 const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
 
 export function stripeHeaders() {
