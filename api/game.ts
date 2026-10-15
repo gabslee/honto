@@ -114,7 +114,9 @@ async function buildDeck(roomId: string, roundCount: number, players: any[], the
     const type = types[index];
     const question = questions[index % questions.length];
     const preference = preferences[index % preferences.length];
-    const localizedDeckLocale = locale === "ja" ? "ja" : "en";
+    // Base copy is English; each viewer gets their own language via publicCard.
+    void locale;
+    const localizedDeckLocale = "en";
     const payload = type === "estimate" ? { question: question[localizedDeckLocale], localized: { en: { question: question.en }, ja: { question: question.ja } }, wrongGuesses: [] } : type === "preference" ? { ...preference[localizedDeckLocale], localized: { en: preference.en, ja: preference.ja } } : {};
     cards.push({ id: id(), room_id: roomId, card_number: index + 1, type, actor_id: actor.id, target_id: target.id, payload: JSON.stringify(payload) });
   }
@@ -124,7 +126,10 @@ async function buildDeck(roomId: string, roundCount: number, players: any[], the
 function publicCard(row: any, meId: string, completed = false, locale: Locale = "en") {
   if (!row) return null;
   const payload = parse(row.payload);
-  if (payload.localized?.[locale]) Object.assign(payload, payload.localized[locale]);
+  // Cards are shown in the viewer's language. Only en/ja decks exist, so every other locale (pt-BR included) uses English.
+  const deckLocale = locale === "ja" ? "ja" : "en";
+  const localizedCopy = payload.localized?.[deckLocale] ?? payload.localized?.en;
+  if (localizedCopy) Object.assign(payload, localizedCopy);
   delete payload.localized;
   const card: any = {
     id: row.id, cardNumber: row.cardNumber, type: row.type, status: row.status, completedAt: row.completedAt ?? null,
@@ -533,8 +538,9 @@ export default async function handler(req: any, res: any) {
     }
     if (body.action === "nextPreference") {
       if (!card || card.type !== "preference" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("Only the player choosing can move to the next question.");
-      const payload = parse(card.payload); const themes = normalizedThemes(room.theme_category); const pool = shuffle(themes.flatMap((theme) => (room.locale === "ja" ? PREFERENCE_CARDS_BY_THEME_JA[theme] : PREFERENCE_CARDS_BY_THEME[theme])));
-      const currentQuestion = typeof payload.question === "string" ? payload.question : ""; const nextCard = pool.find((item) => item.question !== currentQuestion) ?? pool[0];
+      const payload = parse(card.payload); const themes = normalizedThemes(room.theme_category); const pool = shuffle(themes.flatMap((theme) => PREFERENCE_CARDS_BY_THEME[theme].map((en, i) => ({ en, ja: PREFERENCE_CARDS_BY_THEME_JA[theme][i] }))));
+      const currentQuestion = typeof payload.question === "string" ? payload.question : ""; const next = pool.find((item) => item.en.question !== currentQuestion && item.ja?.question !== currentQuestion) ?? pool[0];
+      const nextCard = next ? { ...next.en, localized: { en: next.en, ja: next.ja ?? next.en } } : null;
       if (nextCard) await sql`UPDATE deck_cards SET payload = ${JSON.stringify(nextCard)}, secret = '{}' WHERE id = ${card.id} AND status = 'ready'`;
     }
     if (body.action === "choosePreference") {
@@ -596,9 +602,10 @@ export default async function handler(req: any, res: any) {
     }
     if (body.action === "nextEstimate") {
       if (!card || card.type !== "estimate" || card.status !== "ready" || card.actor_id !== me.id) throw new Error("Only the player answering can choose the next estimate.");
-      const payload = parse(card.payload); const themes = normalizedThemes(room.theme_category); const pool = shuffle(themes.flatMap((theme) => (room.locale === "ja" ? ESTIMATE_QUESTIONS_BY_THEME_JA[theme] : ESTIMATE_QUESTIONS_BY_THEME[theme])));
-      const currentQuestion = typeof payload.question === "string" ? payload.question : ""; const nextQuestion = pool.find((question) => question !== currentQuestion) ?? pool[0] ?? currentQuestion;
-      await sql`UPDATE deck_cards SET payload = ${JSON.stringify(replaceEstimateQuestion(payload, nextQuestion))}, secret = '{}' WHERE id = ${card.id} AND status = 'ready'`;
+      const payload = parse(card.payload); const themes = normalizedThemes(room.theme_category); const pool = shuffle(themes.flatMap((theme) => ESTIMATE_QUESTIONS_BY_THEME[theme].map((en, i) => ({ en, ja: ESTIMATE_QUESTIONS_BY_THEME_JA[theme][i] ?? en }))));
+      const currentQuestion = typeof payload.question === "string" ? payload.question : ""; const next = pool.find((item) => item.en !== currentQuestion && item.ja !== currentQuestion) ?? pool[0];
+      const nextPayload = next ? { ...replaceEstimateQuestion(payload, next.en), localized: { en: { question: next.en }, ja: { question: next.ja } } } : replaceEstimateQuestion(payload, currentQuestion);
+      await sql`UPDATE deck_cards SET payload = ${JSON.stringify(nextPayload)}, secret = '{}' WHERE id = ${card.id} AND status = 'ready'`;
     }
     if (body.action === "guessEstimate") {
       if (!card || card.type !== "estimate" || card.status !== "guess" || card.target_id !== me.id) throw new Error("This estimate is not yours to guess.");
