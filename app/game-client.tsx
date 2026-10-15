@@ -327,8 +327,8 @@ export default function GameClient({ appleConfigured = false, currency = "USD" }
     {error && <div className="toast error-toast">{error}<button onClick={() => setError("")}>×</button></div>}
     {connection !== "online" && <div className={`connection-banner ${connection}`} role="status">{connection === "offline" ? (locale === "ja" ? "オフラインです。接続が戻ると再開します。" : "You are offline. Your game will resume when your connection returns.") : (locale === "ja" ? "パートナーと再接続中…" : "Reconnecting to your partner…")}</div>}
     {game.room.status === "lobby" && <Lobby game={game} host={Boolean(host)} busy={busy} copied={copied} copyInvite={copyInvite} act={act} />}
-    {!game.room.multiplayer && game.room.status !== "playing" && game.players.length <= 2 && <DailyCardPanel code={session.code} token={session.token} />}
-    {!game.room.multiplayer && game.room.status !== "playing" && game.players.length <= 2 && <CoupleHistoryPanel code={session.code} token={session.token} />}
+    {!game.room.multiplayer && game.room.status !== "playing" && game.players.length <= 2 && <DailyCardPanel key={`daily-${game?.players.length ?? 0}`} code={session.code} token={session.token} />}
+    {!game.room.multiplayer && game.room.status !== "playing" && game.players.length <= 2 && <CoupleHistoryPanel key={`history-${game?.players.length ?? 0}`} code={session.code} token={session.token} />}
     {game.group && session && (game.room.status === "playing" || game.room.status === "finished" || game.room.status === "abandoned") && <MultiplayerGame group={game.group} players={game.players} meId={game.meId} busy={busy} act={act} locale={locale} roomCode={session.code} sessionToken={session.token} welcomeAck={game.room.welcomeAck} canRestart={Boolean(host && game.room.canHostMultiplayer)} />}
     {game.room.status === "playing" && !game.group && <GameTable game={game} busy={busy} act={act} />}
     {game.room.status === "finished" && !game.group && !reveal && <Finished players={game.players} restart={() => act("newTable")} />}
