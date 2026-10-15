@@ -7,6 +7,7 @@ import { assertMultiplayerHost, assertRoomCapacity, assertMultiplayerStart, muta
 import { createMultiplayerState, reduceMultiplayer, publicMultiplayer, type MultiplayerCard } from "./multiplayer";
 import { multiplayerPrompts } from "../data/multiplayer-prompts";
 import { archiveFinishedMatch } from "../app/match-history";
+import { deckRequiresPremium } from "../app/deck-access.js";
 
 type CardType = "honto" | "question" | "wouldrather" | "preference" | "estimate" | "rps" | "both";
 type Locale = "en" | "ja" | "pt-BR";
@@ -61,7 +62,7 @@ const code = () => makeRoomCode(WORDS);
 const spinSips = () => 1 + Math.floor(Math.random() * 3);
 const spinHighSips = () => 2 + Math.floor(Math.random() * 3);
 const cleanName = (value?: string) => value?.trim().replace(/\s+/g, " ").slice(0, 24) ?? "";
-const LEGACY_THEME_MAP: Record<string, string> = { general: "general", relationships: "relationships", mixed: "general", family: "general", innocent: "general", life: "life", flirty: "relationships", videoCall: "videoCall", reunion: "reunion", spicy: "spicy", wild: "general" };
+const LEGACY_THEME_MAP: Record<string, string> = { general: "general", relationships: "relationships", mixed: "general", family: "general", innocent: "general", life: "life", flirty: "relationships", videoCall: "videoCall", reunion: "reunion", acrossMiles: "acrossMiles", futureUs: "futureUs", deepTalk: "deepTalk", playful: "playful", spicy: "spicy", spicyLdr: "spicyLdr", wild: "general" };
 const CURATED_THEME_SET = new Set<CuratedTheme>(["general", "life", "relationships", "spicy"]);
 const normalizedThemes = (value?: string | null): CuratedTheme[] => {
   const themes = String(value ?? "").split(",").map((item) => LEGACY_THEME_MAP[item.trim()]).filter((item): item is CuratedTheme => CURATED_THEME_SET.has(item as CuratedTheme));
@@ -438,7 +439,7 @@ export default async function handler(req: any, res: any) {
           if (members.length > 2) throw new Error("Remove extra players before switching to two-player mode.");
         }
         const settings = normalizeRoomSettings(room, body, LEGACY_THEME_MAP);
-        if (settings.themeCategory.split(",").includes("spicy") && !hasPremiumAccess(currentUser)) throw new Error("Spicy is a Premium theme.");
+        if (deckRequiresPremium(settings.themeCategory) && !hasPremiumAccess(currentUser)) throw new Error("Spicy is a Premium theme.");
         const switched = multiplayer !== Boolean(room.multiplayer);
         const available = multiplayer ? [...GROUP_TYPES] : CARD_TYPES;
         const rawTypes = body.cardTypes ?? (switched ? available.join(",") : room.card_types);

@@ -82,7 +82,7 @@ const fallbackQuestions = (categories: string | string[], customTheme?: string |
     const direction = hint.trim().replace(/[?.!]+$/g, "").slice(0, 70);
     return [`What is one personal story connected to ${direction}?`, `What is something unexpected you remember about ${direction}?`, `What is your honest opinion about ${direction}?`];
   }
-  if (key === "spicy") return ["What is an intimate experience you feel comfortable sharing?", "What is a desire you have changed your mind about?", "What is a boundary you learned to communicate?"];
+  if ((key === "spicy" || key === "spicyLdr")) return ["What is an intimate experience you feel comfortable sharing?", "What is a desire you have changed your mind about?", "What is a boundary you learned to communicate?"];
   if (key === "relationships") return ["What is a dating or friendship story you still remember?", "What quality makes someone instantly likable to you?", "What is a relationship green flag you value?"];
   if (key === "life") return ["What is a life experience that changed you?", "What is a decision you would make differently now?", "What is something you learned the hard way?"];
   return ["What is a personal story your friends may not know?", "What is a small decision that changed your day?", "What is a memory you rarely talk about?"];
@@ -91,7 +91,7 @@ const fallbackQuestionsJa = (categories: string | string[], customTheme?: string
   const key = (Array.isArray(categories) ? categories : [categories]).find((item) => item !== "general") ?? "general";
   if (customTheme?.trim()) { const subject = customTheme.trim().slice(0, 60); return [`${subject}に関する思い出は何ですか？`, `${subject}で一番意外だったことは？`, `${subject}について正直にどう思いますか？`]; }
   if (hint?.trim()) { const direction = hint.trim().replace(/[?.!]+$/g, "").slice(0, 70); return [`${direction}に関する個人的な話はありますか？`, `${direction}について覚えている意外なことは？`, `${direction}についての本音は？`]; }
-  if (key === "spicy") return ["安心して話せる親密な経験はありますか？", "考えが変わった願望はありますか？", "伝え方を学んだ境界線は何ですか？"];
+  if ((key === "spicy" || key === "spicyLdr")) return ["安心して話せる親密な経験はありますか？", "考えが変わった願望はありますか？", "伝え方を学んだ境界線は何ですか？"];
   if (key === "relationships") return ["今でも覚えている恋愛や友情の話は？", "人をすぐ好きになる魅力は何ですか？", "大切にしている関係のグリーンフラッグは？"];
   if (key === "life") return ["人生を変えた経験は何ですか？", "今なら違う選択をすることは何ですか？", "苦労して学んだことは何ですか？"];
   return ["友人がまだ知らないあなたの話は？", "一日を変えた小さな決断は？", "あまり話さない思い出は？"];
@@ -109,7 +109,7 @@ const normalizeTheme = (value: string) => value.trim().replace(/^["'“”‘’
 const usableTheme = (value: string, exclude: string[] = []) => { const theme = normalizeTheme(value); const words = theme.split(" ").filter(Boolean); return words.length >= 3 && words.length <= 8 && !/[—–\-:;|]/.test(theme) && !/\b(i|my|me|we|our|us)\b/i.test(theme) && !/\b(when|the time|a time)\s+(i|my|we|our)\b/i.test(theme) && !/\b(edition|confession|confessions|category|categories|theme|party game|two lies|one truth|your relatives|family tradition)$\b/i.test(theme) && !/\b(spicy sausage|chemistry class).*(spicy sausage|chemistry class)\b/i.test(theme) && !exclude.some((item) => item.toLowerCase() === theme.toLowerCase()) ? theme : null; };
 const categoryGuidance = (categories: string | string[]) => {
   const key = Array.isArray(categories) ? categories[0] : categories;
-  if (key === "spicy") return "This is an adults only 18+ category for consenting adults. Topics may openly discuss sex, sexual experiences, desire, intimacy, and bedroom communication, but never minors, coercion, exploitation, incest, or violence. Keep each topic non graphic and broad enough for many different answers.";
+  if ((key === "spicy" || key === "spicyLdr")) return "This is an adults only 18+ category for consenting adults. Topics may openly discuss sex, sexual experiences, desire, intimacy, and bedroom communication, but never minors, coercion, exploitation, incest, or violence. Keep each topic non graphic and broad enough for many different answers.";
   if (key === "relationships") return "Keep this about friendship, dating, attraction, romance, communication, and relationship choices without becoming explicit. Keep each topic broad enough for many different answers.";
   return "Keep every topic grounded in one ordinary personal subject from this category, with no unrelated mashups. Keep each topic broad enough for many different answers.";
 };

@@ -13,14 +13,16 @@ test("Spicy deck asks Premium hosts for 18+ confirmation before first use", () =
   assert.equal(spicyDeckAccess({ premium: true, ageConfirmed: true }), "allowed");
 });
 
-test("each long-distance deck has 40 curated cards in every supported language", () => {
+test("each long-distance deck has its curated cards in every supported language", () => {
+  const expected = { videoCall: 40, reunion: 40, spicy: 40, acrossMiles: 30, futureUs: 30, deepTalk: 30, playful: 30, spicyLdr: 30 };
+  assert.deepEqual(Object.keys(LONG_DISTANCE_DECKS).sort(), Object.keys(expected).sort());
   for (const [key, cards] of Object.entries(LONG_DISTANCE_DECKS)) {
-    assert.equal(cards.length, 40, `${key} should contain 40 cards`);
+    assert.equal(cards.length, expected[key], `${key} should contain ${expected[key]} cards`);
     for (const locale of ["en", "pt-BR", "ja"]) {
       const prompts = deckPrompts(locale)[key];
-      assert.equal(prompts.length, 40);
+      assert.equal(prompts.length, expected[key]);
       assert.ok(prompts.every((prompt) => prompt.trim().length > 0));
-      assert.equal(new Set(prompts).size, 40, `${key}/${locale} should not contain duplicates`);
+      assert.equal(new Set(prompts).size, expected[key], `${key}/${locale} should not contain duplicates`);
     }
   }
 });
