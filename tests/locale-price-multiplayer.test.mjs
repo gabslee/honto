@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 const read = (p) => readFile(new URL(`../${p}`, import.meta.url), "utf8");
 
 test("annual price is displayed as US$29.99 and monthly stays US$4.99", async () => {
-  for (const file of ["app/i18n.ts", "app/pricing/page.tsx", "app/subscriptions/page.tsx"]) {
+  for (const file of ["app/i18n.ts", "app/pricing-config.js", "app/subscriptions/page.tsx"]) {
     const src = await read(file);
     assert.doesNotMatch(src, /39[.,]99/, file);
     assert.match(src, /29[.,]99/, file);

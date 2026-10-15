@@ -1,0 +1,46 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { priceLabels } from "../pricing-config.js";
+
+const PRICING_COPY = {
+  en: { back: "← Back to Honto", eyebrow: "PREMIUM · ONE PLAN FOR BOTH OF YOU", h1a: "Make every date", h1b: "more personal.", lead: "One Premium plan unlocks more ways for you and your partner to connect.", signin: "Sign in with Google to start your Premium trial.", signinCta: "SIGN IN →", agree: ["I agree to the ", "Terms of Use", " and ", "Privacy Policy", "."], benefitsTag: "PREMIUM FOR YOUR COUPLE", benefitsTitle: "More ways to feel close.", benefits: [["AI ideas", "More questions and prompts for the two of you."], ["Your own decks", "Custom questions made for your relationship."], ["Spicy 18+ decks", "Including Spicy long-distance, after an 18+ confirmation."], ["3 daily cards", "Three Cards of the Day instead of one."], ["One shared room", "Your partner enjoys your Premium features too."]], trial: "7-day free trial for both of you. Cancel anytime.", payTag: "CHOOSE HOW TO PAY", payText: "One price per couple. Monthly or yearly billing.", monthlyTag: "MONTHLY · PER COUPLE", perMonth: "/ month", monthlyText: "Covers both of you after the free trial.", opening: "OPENING CHECKOUT…", startMonthly: "START MONTHLY →", yearlyTag: "YEARLY · PER COUPLE", startYearly: "START YEARLY →", perYear: "/ year", yearlyText: (s: string) => `Covers both of you and saves ${s} per year.`, footnote: "Renews automatically after the trial unless canceled. Manage or cancel in the Stripe customer portal.", cardOnly: "Card payments only.", legal: ["Privacy", "Terms", "Subscriptions", "Responsible play"], errTerms: "Please accept the Terms of Use and Privacy Policy before continuing.", errCheckout: "Unable to open checkout." },
+  "pt-BR": { back: "← Voltar para o Honto", eyebrow: "PREMIUM · UM PLANO PARA VOCÊS DOIS", h1a: "Deixe cada date", h1b: "mais pessoal.", lead: "Um único plano Premium libera mais jeitos de você e seu amor se conectarem.", signin: "Entre com o Google para começar o teste do Premium.", signinCta: "ENTRAR →", agree: ["Concordo com os ", "Termos de Uso", " e a ", "Política de Privacidade", "."], benefitsTag: "PREMIUM PARA O CASAL", benefitsTitle: "Mais jeitos de ficar perto.", benefits: [["Ideias com IA", "Mais perguntas e sugestões para vocês dois."], ["Decks de vocês", "Perguntas personalizadas para o relacionamento."], ["Decks Picante 18+", "Incluindo o Picante à distância, após confirmar 18+."], ["3 cartas do dia", "Três cartas do dia em vez de uma."], ["Uma sala compartilhada", "Seu amor também aproveita o seu Premium."]], trial: "7 dias grátis para vocês dois. Cancele quando quiser.", payTag: "COMO PAGAR", payText: "Um preço por casal. Cobrança mensal ou anual.", monthlyTag: "MENSAL · POR CASAL", perMonth: "/ mês", monthlyText: "Vale para vocês dois depois do teste grátis.", opening: "ABRINDO O PAGAMENTO…", startMonthly: "ASSINAR MENSAL →", yearlyTag: "ANUAL · POR CASAL", startYearly: "ASSINAR ANUAL →", perYear: "/ ano", yearlyText: (s: string) => `Vale para vocês dois e economiza ${s} por ano.`, footnote: "Renova automaticamente após o teste, a menos que seja cancelado. Gerencie ou cancele no portal do cliente Stripe.", cardOnly: "Pagamento somente com cartão.", legal: ["Privacidade", "Termos", "Assinaturas", "Jogo responsável"], errTerms: "Aceite os Termos de Uso e a Política de Privacidade para continuar.", errCheckout: "Não foi possível abrir o pagamento." },
+  ja: { back: "← Hontoに戻る", eyebrow: "PREMIUM · 二人でひとつのプラン", h1a: "毎回のデートを", h1b: "もっと特別に。", lead: "ひとつのPremiumで、二人がつながる方法がもっと増えます。", signin: "Googleでログインして、Premiumの無料体験を始めましょう。", signinCta: "ログイン →", agree: ["", "利用規約", "と", "プライバシーポリシー", "に同意します。"], benefitsTag: "カップルのためのPREMIUM", benefitsTitle: "もっと近くに感じる方法。", benefits: [["AIアイデア", "二人のための質問やお題がもっと。"], ["自分たちのデッキ", "二人の関係に合わせた質問。"], ["スパイシー18+デッキ", "18歳以上の確認後、遠距離スパイシーも。"], ["今日のカード3枚", "今日のカードが1枚から3枚に。"], ["共有ルーム", "パートナーもPremium機能を楽しめます。"]], trial: "二人とも7日間無料。いつでも解約できます。", payTag: "お支払い方法", payText: "カップルでひとつの料金。月払いまたは年払い。", monthlyTag: "月額 · カップル", perMonth: "/ 月", monthlyText: "無料体験後、二人分をカバーします。", opening: "決済を開いています…", startMonthly: "月額で始める →", yearlyTag: "年額 · カップル", startYearly: "年額で始める →", perYear: "/ 年", yearlyText: (s: string) => `二人分をカバーし、年間${s}お得です。`, footnote: "解約しない限り、無料体験後に自動更新されます。Stripeのカスタマーポータルで管理・解約できます。", cardOnly: "カード払いのみ。", legal: ["プライバシー", "利用規約", "サブスクリプション", "責任あるプレイ"], errTerms: "続けるには利用規約とプライバシーポリシーに同意してください。", errCheckout: "決済を開けませんでした。" },
+} as const;
+
+type PricingLocale = "en" | "pt-BR" | "ja";
+function readLocale(): PricingLocale { const saved = localStorage.getItem("honto-locale"); const nav = navigator.language.toLowerCase(); return saved === "pt-BR" || saved === "ja" || saved === "en" ? saved : nav.startsWith("pt") ? "pt-BR" : nav.startsWith("ja") ? "ja" : "en"; }
+function subscribeLocale(onChange: () => void) { window.addEventListener("storage", onChange); return () => window.removeEventListener("storage", onChange); }
+
+export default function PricingClient({ currency = "USD" }: { currency?: "USD" | "BRL" }) {
+  const locale = useSyncExternalStore(subscribeLocale, readLocale, () => "en" as const);
+  const prices = priceLabels(currency, locale); const c = PRICING_COPY[locale];
+  const [loading, setLoading] = useState<"month" | "year" | null>(null);
+  const [error, setError] = useState("");
+  const [accepted, setAccepted] = useState(false);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  useEffect(() => { void fetch("/api/auth/me", { cache: "no-store" }).then((response) => response.json()).then((data) => { setSignedIn(Boolean(data.user)); setAccepted(false); }).catch(() => setSignedIn(false)); }, []);
+  const checkout = async (interval: "month" | "year") => {
+    setLoading(interval);
+    setError("");
+    try {
+      if (signedIn === null) return;
+      if (signedIn === false) { window.location.href = "/api/auth/google/start"; return; }
+      if (!accepted) throw new Error(c.errTerms);
+      const consent = await fetch("/api/account/consent", { method: "POST" });
+      if (!consent.ok) throw new Error(c.errTerms);
+      const response = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ interval }) });
+      const data = await response.json();
+      if (response.status === 401) { window.location.href = "/api/auth/google/start"; return; }
+      if (!response.ok || !data.url) throw new Error(data.error ?? c.errCheckout);
+      window.location.href = data.url;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : c.errCheckout);
+      setLoading(null);
+    }
+  };
+  const disabled = Boolean(loading) || signedIn === null;
+  return <main className="pricing-page"><Link className="pricing-back" href="/">{c.back}</Link><div className="pricing-brand">HONTO?<b>!</b></div><span className="eyebrow">{c.eyebrow}</span><h1>{c.h1a}<br/><em>{c.h1b}</em></h1><p className="pricing-lead">{c.lead}</p>{signedIn === false ? <p className="pricing-signin pricing-auth-slot">{c.signin} <a href="/api/auth/google/start">{c.signinCta}</a></p> : <label className="terms-consent pricing-auth-slot"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} /> <span>{c.agree[0]}<a href="/terms" target="_blank" rel="noreferrer">{c.agree[1]}</a>{c.agree[2]}<a href="/privacy" target="_blank" rel="noreferrer">{c.agree[3]}</a>{c.agree[4]}</span></label>}<section className="pricing-benefits" aria-labelledby="premium-benefits-title"><div><span className="pricing-tag">{c.benefitsTag}</span><h2 id="premium-benefits-title">{c.benefitsTitle}</h2></div><ul>{c.benefits.map(([title, text]) => <li key={title}><strong>{title}</strong><span>{text}</span></li>)}</ul><p className="trial-note">{c.trial}</p></section><div className="billing-heading"><span className="pricing-tag">{c.payTag}</span><p>{c.payText}</p></div><section className="pricing-grid billing-options" aria-label={c.payTag}><article className="pricing-card billing-card"><span className="pricing-tag">{c.monthlyTag}</span><div className="pricing-amount"><strong>{prices.month}</strong><span>{c.perMonth}</span></div><p>{c.monthlyText}</p><button className="primary-button" disabled={disabled} onClick={() => void checkout("month")}>{loading === "month" ? c.opening : c.startMonthly}</button></article><article className="pricing-card pricing-card-featured billing-card"><span className="pricing-tag">{c.yearlyTag}</span><div className="pricing-amount"><strong>{prices.year}</strong><span>{c.perYear}</span></div><p>{c.yearlyText(prices.yearlySavings)}</p><button className="primary-button" disabled={disabled} onClick={() => void checkout("year")}>{loading === "year" ? c.opening : c.startYearly}</button></article></section>{error && <p className="form-error pricing-error" role="alert">{error}</p>}<p className="pricing-footnote">{c.footnote}{currency === "BRL" ? ` ${c.cardOnly}` : ""}</p><footer className="legal-footer"><a href="/privacy">{c.legal[0]}</a><a href="/terms">{c.legal[1]}</a><a href="/subscriptions">{c.legal[2]}</a><a href="/responsible-play">{c.legal[3]}</a></footer></main>;
+}

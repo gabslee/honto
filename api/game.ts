@@ -7,13 +7,17 @@ import { assertMultiplayerHost, assertRoomCapacity, assertMultiplayerStart, muta
 import { createMultiplayerState, reduceMultiplayer, publicMultiplayer, type MultiplayerCard } from "./multiplayer";
 import { multiplayerPrompts } from "../data/multiplayer-prompts";
 import { archiveFinishedMatch } from "../app/match-history";
+import { handleDaily } from "./daily-card";
+import { handleHistory, snapshotMoments } from "./couple-history";
+import { rememberPartnerKey } from "./couple";
+import { normalizeDrinkMode } from "../app/date-mode.js";
 import { deckRequiresPremium } from "../app/deck-access.js";
 
 type CardType = "honto" | "question" | "wouldrather" | "preference" | "estimate" | "rps" | "both";
 type Locale = "en" | "ja" | "pt-BR";
 type RpsChoice = "rock" | "paper" | "scissors";
 type Body = {
-  action?: string; code?: string; name?: string; token?: string; roundCount?: number;
+  action?: string; drinkMode?: string; code?: string; name?: string; token?: string; roundCount?: number;
   themeCategory?: string; customTheme?: string | null; prompt?: string; statements?: string[];
   truthIndex?: number; guessedIndex?: number; question?: string; sips?: number;
   choice?: "answer" | "skip"; preferenceIndex?: number; correctNumber?: number; estimate?: number; rpsChoice?: RpsChoice; locale?: Locale; wager?: string; wouldRatherIndex?: number; cardTypes?: string;
@@ -43,6 +47,7 @@ function ensureSchema() {
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS multiplayer boolean NOT NULL DEFAULT false`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS group_state jsonb`;
     await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS revision integer NOT NULL DEFAULT 0`;
+    await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS drink_mode text NOT NULL DEFAULT 'sips'`;
     await sql`CREATE TABLE IF NOT EXISTS players (id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id) ON DELETE CASCADE, name text NOT NULL, token text UNIQUE NOT NULL, is_host boolean NOT NULL DEFAULT false, sips integer NOT NULL DEFAULT 0, joined_at timestamptz NOT NULL DEFAULT now())`;
     await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS wager text`;
     await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS user_id text`;
@@ -168,7 +173,7 @@ async function state(roomCode: string, token: string, currentUser: CurrentUser |
   const cardRows = room.status === "playing" ? await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.card_number = ${room.current_round} LIMIT 1` : [];
   const lastRows = await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.status = 'complete' ORDER BY c.card_number DESC LIMIT 1`;
   return {
-    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, cardTypes: room.multiplayer ? groupCardTypes(room.card_types).join(",") : normalizedCardTypes(room.card_types).join(","), welcomeAck: Array.isArray(room.welcome_ack) ? room.welcome_ack : [], locale: myLocale, startedAt: room.started_at, canUseSpicy: hasPremiumAccess(currentUser), canCustomizeDeck: hasPremiumAccess(currentUser), multiplayer: Boolean(room.multiplayer), maxPlayers: room.multiplayer ? 6 : 2, canHostMultiplayer: Boolean(hasPremiumAccess(currentUser) && playerRows.some((p: any) => p.id === me.id && p.isHost && p.userId === currentUser?.id)) },
+    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, cardTypes: room.multiplayer ? groupCardTypes(room.card_types).join(",") : normalizedCardTypes(room.card_types).join(","), welcomeAck: Array.isArray(room.welcome_ack) ? room.welcome_ack : [], locale: myLocale, startedAt: room.started_at, drinkMode: normalizeDrinkMode(room.drink_mode), canUseSpicy: hasPremiumAccess(currentUser), canCustomizeDeck: hasPremiumAccess(currentUser), multiplayer: Boolean(room.multiplayer), maxPlayers: room.multiplayer ? 6 : 2, canHostMultiplayer: Boolean(hasPremiumAccess(currentUser) && playerRows.some((p: any) => p.id === me.id && p.isHost && p.userId === currentUser?.id)) },
     players, group, activeCard: room.multiplayer ? null : publicCard(cardRows[0], me.id, false, myLocale), lastCard: room.multiplayer ? null : publicCard(lastRows[0], me.id, true, myLocale), meId: me.id,
   };
 }
@@ -187,6 +192,7 @@ async function getContext(roomCode: string, token: string) {
 async function finishCard(room: any) {
   const next = Number(room.current_round) + 1;
   const finished = next > Number(room.round_count);
+  if (finished) await snapshotMoments(sql, room);
   await sql`UPDATE rooms SET current_round = ${finished ? room.current_round : next}, status = ${finished ? "finished" : "playing"}, updated_at = now() WHERE id = ${room.id}`;
   if (finished) await archiveFinishedMatch(room.id);
 }
@@ -357,6 +363,15 @@ export default async function handler(req: any, res: any) {
 
     const token = String(body.token ?? "");
     const { room, me, card } = await getContext(roomCode, token);
+    if (!room.multiplayer) await rememberPartnerKey(sql, room, me, (body as Record<string, unknown>).partnerKey);
+    if (typeof body.action === "string" && ["daily", "dailyAnswer", "dailyConfirmAdult"].includes(body.action)) {
+      return json(res, await handleDaily(sql, room, me, body as Record<string, unknown>, currentUser));
+    }
+    if (typeof body.action === "string" && ["history", "setReunion"].includes(body.action)) {
+      return json(res, await handleHistory(sql, room, me, body as Record<string, unknown>));
+    }
+    // Save completed cards to the couple history before a new deck replaces them.
+    if (body.action === "start" || body.action === "newTable") await snapshotMoments(sql, room);
     if (body.action === "setLocale") {
       const locale: Locale = body.locale === "ja" || body.locale === "pt-BR" ? body.locale : "en";
       await sql`UPDATE players SET locale = ${locale} WHERE id = ${me.id} AND room_id = ${room.id}`;
@@ -445,9 +460,10 @@ export default async function handler(req: any, res: any) {
         const rawTypes = body.cardTypes ?? (switched ? available.join(",") : room.card_types);
         const cardTypes = (multiplayer ? groupCardTypes(rawTypes) : normalizedCardTypes(rawTypes)).join(",");
         if (body.cardTypes !== undefined && cardTypes !== available.join(",") && !hasPremiumAccess(currentUser)) throw new Error("Custom decks are a Premium feature.");
-        return { ...settings, multiplayer, cardTypes };
+        const drinkMode = normalizeDrinkMode(body.drinkMode, room.drink_mode);
+        return { ...settings, multiplayer, cardTypes, drinkMode };
       }, async ({ room }: any, settings: any) => {
-        const rows = await sql`UPDATE rooms SET round_count = ${settings.roundCount}, theme_category = ${settings.themeCategory}, custom_theme = ${settings.customTheme}, locale = ${settings.locale}, card_types = ${settings.cardTypes}, multiplayer = ${settings.multiplayer}, group_state = NULL, revision = revision + 1, updated_at = now() WHERE id = ${room.id} AND revision = ${room.revision} AND status = 'lobby' RETURNING id`;
+        const rows = await sql`UPDATE rooms SET round_count = ${settings.roundCount}, theme_category = ${settings.themeCategory}, custom_theme = ${settings.customTheme}, locale = ${settings.locale}, card_types = ${settings.cardTypes}, drink_mode = ${settings.drinkMode}, multiplayer = ${settings.multiplayer}, group_state = NULL, revision = revision + 1, updated_at = now() WHERE id = ${room.id} AND revision = ${room.revision} AND status = 'lobby' RETURNING id`;
         return rows.length > 0;
       });
     }

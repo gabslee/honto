@@ -713,3 +713,20 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .ldr-testimonials { margin-top:32px; display:grid; gap:14px; }
 .ldr-testimonials figure { margin:0; border-left:3px solid var(--ink); padding-left:16px; }
 @media (max-width:760px) { .ldr-steps { grid-template-columns:1fr; } .ldr-proof { padding-top:40px; } }
+
+/* Card of the Day */
+.daily-card-panel { max-width:980px; margin:28px auto 0; box-sizing:border-box; }
+.daily-card { border-top:1px dashed #17243d55; padding:16px 0 4px; display:grid; gap:10px; }
+.daily-card h3 { margin:0; font-size:22px; }
+.daily-card textarea { width:100%; min-height:80px; box-sizing:border-box; padding:10px; font:15px/1.4 Arial,sans-serif; }
+.daily-reveal p { margin:4px 0; font:15px/1.5 Arial,sans-serif; }
+.daily-card-teaser { max-width:760px; margin:40px auto 0; text-align:center; }
+.daily-card-teaser p { font:16px/1.5 Arial,sans-serif; }
+.date-mode-banner { max-width:760px; margin:8px auto 14px; padding:8px 14px; border:2px solid var(--ink); border-radius:12px; background:#ffe3ef; font:14px/1.4 Arial,sans-serif; text-align:center; }
+.couple-history-panel { max-width:980px; margin:28px auto 0; box-sizing:border-box; }
+.reunion-countdown { display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:space-between; font:16px/1.4 Arial,sans-serif; }
+.reunion-countdown strong { font-size:28px; }
+.history-list { display:grid; gap:12px; margin-top:16px; }
+.history-list article { border-top:1px dashed #17243d55; padding-top:10px; }
+.history-list h3 { margin:4px 0; font-size:18px; }
+.history-list p { margin:2px 0; font:14px/1.4 Arial,sans-serif; }
