@@ -28,10 +28,3 @@ export async function userByStripeId(customerId: string | null, subscriptionId: 
   const rows = await sql`SELECT id FROM users WHERE (${customerId} IS NOT NULL AND stripe_customer_id = ${customerId}) OR (${subscriptionId} IS NOT NULL AND stripe_subscription_id = ${subscriptionId}) LIMIT 1`;
   return (rows[0] as { id?: string } | undefined)?.id ?? null;
 }
-
-// One-time Spicy 18+ long-distance add-on. Never touches plan/subscription columns.
-export async function saveSpicyAddonPurchase(userId: string, customerId: string | null) {
-  if (!sql) return;
-  await ensureIdentitySchema();
-  await sql`UPDATE users SET spicy_addon_purchased_at = COALESCE(spicy_addon_purchased_at, now()), stripe_customer_id = COALESCE(${customerId}, stripe_customer_id), updated_at = now() WHERE id = ${userId}`;
-}

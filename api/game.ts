@@ -7,7 +7,7 @@ import { assertMultiplayerHost, assertRoomCapacity, assertMultiplayerStart, muta
 import { createMultiplayerState, reduceMultiplayer, publicMultiplayer, type MultiplayerCard } from "./multiplayer";
 import { multiplayerPrompts } from "../data/multiplayer-prompts";
 import { archiveFinishedMatch } from "../app/match-history";
-import { ownsSpicyAddon, spicyAddonConfig, spicyAddonDeckError } from "../app/spicy-addon.js";
+import { deckRequiresPremium } from "../app/deck-access.js";
 
 type CardType = "honto" | "question" | "wouldrather" | "preference" | "estimate" | "rps" | "both";
 type Locale = "en" | "ja" | "pt-BR";
@@ -168,7 +168,7 @@ async function state(roomCode: string, token: string, currentUser: CurrentUser |
   const cardRows = room.status === "playing" ? await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.card_number = ${room.current_round} LIMIT 1` : [];
   const lastRows = await sql`SELECT c.id, c.card_number AS "cardNumber", c.type, c.status, c.actor_id AS "actorId", a.name AS "actorName", c.target_id AS "targetId", t.name AS "targetName", c.payload, c.secret, c.result, c.revealed_by AS "revealedBy", c.completed_at AS "completedAt" FROM deck_cards c JOIN players a ON a.id = c.actor_id JOIN players t ON t.id = c.target_id WHERE c.room_id = ${room.id} AND c.status = 'complete' ORDER BY c.card_number DESC LIMIT 1`;
   return {
-    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, cardTypes: room.multiplayer ? groupCardTypes(room.card_types).join(",") : normalizedCardTypes(room.card_types).join(","), welcomeAck: Array.isArray(room.welcome_ack) ? room.welcome_ack : [], locale: myLocale, startedAt: room.started_at, canUseSpicy: hasPremiumAccess(currentUser), spicyAddonEnabled: spicyAddonConfig(process.env).enabled, ownsSpicyAddon: spicyAddonConfig(process.env).enabled && ownsSpicyAddon(currentUser), canCustomizeDeck: hasPremiumAccess(currentUser), multiplayer: Boolean(room.multiplayer), maxPlayers: room.multiplayer ? 6 : 2, canHostMultiplayer: Boolean(hasPremiumAccess(currentUser) && playerRows.some((p: any) => p.id === me.id && p.isHost && p.userId === currentUser?.id)) },
+    room: { code: room.code, status: room.status, roundCount: room.round_count, currentRound: room.current_round, themeCategory: room.theme_category, customTheme: room.custom_theme, cardTypes: room.multiplayer ? groupCardTypes(room.card_types).join(",") : normalizedCardTypes(room.card_types).join(","), welcomeAck: Array.isArray(room.welcome_ack) ? room.welcome_ack : [], locale: myLocale, startedAt: room.started_at, canUseSpicy: hasPremiumAccess(currentUser), canCustomizeDeck: hasPremiumAccess(currentUser), multiplayer: Boolean(room.multiplayer), maxPlayers: room.multiplayer ? 6 : 2, canHostMultiplayer: Boolean(hasPremiumAccess(currentUser) && playerRows.some((p: any) => p.id === me.id && p.isHost && p.userId === currentUser?.id)) },
     players, group, activeCard: room.multiplayer ? null : publicCard(cardRows[0], me.id, false, myLocale), lastCard: room.multiplayer ? null : publicCard(lastRows[0], me.id, true, myLocale), meId: me.id,
   };
 }
@@ -439,9 +439,7 @@ export default async function handler(req: any, res: any) {
           if (members.length > 2) throw new Error("Remove extra players before switching to two-player mode.");
         }
         const settings = normalizeRoomSettings(room, body, LEGACY_THEME_MAP);
-        if (settings.themeCategory.split(",").includes("spicy") && !hasPremiumAccess(currentUser)) throw new Error("Spicy is a Premium theme.");
-        const addonError = spicyAddonDeckError(settings.themeCategory, { enabled: spicyAddonConfig(process.env).enabled, owned: ownsSpicyAddon(currentUser) });
-        if (addonError) throw new Error(addonError);
+        if (deckRequiresPremium(settings.themeCategory) && !hasPremiumAccess(currentUser)) throw new Error("Spicy is a Premium theme.");
         const switched = multiplayer !== Boolean(room.multiplayer);
         const available = multiplayer ? [...GROUP_TYPES] : CARD_TYPES;
         const rawTypes = body.cardTypes ?? (switched ? available.join(",") : room.card_types);

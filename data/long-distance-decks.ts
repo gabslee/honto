@@ -8,8 +8,8 @@ const card = (en: string, pt: string, ja: string): LocalizedCard => ({ en, "pt-B
 // Themed decks for long-distance couples (2 players). Each card has en, pt-BR and ja copy,
 // matching the structure of the decks above.
 // acrossMiles, futureUs, deepTalk and playful are free decks (like videoCall/reunion).
-// spicyLdr is the Spicy 18+ long-distance add-on: a separate one-time purchase, gated by
-// app/spicy-addon.js (feature flag + Stripe price id env var) and an 18+ confirmation.
+// spicyLdr is the Spicy 18+ long-distance deck: Premium-only, gated exactly like "spicy"
+// (Premium + 18+ confirmation; server refuses it for non-Premium hosts).
 export type ThemedDeckKey = "acrossMiles" | "futureUs" | "deepTalk" | "playful" | "spicyLdr";
 
 export const THEMED_DECKS: Record<ThemedDeckKey, readonly LocalizedCard[]> = {
