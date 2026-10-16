@@ -27,6 +27,12 @@ export async function saveStripeSubscription(userId: string, customerId: string 
   await sql`UPDATE users SET plan = ${normalized === "active" ? "premium" : "free"}, subscription_status = ${normalized}, subscription_expires_at = ${periodEnd ? new Date(periodEnd * 1000).toISOString() : null}::timestamptz, trial_started_at = CASE WHEN ${trialEnd !== null}::boolean THEN COALESCE(trial_started_at, now()) ELSE trial_started_at END, trial_ends_at = ${trialEnd ? new Date(trialEnd * 1000).toISOString() : null}::timestamptz, stripe_customer_id = COALESCE(${customerId}::text, stripe_customer_id), stripe_subscription_id = COALESCE(${subscriptionId}::text, stripe_subscription_id), updated_at = now() WHERE id = ${userId}`;
 }
 
+export async function linkStripeCustomer(userId: string, customerId: string | null, subscriptionId: string | null) {
+  if (!sql || (!customerId && !subscriptionId)) return;
+  await ensureIdentitySchema();
+  await sql`UPDATE users SET stripe_customer_id = COALESCE(${customerId}::text, stripe_customer_id), stripe_subscription_id = COALESCE(${subscriptionId}::text, stripe_subscription_id), updated_at = now() WHERE id = ${userId}`;
+}
+
 export async function userByStripeId(customerId: string | null, subscriptionId: string | null) {
   if (!sql) return null;
   await ensureIdentitySchema();
