@@ -1,4 +1,5 @@
-import { saveStripeSubscription, stripeSecret, userByStripeId } from "../../../stripe";
+import { linkStripeCustomer, saveStripeSubscription, userByStripeId } from "../../../stripe";
+import { stripeEventUserId } from "../../../stripe-event.js";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
   if (!secret || !signature || !(await signatureValid(payload, signature, secret))) return Response.json({ error: "Invalid Stripe signature." }, { status: 400 });
   const event = JSON.parse(payload) as { type?: string; data?: { object?: Record<string, any> } };
   const object = event.data?.object ?? {};
-  const metadataUserId = String(object.metadata?.user_id ?? object.subscription_details?.metadata?.user_id ?? "");
+  const metadataUserId = stripeEventUserId(object);
   const customerId = typeof object.customer === "string" ? object.customer : null;
   const subscriptionId = typeof object.subscription === "string" ? object.subscription : (typeof object.id === "string" && object.id.startsWith("sub_") ? object.id : null);
   const userId = metadataUserId || await userByStripeId(customerId, subscriptionId);
@@ -30,6 +31,8 @@ export async function POST(request: Request) {
     await saveStripeSubscription(userId, customerId, subscriptionId, status, Number(object.current_period_end) || null, Number(object.trial_end) || null);
   } else if (userId && event.type === "invoice.payment_failed") {
     await saveStripeSubscription(userId, customerId, subscriptionId, "past_due", null);
+  } else if (userId) {
+    await linkStripeCustomer(userId, customerId, subscriptionId);
   }
   return Response.json({ received: true });
 }
