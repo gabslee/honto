@@ -4,6 +4,7 @@ import { daysUntil, summarizeMoment, validReunionDate } from "../app/couple-hist
 import { roleFor } from "../app/couple-identity.js";
 import { ensureCoupleSchema, resolveCouple } from "./couple";
 import { dailyCardText } from "./daily-card";
+import { couplePhotos, publicPhoto } from "./photo-moments";
 
 type Sql = NeonQueryFunction<false, false>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic SQL rows
@@ -30,7 +31,8 @@ export async function historyState(sql: Sql, room: Row, me: Row, timeZone: strin
   const rows = await sql`SELECT a.day, a.slot, c.deck, c.card_index AS "index", json_agg(json_build_object('name', a.author_name, 'answer', a.answer, 'role', a.role) ORDER BY a.role) AS answers FROM daily_answers a JOIN daily_cards c ON c.couple_id = a.couple_id AND c.day = a.day AND c.slot = a.slot WHERE a.couple_id = ${couple.id} GROUP BY a.day, a.slot, c.deck, c.card_index HAVING count(*) >= 2 ORDER BY a.day DESC, a.slot LIMIT 60`;
   const myRole = roleFor(me);
   const daily = (rows as Row[]).map((row) => ({ day: row.day, slot: row.slot, deck: row.deck, index: row.index, text: dailyCardText(row.deck, row.index), answers: (typeof row.answers === "string" ? JSON.parse(row.answers) : row.answers).map((answer: Row) => ({ name: answer.name, answer: answer.answer, mine: answer.role === myRole })) }));
-  return { history: { coupleId: couple.id, reunionDate: couple.reunionDate, daysUntilReunion: daysUntil(couple.reunionDate, today), today, moments, daily } };
+  const photos = (await couplePhotos(sql, couple.id)).map((row) => publicPhoto(row, myRole));
+  return { history: { coupleId: couple.id, reunionDate: couple.reunionDate, daysUntilReunion: daysUntil(couple.reunionDate, today), today, moments, daily, photos } };
 }
 
 export async function handleHistory(sql: Sql, room: Row, me: Row, body: Row) {

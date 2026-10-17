@@ -6,6 +6,8 @@ export const MOBILE_ROUTES = {
   "GET history": "history",
   "PUT reunion": "setReunion",
   "POST reunion": "setReunion",
+  "GET moments/latest": "photoLatest",
+  "POST moments/photo": "photoUpload",
 };
 export function mobileAction(method, path) {
   return MOBILE_ROUTES[`${String(method).toUpperCase()} ${path.join("/")}`] ?? null;
