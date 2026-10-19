@@ -1,0 +1,15 @@
+{
+  "id": "cpl_01",
+  "pairedAt": "2026-10-19T12:00:00Z",
+  "startedOn": null,
+  "daysTogether": null,
+  "partner": {
+    "userId": "usr_kenji",
+    "displayName": "Kenji",
+    "timeZone": "Asia/Tokyo",
+    "utcOffsetMinutes": 540,
+    "timeZoneUpdatedAt": "2026-10-19T11:58:00Z"
+  },
+  "reunion": null,
+  "premium": false
+}

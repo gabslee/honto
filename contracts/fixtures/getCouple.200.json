@@ -1,0 +1,20 @@
+{
+  "id": "cpl_01",
+  "pairedAt": "2026-10-02T22:10:00Z",
+  "startedOn": "2024-03-02",
+  "daysTogether": 961,
+  "partner": {
+    "userId": "usr_kenji",
+    "displayName": "Kenji",
+    "timeZone": "Asia/Tokyo",
+    "utcOffsetMinutes": 540,
+    "timeZoneUpdatedAt": "2026-10-19T11:58:00Z"
+  },
+  "reunion": {
+    "at": "2026-11-14T09:30:00Z",
+    "city": "Tokyo",
+    "timeZone": "Asia/Tokyo",
+    "daysUntil": 26
+  },
+  "premium": true
+}

@@ -1,0 +1,4 @@
+{
+  "error": "localDay must be today or yesterday in your time zone.",
+  "code": "invalid_local_day"
+}

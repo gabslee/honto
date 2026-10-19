@@ -1,0 +1,13 @@
+{
+  "token": "hm_u_fixture0000000000000000000000000000000000",
+  "tokenType": "Bearer",
+  "expiresInDays": 365,
+  "created": false,
+  "user": {
+    "id": "usr_ana",
+    "email": "ana@example.com",
+    "displayName": "Ana",
+    "timeZone": "America/Sao_Paulo",
+    "createdAt": "2026-10-01T13:20:00Z"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "trp_01",
+  "traveler": "me",
+  "travelerUserId": "usr_ana",
+  "departsAt": "2026-11-13T15:00:00Z",
+  "arrivesAt": "2026-11-14T10:15:00Z",
+  "fromCity": "São Paulo",
+  "toCity": "Tokyo",
+  "phase": "scheduled",
+  "liveActivity": {
+    "eligible": true,
+    "startsAt": "2026-11-14T02:15:00Z",
+    "endsAt": "2026-11-14T11:15:00Z",
+    "startedAt": null,
+    "endedAt": null
+  },
+  "createdAt": "2026-10-10T20:00:00Z",
+  "updatedAt": "2026-10-19T12:00:00Z"
+}

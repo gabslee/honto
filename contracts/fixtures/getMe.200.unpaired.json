@@ -1,0 +1,30 @@
+{
+  "user": {
+    "id": "usr_ana",
+    "email": "ana@example.com",
+    "displayName": "Ana",
+    "timeZone": null,
+    "createdAt": "2026-10-01T13:20:00Z"
+  },
+  "couple": null,
+  "entitlement": {
+    "premium": false,
+    "source": null,
+    "productId": null,
+    "periodType": null,
+    "expiresAt": null,
+    "willRenew": null,
+    "grantedBy": null,
+    "trialEligible": true,
+    "features": {
+      "fullHistory": false,
+      "calendar": false,
+      "eventTitles": false,
+      "liveActivity": false,
+      "countdownWidget": false,
+      "nudge": true
+    }
+  },
+  "pendingUnpair": null,
+  "hasPendingInvite": true
+}

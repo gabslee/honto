@@ -12,7 +12,13 @@
     "test": "npm run test:unit && npm run build",
     "test:unit": "node --experimental-strip-types --test tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern marketing",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "contracts:generate": "node contracts/scripts/generate.mjs",
+    "contracts:lint": "npx --yes @redocly/cli@2.64.1 lint contracts/openapi.yaml",
+    "contracts:check": "node contracts/scripts/generate.mjs --check && node contracts/scripts/validate-fixtures.mjs && tsc -p contracts/tsconfig.json",
+    "contracts:dart": "bash contracts/scripts/check-dart.sh",
+    "contracts:mock": "node contracts/mock/server.mjs",
+    "contracts:validate": "npm run contracts:lint && npm run contracts:check && npm run contracts:dart"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
@@ -46,7 +52,8 @@
     "typescript-eslint": "8.59.3",
     "vinext": "1.0.0-beta.2",
     "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "wrangler": "4.92.0",
+    "yaml": "^2.9.1"
   },
   "type": "module"
 }

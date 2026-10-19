@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-19T12:00:00Z",
+  "paired": true,
+  "premium": true,
+  "me": {
+    "displayName": "Ana",
+    "postedToday": true
+  },
+  "partner": {
+    "displayName": "Kenji",
+    "timeZone": "Asia/Tokyo",
+    "photo": {
+      "photoId": "ph_kenji_1019",
+      "localDay": "2026-10-19",
+      "takenAt": "2026-10-19T10:05:00Z",
+      "thumbFile": "partner_thumb.jpg",
+      "phrase": "会いたい · I miss you"
+    },
+    "status": {
+      "state": "busy",
+      "busyUntil": "2026-10-19T13:00:00Z",
+      "freeUntil": null,
+      "title": null,
+      "syncedAt": "2026-10-19T10:55:00Z"
+    }
+  },
+  "startedOn": "2024-03-02",
+  "reunion": {
+    "at": "2026-11-14T09:30:00Z",
+    "city": "Tokyo"
+  },
+  "nudges": {
+    "lastSentAt": "2026-10-19T11:30:00Z",
+    "lastReceivedAt": "2026-10-19T10:06:00Z",
+    "nextAllowedAt": null
+  }
+}

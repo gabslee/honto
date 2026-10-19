@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hontogame.com/contracts/widget-snapshot.v1.json",
+  "title": "Honto widget snapshot v1 (snapshot.v1.json)",
+  "$comment": "GENERATED from contracts/openapi.yaml#/components/schemas/WidgetSnapshot. Do not edit by hand.",
+  "type": "object",
+  "description": "`snapshot.v1.json` in the App Group (`group.com.hontogame.app`) / Android `filesDir/widget/`.\nWritten by Flutter (Pigeon `WidgetsHostApi`), the NSE and the Android FCM service; read by the widgets\nand the nudge App Intent. Derived from `GET /api/v1/today`. Breaking change = new version + new file name.\n",
+  "required": [
+    "version",
+    "generatedAt",
+    "paired",
+    "premium",
+    "me",
+    "partner",
+    "startedOn",
+    "reunion",
+    "nudges"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "description": "Always 1 for this file."
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "paired": {
+      "type": "boolean"
+    },
+    "premium": {
+      "type": "boolean"
+    },
+    "me": {
+      "$ref": "#/$defs/WidgetSnapshotMe"
+    },
+    "partner": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WidgetSnapshotPartner"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "startedOn": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LocalDay"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reunion": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WidgetSnapshotReunion"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nudges": {
+      "$ref": "#/$defs/NudgeState"
+    }
+  },
+  "$defs": {
+    "LocalDay": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "A calendar day in some person's local time zone (never converted).",
+      "examples": [
+        "2026-10-19"
+      ]
+    },
+    "NudgeState": {
+      "type": "object",
+      "required": [
+        "lastSentAt",
+        "lastReceivedAt",
+        "nextAllowedAt"
+      ],
+      "properties": {
+        "lastSentAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "lastReceivedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "nextAllowedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "PartnerState": {
+      "type": "string",
+      "enum": [
+        "busy",
+        "free",
+        "unknown"
+      ]
+    },
+    "PartnerStatus": {
+      "type": "object",
+      "required": [
+        "state",
+        "busyUntil",
+        "freeUntil",
+        "title",
+        "syncedAt"
+      ],
+      "description": "\"Busy until 3 PM\" is formatted on the client from `busyUntil` + the partner time zone.",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/PartnerState"
+        },
+        "busyUntil": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "freeUntil": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "description": "Start of the next busy block within the window."
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Current event title, only if opted in and Premium."
+        },
+        "syncedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "TimeZoneId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "IANA time zone id.",
+      "examples": [
+        "America/Sao_Paulo"
+      ]
+    },
+    "WidgetSnapshotMe": {
+      "type": "object",
+      "required": [
+        "displayName",
+        "postedToday"
+      ],
+      "properties": {
+        "displayName": {
+          "type": "string"
+        },
+        "postedToday": {
+          "type": "boolean"
+        }
+      }
+    },
+    "WidgetSnapshotPartner": {
+      "type": "object",
+      "required": [
+        "displayName",
+        "timeZone",
+        "photo",
+        "status"
+      ],
+      "properties": {
+        "displayName": {
+          "type": "string"
+        },
+        "timeZone": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimeZoneId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "photo": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WidgetSnapshotPhoto"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartnerStatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "WidgetSnapshotPhoto": {
+      "type": "object",
+      "required": [
+        "photoId",
+        "localDay",
+        "takenAt",
+        "thumbFile",
+        "phrase"
+      ],
+      "properties": {
+        "photoId": {
+          "type": "string"
+        },
+        "localDay": {
+          "$ref": "#/$defs/LocalDay"
+        },
+        "takenAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "thumbFile": {
+          "type": "string",
+          "description": "File name inside the App Group / Android filesDir `widget/` folder (e.g. `partner_thumb.jpg`)."
+        },
+        "phrase": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "WidgetSnapshotReunion": {
+      "type": "object",
+      "required": [
+        "at",
+        "city"
+      ],
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "city": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

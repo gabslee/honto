@@ -1,0 +1,33 @@
+{
+  "user": {
+    "id": "usr_ana",
+    "email": "ana@example.com",
+    "displayName": "Ana",
+    "timeZone": "America/Sao_Paulo",
+    "createdAt": "2026-10-01T13:20:00Z"
+  },
+  "couple": null,
+  "entitlement": {
+    "premium": false,
+    "source": null,
+    "productId": null,
+    "periodType": null,
+    "expiresAt": null,
+    "willRenew": null,
+    "grantedBy": null,
+    "trialEligible": true,
+    "features": {
+      "fullHistory": false,
+      "calendar": false,
+      "eventTitles": false,
+      "liveActivity": false,
+      "countdownWidget": false,
+      "nudge": true
+    }
+  },
+  "pendingUnpair": {
+    "unpairedAt": "2026-10-18T20:00:00Z",
+    "photosAvailableUntil": "2026-11-17T20:00:00Z"
+  },
+  "hasPendingInvite": false
+}

@@ -1,0 +1,13 @@
+name: honto_contracts
+description: Generated Honto /api/v1 models, typed client and fakes. Source of truth is ../openapi.yaml.
+version: 1.0.0-w0
+publish_to: none
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  http: ^1.2.0
+
+dev_dependencies:
+  test: ^1.25.0

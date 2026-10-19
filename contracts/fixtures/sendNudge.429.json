@@ -1,0 +1,5 @@
+{
+  "error": "You just sent one. Try again in a moment.",
+  "code": "rate_limited",
+  "retryAfterSeconds": 42
+}
