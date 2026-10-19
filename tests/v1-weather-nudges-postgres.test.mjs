@@ -47,11 +47,11 @@ test('weather validation and nudge push payload (pure)', async () => {
     assert.ok('error' in w.parseWeather({ ...ok, latitude: 38.7 }, now) === false, 'extra keys are ignored, never stored');
 
     const push = await import('../app/push/index.ts');
-    const data = push.pushData('cpl_1', { type: 'nudge.new', nudgeId: 'ndg_1', fromName: 'Gabriel' }, new Date('2026-10-19T15:00:00Z'));
+    const data = push.pushData('cpl_1', { type: 'nudge.new', nudgeId: 'ndg_1', createdAt: '2026-10-19T14:59:59Z', fromName: 'Gabriel' }, new Date('2026-10-19T15:00:00Z'));
     assertContract('PushData', data);
-    assert.deepEqual(data, { type: 'nudge.new', coupleId: 'cpl_1', sentAt: '2026-10-19T15:00:00Z', nudgeId: 'ndg_1', fromName: 'Gabriel' });
+    assert.deepEqual(data, { type: 'nudge.new', coupleId: 'cpl_1', sentAt: '2026-10-19T15:00:00Z', nudgeId: 'ndg_1', createdAt: '2026-10-19T14:59:59Z', fromName: 'Gabriel' });
     const alert = push.apnsAlertPayload(data);
-    assert.deepEqual(alert.aps.alert, { title: 'Gabriel', body: 'Thinking of you' });
+    assert.deepEqual(alert.aps.alert, { title: 'Honto', body: 'Gabriel is thinking of you' });
     assert.equal(alert.aps['mutable-content'], 1);
     assert.equal(alert.aps.sound, undefined, 'silent');
   } finally {
@@ -157,6 +157,7 @@ test('weather and nudges over the real route handlers', async () => {
     assertContract('NudgeResult', firstJson);
     assert.equal(Date.parse(firstJson.nextAllowedAt) - Date.parse(firstJson.createdAt), 60_000);
     assert.deepEqual(sent.map((s) => [s.coupleId, s.fromUserId, s.event.type, s.event.nudgeId, s.event.fromName]), [['cpl_ak', 'usr_ana', 'nudge.new', firstJson.id, 'Ana Maria']]);
+    assert.equal(sent[0].event.createdAt, firstJson.createdAt, 'push carries the nudge createdAt');
     const retry = await nudge('ana', { source: 'widget', clientId: clientId.toUpperCase() }, new Date(nowMs + 5_000));
     assert.equal(retry.status, 201, 'same clientId: same result, not rate limited');
     assert.deepEqual(await retry.json(), firstJson);
