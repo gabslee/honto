@@ -50,3 +50,12 @@ App Store Connect / Play builds. Never commit values.
 
 No new variables. `api/v1/context.ts` (`requireUser`, `requireCouple`, `isCouplePremium`) and
 `PUT /api/v1/me/timezone` only use the existing `DATABASE_URL` and `AUTH_SESSION_SALT` (token and cookie hashes).
+
+## claude/api-v1-calendar-billing-37k6wl (W3 calendar + RevenueCat)
+
+| Name | Used by | Notes |
+|---|---|---|
+| `REVENUECAT_WEBHOOK_SECRET` | `POST /api/v1/billing/revenuecat` | exact `Authorization` header value configured in the RevenueCat webhook (secret). Replaces the `REVENUECAT_WEBHOOK_AUTH` name above. Unset or empty: every webhook call gets 401 |
+
+The calendar endpoints (`PUT /api/v1/calendar/busy`, `GET /api/v1/calendar`) need no new variables
+(`DATABASE_URL`, `AUTH_SESSION_SALT`). `REVENUECAT_SECRET_API_KEY` is not used yet.
