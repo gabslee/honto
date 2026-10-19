@@ -68,6 +68,14 @@ paths:
       tags: [auth]
       operationId: signInWithGoogle
       summary: Native Google Sign-In; returns an hm_u_ token.
+      description: |
+        The ID token is verified with the Google JWKS; audience = the web, iOS or Android client id.
+        `email_verified` must be true (`400 email_required` otherwise).
+        Account matching (same Honto account as the web game and `/api/mobile`): the provider subject already
+        linked to a user; else an existing user with the same email (case-insensitive), only when the provider
+        marks it verified, and the subject is then linked to that user (existing and Premium accounts are
+        relinked, never duplicated); else a new user (201). `400 email_required` when no linked subject and no
+        verified email. Returns the same opaque `hm_u_` token as the email login, plus a refresh token.
       security: []
       requestBody:
         required: true
@@ -85,7 +93,14 @@ paths:
       tags: [auth]
       operationId: signInWithApple
       summary: Native Sign in with Apple; returns an hm_u_ token.
-      description: Apple only shares name/email on the first sign-in, so send `name` then.
+      description: |
+        Apple only shares name/email on the first sign-in, so send `name` then. The identity token is verified
+        with the Apple JWKS; audience = the bundle id `com.hontogame.app`.
+        Account matching (same Honto account as the web game and `/api/mobile`): the provider subject already
+        linked to a user; else an existing user with the same email (case-insensitive), only when the provider
+        marks it verified, and the subject is then linked to that user (existing and Premium accounts are
+        relinked, never duplicated); else a new user (201). `400 email_required` when no linked subject and no
+        verified email. Returns the same opaque `hm_u_` token as the email login, plus a refresh token.
       security: []
       requestBody:
         required: true
@@ -171,6 +186,7 @@ paths:
       tags: [auth]
       operationId: logout
       summary: Revoke the bearer token (or clear the web cookie).
+      description: With a bearer `hm_u_`, also revokes the refresh-token chain issued with it. With the cookie, deletes the web session.
       responses:
         '200':
           description: Revoked.
