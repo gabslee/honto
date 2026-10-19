@@ -1,13 +1,11 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
 import type { JWTVerifyGetKey } from "jose";
-import type { AuthPlatform, AuthSession, LogoutResponse, User } from "../../contracts/honto-api";
-import { verifyAppleNativeToken, verifyGoogleIdToken, type ProviderIdentity } from "../../app/mobile-auth";
-import { bearerToken, clearUserCookie, createMobileToken, database, ensureIdentitySchema, revokeMobileToken } from "../../app/server-auth";
+import type { AuthPlatform, AuthSession, LinkProvider, LogoutResponse, ProviderLinkResult, User } from "../../contracts/honto-api";
+import { findLinkedUser, findOrCreateProviderUser, isPrivateRelayEmail, linkProviderIdentity, verifyAppleNativeToken, verifyGoogleIdToken, type ProviderIdentity } from "../../app/mobile-auth";
+import { bearerToken, clearUserCookie, createMobileToken, database, revokeMobileToken } from "../../app/server-auth";
 import { apiError, noStore, requireUser } from "./context";
 import { ensureLifecycleSchema, sessionTokenHash } from "./lifecycle";
 import { issueRefreshToken, REFRESH_TTL_DAYS } from "./refresh-tokens";
 
-type Sql = NeonQueryFunction<false, false>;
 type Provider = "google" | "apple";
 const PLATFORMS: AuthPlatform[] = ["ios", "android"];
 
@@ -27,37 +25,11 @@ async function verifyIdentity(provider: Provider, idToken: string, nonce: unknow
 }
 
 /**
- * Same Honto account across the web game, /api/mobile and the new app:
- * 1. the provider subject already linked in auth_accounts (Apple only sends the email on the first sign-in);
- * 2. else an existing user with the same email (lower(), so mixed-case rows from older flows match), only when
- *    the provider says the email is verified; the subject is linked to that user, so existing accounts
- *    (Premium included) are relinked, never duplicated;
- * 3. else a new user, again only with a verified email.
- * Without a verified email and no linked subject it throws `email_required`.
- */
-export async function findOrLinkProviderUser(sql: Sql, identity: ProviderIdentity, name: string | null) {
-  await ensureIdentitySchema();
-  const linked = await sql`SELECT a.user_id AS "userId" FROM auth_accounts a JOIN users u ON u.id = a.user_id WHERE a.provider = ${identity.provider} AND a.provider_account_id = ${identity.sub} LIMIT 1`;
-  if (linked[0]) return { userId: String(linked[0].userId), created: false };
-  const email = identity.email?.trim().toLowerCase();
-  if (!email || !identity.emailVerified) throw new Error("email_required");
-  let created = false;
-  let user = (await sql`SELECT id FROM users WHERE lower(email) = ${email} ORDER BY created_at, id LIMIT 1`)[0];
-  if (!user) {
-    const displayName = (name?.trim() || identity.name?.trim() || email.split("@")[0]).slice(0, 80);
-    const role = process.env.HONTO_ADMIN_EMAIL?.trim().toLowerCase() === email ? "admin" : "user";
-    const inserted = await sql`INSERT INTO users (id, email, display_name, role, plan, subscription_status) VALUES (${crypto.randomUUID()}, ${email}, ${displayName}, ${role}, ${role === "admin" ? "premium" : "free"}, ${role === "admin" ? "active" : "inactive"}) ON CONFLICT (email) DO NOTHING RETURNING id`;
-    user = inserted[0] ?? (await sql`SELECT id FROM users WHERE lower(email) = ${email} ORDER BY created_at, id LIMIT 1`)[0];
-    created = Boolean(inserted[0]);
-  }
-  const userId = String(user.id);
-  await sql`INSERT INTO auth_accounts (id, user_id, provider, provider_account_id) VALUES (${crypto.randomUUID()}, ${userId}, ${identity.provider}, ${identity.sub}) ON CONFLICT (provider, provider_account_id) DO UPDATE SET user_id = EXCLUDED.user_id`;
-  return { userId, created };
-}
-
-/**
- * POST /api/v1/auth/google and /api/v1/auth/apple `{ idToken, nonce?, platform, name? }`. Returns the same
- * session as the email login: an opaque `hm_u_` token (365 days) plus a rotating `hm_r_` refresh token.
+ * POST /api/v1/auth/google and /api/v1/auth/apple `{ idToken, nonce?, platform, name? }`. The account comes from
+ * `findOrCreateProviderUser` (shared with /api/mobile and the web callbacks): linked subject, then verified
+ * `lower(email)` (existing and Premium accounts are relinked, never duplicated), else a new user; identities are
+ * never moved between users. Returns the same session as the email login (opaque `hm_u_`, 365 days, plus a
+ * rotating `hm_r_`) with `isNewUser` and `usedPrivateRelayEmail` so the app can suggest linking.
  * 200 existing account, 201 new; 400 bad body / `email_required`; 401 `invalid_token`; 503 `missing_config`.
  */
 export async function providerSignIn(request: Request, provider: Provider) {
@@ -78,16 +50,49 @@ export async function providerSignIn(request: Request, provider: Provider) {
   await ensureLifecycleSchema(sql);
   let account: { userId: string; created: boolean };
   try {
-    account = await findOrLinkProviderUser(sql, identity, provider === "apple" && typeof body?.name === "string" ? body.name : null);
+    const name = provider === "apple" && typeof body?.name === "string" && body.name.trim() ? body.name.trim().slice(0, 80) : null;
+    account = await findOrCreateProviderUser(identity, name);
   } catch (cause) {
-    if (cause instanceof Error && cause.message === "email_required") return apiError(400, "email_required", "Share your email the first time you sign in.");
+    if (cause instanceof Error && cause.message === "email_not_verified") return apiError(400, "email_required", "Share a verified email the first time you sign in.");
     throw cause;
   }
   const token = await createMobileToken({ kind: "user", userId: account.userId, platform });
   const refreshToken = await issueRefreshToken(sql, account.userId, platform, undefined, token);
   const user = (await sql`SELECT id, email, display_name AS "displayName", time_zone AS "timeZone", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt" FROM users WHERE id = ${account.userId}`)[0] as User;
-  const result: AuthSession = { token, tokenType: "Bearer", expiresInDays: 365, created: account.created, user: { id: user.id, email: user.email, displayName: user.displayName, timeZone: user.timeZone ?? null, createdAt: user.createdAt }, refreshToken, refreshExpiresInDays: REFRESH_TTL_DAYS };
+  const result: AuthSession = { token, tokenType: "Bearer", expiresInDays: 365, created: account.created, user: { id: user.id, email: user.email, displayName: user.displayName, timeZone: user.timeZone ?? null, createdAt: user.createdAt }, refreshToken, refreshExpiresInDays: REFRESH_TTL_DAYS, isNewUser: account.created, usedPrivateRelayEmail: isPrivateRelayEmail(user.email) || isPrivateRelayEmail(identity.email) };
   return Response.json(result, { status: account.created ? 201 : 200, headers: noStore });
+}
+
+const LINK_PROVIDERS: LinkProvider[] = ["apple", "google"];
+const providerName = (provider: LinkProvider) => provider === "apple" ? "Apple ID" : "Google account";
+
+/**
+ * POST /api/v1/auth/link/{provider} `{ idToken, nonce? }` (signed in): adds the token's provider subject to my
+ * account. 201 linked now, 200 already mine, 409 `identity_in_use` when it belongs to another account (nothing
+ * is moved), 401 not signed in / invalid token, 404 unknown provider, 503 provider not configured.
+ */
+export async function linkProviderResponse(request: Request, provider: string) {
+  if (!LINK_PROVIDERS.includes(provider as LinkProvider)) return apiError(404, "not_found", "Unknown sign-in provider.");
+  const auth = await requireUser(request);
+  if (auth instanceof Response) return auth;
+  const body = await request.json().catch(() => null) as Record<string, unknown> | null;
+  const idToken = typeof body?.idToken === "string" ? body.idToken.trim() : "";
+  if (!idToken) return apiError(400, "bad_request", "idToken is required.");
+  let identity: ProviderIdentity;
+  try {
+    identity = await verifyIdentity(provider as Provider, idToken, body?.nonce);
+  } catch (cause) {
+    if (cause instanceof Error && cause.message === "missing_config") return apiError(503, "missing_config", "Sign-in is not configured.");
+    return apiError(401, "invalid_token", "Invalid sign-in token.");
+  }
+  const me = auth.user.id;
+  const inUse = () => apiError(409, "identity_in_use", `This ${providerName(provider as LinkProvider)} is already used by another Honto account.`);
+  const result = (alreadyLinked: boolean): ProviderLinkResult => ({ provider: provider as LinkProvider, alreadyLinked, email: identity.email, usedPrivateRelayEmail: isPrivateRelayEmail(identity.email) });
+  const current = await findLinkedUser(identity.provider, identity.sub);
+  if (current === me) return Response.json(result(true), { headers: noStore });
+  if (current) return inUse();
+  const owner = await linkProviderIdentity(identity.provider, identity.sub, me);
+  return owner === me ? Response.json(result(false), { status: 201, headers: noStore }) : inUse();
 }
 
 /**

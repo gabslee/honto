@@ -155,6 +155,133 @@ test('v1 Google / Apple sign-in relinks existing accounts; logout revokes the cu
       expectError(await post(apple.POST, { idToken: await sign({ email: 'kenji@example.com', email_verified: true }, { iss: GOOGLE, aud: 'com.hontogame.app', sub: 'a-kenji' }), platform: 'ios' }), 401, 'invalid_token');
     });
 
+    await t.test('sign-in response: isNewUser and usedPrivateRelayEmail', async () => {
+      const existing = await post(google.POST, { idToken: await sign({ email: 'ana@example.com', email_verified: true }, { sub: 'g-ana' }), platform: 'ios' });
+      assert.deepEqual([existing.json.isNewUser, existing.json.usedPrivateRelayEmail], [false, false]);
+      const hidden = await post(apple.POST, { idToken: await sign({ email: 'Q9z@PrivateRelay.AppleID.com', email_verified: 'true' }, { iss: APPLE, aud: 'com.hontogame.app', sub: 'a-hidden' }), name: 'Mia', platform: 'ios' });
+      assert.equal(hidden.status, 201);
+      assertContract('AuthSession', hidden.json);
+      assert.deepEqual([hidden.json.isNewUser, hidden.json.created, hidden.json.usedPrivateRelayEmail, hidden.json.user.email], [true, true, true, 'q9z@privaterelay.appleid.com']);
+      // Later Apple sign-ins carry no email: still flagged from the account email.
+      const later = await post(apple.POST, { idToken: await sign({}, { iss: APPLE, aud: 'com.hontogame.app', sub: 'a-hidden' }), platform: 'ios' });
+      assert.deepEqual([later.status, later.json.isNewUser, later.json.usedPrivateRelayEmail], [200, false, true]);
+    });
+
+    await t.test('identities are never moved to another user (shared findOrCreateProviderUser / linkProviderIdentity)', async () => {
+      const { findOrCreateProviderUser, linkProviderIdentity } = await import('../app/mobile-auth.ts');
+      // Subject linked to Ana, token now carries Kenji's verified email: still Ana, link unchanged.
+      const same = await findOrCreateProviderUser({ provider: 'google', sub: 'g-ana', email: 'kenji@example.com', emailVerified: true, name: null });
+      assert.deepEqual(same, { userId: 'usr_ana', created: false });
+      assert.equal(await linkProviderIdentity('google', 'g-ana', 'usr_kenji'), 'usr_ana', 'DO NOTHING: the owner is reported, not replaced');
+      assert.equal(await linkProviderIdentity('google', 'g-ana', 'usr_ana'), 'usr_ana');
+      assert.deepEqual((await db.query("SELECT user_id FROM auth_accounts WHERE provider = 'google' AND provider_account_id = 'g-ana'")).rows, [{ user_id: 'usr_ana' }]);
+      // Email match is lower(email) and only with email_verified.
+      assert.deepEqual(await findOrCreateProviderUser({ provider: 'google', sub: 'g-ana-2', email: 'ANA@example.COM', emailVerified: true, name: null }), { userId: 'usr_ana', created: false });
+      await assert.rejects(findOrCreateProviderUser({ provider: 'google', sub: 'g-ana-3', email: 'ana@example.com', emailVerified: false, name: null }), /email_not_verified/);
+      assert.equal((await db.query("SELECT count(*)::int AS n FROM auth_accounts WHERE provider_account_id = 'g-ana-3'")).rows[0].n, 0);
+      assert.equal((await db.query("SELECT count(*)::int AS n FROM users WHERE lower(email) = 'ana@example.com'")).rows[0].n, 1, 'never duplicated');
+    });
+
+    await t.test('POST /api/v1/auth/link/{provider}: adds an identity to the signed-in account, 409 if taken', async () => {
+      const route = await import('../app/api/v1/auth/link/[provider]/route.ts');
+      const yuki = (await db.query("SELECT id FROM users WHERE email = 'x1@privaterelay.appleid.com'")).rows[0].id;
+      const yukiToken = await auth.createMobileToken({ kind: 'user', userId: yuki, platform: 'ios' });
+      const kenjiToken = await auth.createMobileToken({ kind: 'user', userId: 'usr_kenji', platform: 'ios' });
+      const link = async (provider, body, token) => {
+        const response = await route.POST(new Request(`https://hontogame.com/api/v1/auth/link/${provider}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) }), { params: Promise.resolve({ provider }) });
+        assert.equal(response.headers.get('cache-control'), 'no-store');
+        return { status: response.status, json: await response.json() };
+      };
+      const yukiGoogle = await sign({ email: 'yuki.real@gmail.com', email_verified: true }, { sub: 'g-yuki' });
+      expectError(await link('google', { idToken: yukiGoogle }), 401, 'unauthorized');
+      expectError(await link('github', { idToken: yukiGoogle }, yukiToken), 404, 'not_found');
+      expectError(await link('google', {}, yukiToken), 400, 'bad_request');
+      expectError(await link('google', { idToken: 'not.a.jwt' }, yukiToken), 401, 'invalid_token');
+      expectError(await link('apple', { idToken: yukiGoogle }, yukiToken), 401, 'invalid_token');
+
+      const added = await link('google', { idToken: yukiGoogle }, yukiToken);
+      assert.equal(added.status, 201, JSON.stringify(added.json));
+      assertContract('ProviderLinkResult', added.json);
+      assert.deepEqual(added.json, { provider: 'google', alreadyLinked: false, email: 'yuki.real@gmail.com', usedPrivateRelayEmail: false });
+      const again = await link('google', { idToken: yukiGoogle }, yukiToken);
+      assert.deepEqual([again.status, again.json.alreadyLinked], [200, true]);
+      // The Apple "Hide My Email" user can now sign in with Google and lands on the same account.
+      const viaGoogle = await post(google.POST, { idToken: yukiGoogle, platform: 'android' });
+      assert.deepEqual([viaGoogle.status, viaGoogle.json.user.id, viaGoogle.json.usedPrivateRelayEmail], [200, yuki, true]);
+
+      // Someone else's identity: 409, and nothing moves.
+      const anaGoogle = await sign({ email: 'ana@example.com', email_verified: true }, { sub: 'g-ana' });
+      const taken = await link('google', { idToken: anaGoogle }, kenjiToken);
+      expectError(taken, 409, 'identity_in_use');
+      assert.deepEqual((await db.query("SELECT user_id FROM auth_accounts WHERE provider_account_id = 'g-ana'")).rows, [{ user_id: 'usr_ana' }]);
+      expectError(await link('apple', { idToken: await sign({}, { iss: APPLE, aud: 'com.hontogame.app', sub: 'a-hidden' }) }, kenjiToken), 409, 'identity_in_use');
+      const relayLink = await link('apple', { idToken: await sign({ email: 'k2@privaterelay.appleid.com', email_verified: true }, { iss: APPLE, aud: 'com.hontogame.app', sub: 'a-kenji-2' }) }, kenjiToken);
+      assert.deepEqual([relayLink.status, relayLink.json.usedPrivateRelayEmail], [201, true]);
+
+      const saved = process.env.GOOGLE_CLIENT_ID;
+      const ios = process.env.GOOGLE_IOS_CLIENT_ID;
+      const android = process.env.GOOGLE_ANDROID_CLIENT_ID;
+      delete process.env.GOOGLE_CLIENT_ID; delete process.env.GOOGLE_IOS_CLIENT_ID; delete process.env.GOOGLE_ANDROID_CLIENT_ID;
+      expectError(await link('google', { idToken: yukiGoogle }, yukiToken), 503, 'missing_config');
+      Object.assign(process.env, { GOOGLE_CLIENT_ID: saved, GOOGLE_IOS_CLIENT_ID: ios, GOOGLE_ANDROID_CLIENT_ID: android });
+    });
+
+    await t.test('web callbacks: subject first, lower(email) next, never move an identity', async () => {
+      const googleCallback = await import('../app/api/auth/google/callback/route.ts');
+      const appleCallback = await import('../app/api/auth/apple/callback/route.ts');
+      const env = { GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET, APPLE_CLIENT_ID: process.env.APPLE_CLIENT_ID, APPLE_TEAM_ID: process.env.APPLE_TEAM_ID, APPLE_KEY_ID: process.env.APPLE_KEY_ID, APPLE_PRIVATE_KEY: process.env.APPLE_PRIVATE_KEY };
+      const { exportPKCS8, generateKeyPair: es } = await import('jose');
+      const appleSigning = await es('ES256', { extractable: true });
+      Object.assign(process.env, { GOOGLE_CLIENT_SECRET: 'secret', APPLE_CLIENT_ID: 'com.hontogame.web', APPLE_TEAM_ID: 'TEAM', APPLE_KEY_ID: 'KEY', APPLE_PRIVATE_KEY: await exportPKCS8(appleSigning.privateKey) });
+      const realFetch = globalThis.fetch;
+      let googleProfile; let appleIdToken;
+      const publicJwk = { ...(await exportJWK(publicKey)), kid: 'k1', alg: 'RS256' };
+      globalThis.fetch = async (input) => {
+        const url = String(input);
+        if (url === 'https://oauth2.googleapis.com/token') return Response.json({ access_token: 'at' });
+        if (url === 'https://openidconnect.googleapis.com/v1/userinfo') return Response.json(googleProfile);
+        if (url === 'https://appleid.apple.com/auth/token') return Response.json({ id_token: appleIdToken });
+        if (url === 'https://appleid.apple.com/auth/keys') return Response.json({ keys: [publicJwk] });
+        throw new Error(`unexpected fetch ${url}`);
+      };
+      const sessionUser = async (response) => {
+        const cookie = response.headers.getSetCookie().find((c) => c.startsWith('honto_session=') && !c.startsWith('honto_session=;'));
+        assert.ok(cookie, `signed in (${response.headers.get('location')})`);
+        return (await requireUser(new Request('https://x', { headers: { cookie: cookie.split(';')[0] } }))).user.id;
+      };
+      const viaGoogle = async (profile) => {
+        googleProfile = profile;
+        return googleCallback.GET(new Request('https://hontogame.com/api/auth/callback/google?code=c&state=s1', { headers: { cookie: 'honto_google_state=s1; honto_google_return=%2Fapp' } }));
+      };
+      const viaApple = async (claims, sub) => {
+        appleIdToken = await sign({ ...claims, nonce: 'n1' }, { iss: APPLE, aud: 'com.hontogame.web', sub });
+        return appleCallback.POST(new Request('https://hontogame.com/api/auth/apple/callback', { method: 'POST', headers: { cookie: 'honto_apple_state=s2; honto_apple_nonce=n1; honto_apple_return=%2Fapp', 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ code: 'c', state: 's2' }) }));
+      };
+      try {
+        const before = await userCount();
+        // Linked subject whose Google email is now Kenji's: signs in Ana, the link is not moved to Kenji.
+        assert.equal(await sessionUser(await viaGoogle({ sub: 'g-ana', email: 'kenji@example.com', email_verified: true, name: 'Ana' })), 'usr_ana');
+        assert.deepEqual((await db.query("SELECT user_id FROM auth_accounts WHERE provider_account_id = 'g-ana'")).rows, [{ user_id: 'usr_ana' }]);
+        // New subject, mixed-case stored email ('Ana@Example.com'): relinked to Ana, no duplicate user.
+        assert.equal(await sessionUser(await viaGoogle({ sub: 'g-ana-web', email: 'ana@example.com', email_verified: true, name: 'Ana' })), 'usr_ana');
+        assert.equal(await userCount(), before);
+        const unverified = await viaGoogle({ sub: 'g-nope', email: 'nope@example.com', email_verified: false });
+        assert.match(unverified.headers.get('location'), /error/);
+
+        // Apple web: linked subject without email in the token (returning user) signs in Kenji.
+        assert.equal(await sessionUser(await viaApple({}, 'a-kenji')), 'usr_kenji');
+        // Linked subject with Ana's verified email: still Kenji, nothing moved.
+        assert.equal(await sessionUser(await viaApple({ email: 'ana@example.com', email_verified: 'true' }, 'a-kenji')), 'usr_kenji');
+        assert.deepEqual((await db.query("SELECT user_id FROM auth_accounts WHERE provider = 'apple' AND provider_account_id = 'a-kenji'")).rows, [{ user_id: 'usr_kenji' }]);
+        // Unknown subject without a verified email is refused.
+        assert.match((await viaApple({ email: 'web@example.com', email_verified: 'false' }, 'a-unknown-web')).headers.get('location'), /error/);
+        assert.equal(await userCount(), before);
+      } finally {
+        globalThis.fetch = realFetch;
+        for (const [key, value] of Object.entries(env)) if (value === undefined) delete process.env[key]; else process.env[key] = value;
+      }
+    });
+
     await t.test('logout: revokes the current bearer token and its refresh chain only', async () => {
       const second = await post(google.POST, { idToken: await sign({ email: 'ana@example.com', email_verified: true }, { sub: 'g-ana' }), platform: 'android' });
       const res = await post(logout.POST, {}, { authorization: `Bearer ${anaSession.token}` });
