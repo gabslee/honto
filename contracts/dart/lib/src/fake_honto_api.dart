@@ -92,6 +92,15 @@ class FakeHontoApi implements HontoApi {
       _run('signInWithApple', () => AuthSession.fromJson(_json('signInWithApple.201')));
 
   @override
+  Future<ProviderLinkResult> linkProviderIdentity(String provider, ProviderLinkRequest body) => _run('linkProviderIdentity', () {
+        // Any token containing "taken" simulates an identity that belongs to another account.
+        if (body.idToken.contains('taken')) {
+          throw HontoApiException(409, ApiError.fromJson(_json('linkProviderIdentity.409')));
+        }
+        return ProviderLinkResult.fromJson(_json('linkProviderIdentity.201')..['provider'] = provider);
+      });
+
+  @override
   Future<EmailStartResponse> startEmailSignIn(EmailStartRequest body) =>
       _run('startEmailSignIn', () => EmailStartResponse.fromJson(_json('startEmailSignIn.202')));
 
@@ -102,6 +111,15 @@ class FakeHontoApi implements HontoApi {
           throw HontoApiException(401, ApiError.fromJson(_json('verifyEmailSignIn.401')));
         }
         return AuthSession.fromJson(_json(body.platform == Platform.web ? 'verifyEmailSignIn.200.web' : 'verifyEmailSignIn.200'));
+      });
+
+  @override
+  Future<AuthSession> refreshSession(RefreshRequest body) => _run('refreshSession', () {
+        // Any token containing "reused" simulates a revoked or reused refresh token.
+        if (body.refreshToken.contains('reused')) {
+          throw HontoApiException(401, ApiError.fromJson(_json('refreshSession.401')));
+        }
+        return AuthSession.fromJson(_json('refreshSession.200'));
       });
 
   @override

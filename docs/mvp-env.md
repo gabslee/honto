@@ -50,3 +50,21 @@ App Store Connect / Play builds. Never commit values.
 
 No new variables. `api/v1/context.ts` (`requireUser`, `requireCouple`, `isCouplePremium`) and
 `PUT /api/v1/me/timezone` only use the existing `DATABASE_URL` and `AUTH_SESSION_SALT` (token and cookie hashes).
+
+## feat/api-v1-couple-auth (W1b: couple, pairing, me/today, magic link, refresh, unpair, export, retention)
+
+| Name | Where | Notes |
+|---|---|---|
+| `RESEND_API_KEY` | Vercel (Production; optional in Preview) | Resend API key, sent with plain `fetch` to `https://api.resend.com/emails`. Empty: dev/Preview log the magic link and code to the function log; Production answers `503 email_unavailable` and never logs tokens. |
+| `EMAIL_FROM` | Vercel | Sender on a domain verified in Resend. Default `Honto <hello@hontogame.com>`. |
+| `CRON_SECRET` | Vercel + Cloudflare Worker | `GET /api/cron/retention` requires `Authorization: Bearer <CRON_SECRET>`; unset = every call is 401. |
+| `ANDROID_CERT_SHA256` | Vercel (read at build time) | App signing certificate SHA-256 fingerprint(s) for `/.well-known/assetlinks.json`, `AA:BB:…` form, comma separated (Play App Signing key, plus upload/debug keys if wanted). Empty = `[]`. Redeploy after changing it. |
+
+Existing names used: `DATABASE_URL`, `AUTH_SESSION_SALT` (also salts magic-link, code, refresh-token and IP hashes),
+`HONTO_ADMIN_EMAIL` (an email sign-in with this address gets the admin role, as with Google/Apple) and the Vercel
+system variable `VERCEL_ENV` (`production` = links always on `https://hontogame.com`, no console sender; otherwise
+links use the request's own origin so they work on a Preview URL).
+No new variables for the refresh tokens or the AASA file (app ID `4AW8H42XNA.com.hontogame.app` is fixed in code).
+`POST /api/v1/auth/google` and `/apple` reuse the existing `GOOGLE_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`,
+`GOOGLE_ANDROID_CLIENT_ID` (accepted Google audiences; none set = `503 missing_config`) and `APPLE_IOS_BUNDLE_ID`
+(Apple audience, default `com.hontogame.app`). No new variables.

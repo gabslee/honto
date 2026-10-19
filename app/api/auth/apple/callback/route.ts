@@ -1,5 +1,6 @@
 import { generateAppleClientSecret, verifyAppleIdToken } from "../../../../apple-auth";
 import { googleReturnWithAuth } from "../../../../google-return.js";
+import { findOrCreateProviderUser } from "../../../../mobile-auth";
 import { createUserSession, database, ensureIdentitySchema, userCookie } from "../../../../server-auth";
 
 export const dynamic = "force-dynamic";
@@ -53,18 +54,19 @@ export async function POST(request: Request) {
     const tokens = await tokenResponse.json() as { id_token?: string };
     if (!tokens.id_token) throw new Error("Apple did not return an id_token");
     const claims = await verifyAppleIdToken(tokens.id_token, clientId, nonceCookie);
+    // A verified email is only needed when the Apple subject is not linked yet (findOrCreateProviderUser).
     const verified = claims.email_verified === true || claims.email_verified === "true";
-    if (!claims.email || !verified) throw new Error("Apple account email is not verified");
 
     const sql = database();
     if (!sql) throw new Error("DATABASE_URL is not configured");
     await ensureIdentitySchema();
-    const email = claims.email.toLowerCase();
+    const email = claims.email?.toLowerCase() ?? null;
     const name = appleName(form.get("user")) || email;
-    const role = process.env.HONTO_ADMIN_EMAIL?.trim().toLowerCase() === email ? "admin" : "user";
-    const users = await sql`INSERT INTO users (id, email, display_name, role, plan, subscription_status) VALUES (${crypto.randomUUID()}, ${email}, ${name}, ${role}, ${role === "admin" ? "premium" : "free"}, ${role === "admin" ? "active" : "inactive"}) ON CONFLICT (email) DO UPDATE SET role = CASE WHEN users.role = 'admin' OR EXCLUDED.role = 'admin' THEN 'admin' ELSE users.role END, plan = CASE WHEN users.role = 'admin' OR EXCLUDED.role = 'admin' THEN 'premium' ELSE users.plan END, subscription_status = CASE WHEN users.role = 'admin' OR EXCLUDED.role = 'admin' THEN 'active' ELSE users.subscription_status END, updated_at = now() RETURNING id`;
-    const userId = String(users[0].id);
-    await sql`INSERT INTO auth_accounts (id, user_id, provider, provider_account_id) VALUES (${crypto.randomUUID()}, ${userId}, 'apple', ${claims.sub}) ON CONFLICT (provider, provider_account_id) DO UPDATE SET user_id = EXCLUDED.user_id`;
+    const role = verified && email && process.env.HONTO_ADMIN_EMAIL?.trim().toLowerCase() === email ? "admin" : "user";
+    // Linked Apple subject first, then the verified email (case-insensitive), else a new user. The subject is
+    // linked without ever moving it to another user.
+    const { userId } = await findOrCreateProviderUser({ provider: "apple", sub: claims.sub, email, emailVerified: verified, name: null }, name);
+    if (role === "admin") await sql`UPDATE users SET role = 'admin', plan = 'premium', subscription_status = 'active', updated_at = now() WHERE id = ${userId}`;
     const session = await createUserSession(userId);
     return redirect(request, withAuth("success"), [userCookie(session), ...clears]);
   } catch (error) {
