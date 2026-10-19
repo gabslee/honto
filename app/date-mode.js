@@ -37,7 +37,7 @@ export function dateTaskFor(seed, locale = "en") {
 }
 
 export function pointsLabel(count, locale = "en", dateMode = false) {
-  if (dateMode) return locale === "ja" ? "ポイント" : locale === "pt-BR" ? (count === 1 ? "ponto ♥" : "pontos ♥") : (count === 1 ? "♥ point" : "♥ points");
+  if (dateMode) return locale === "ja" ? "ポイント" : locale === "pt-BR" ? (count === 1 ? "ponto" : "pontos") : (count === 1 ? "point" : "points");
   return locale === "ja" ? "シップ" : count === 1 ? "sip" : "sips";
 }
 
@@ -50,7 +50,8 @@ export function dateResultTitle({ loserName, both, points, locale = "en" }) {
 // Rewrites any drinking wording into the no-alcohol date-mode equivalent (en, pt-BR, ja).
 const keepCase = (match, replacement) => (match === match.toUpperCase() && /[A-Z]/.test(match) ? replacement.toUpperCase() : /^[A-Z]/.test(match) ? replacement[0].toUpperCase() + replacement.slice(1) : replacement);
 const DATE_RULES = [
-  [/🍺|🥃|🍻/g, "💗"],
+  // Strip drink emoji that may arrive in AI or player text (the UI itself uses SVG icons, never emoji).
+  [/ ?(?:\u{1F37A}|\u{1F943}|\u{1F37B}|\u{1F942}) ?/gu, " "],
   [/Skip & sip!/gi, "Skip & love task!"],
   [/\bno drinks\b/gi, "no drinks"],
   [/\bcheers\b/gi, "high five"],

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Icon } from "./icons";
 import type { Locale } from "./i18n";
 import type { PublicMultiplayerState } from "../api/multiplayer";
 
@@ -16,14 +17,14 @@ const LABELS: Record<string, [string, string]> = {
   who: ["Who at the table…?", "この中で誰が…？"], both: ["Everyone Drinks", "みんなで飲む"],
   everyone: ["Everyone Drinks", "みんなで飲む"], challenge: ["Table Challenge", "テーブルチャレンジ"],
 };
-const CARD_UI: Record<string, { icon: string; color: string; className: string }> = {
-  honto: { icon: "🤥", color: "yellow", className: "writer" },
-  preference: { icon: "🧠", color: "blue", className: "preference-card" },
-  estimate: { icon: "🎯", color: "pink", className: "estimate-card" },
-  wouldrather: { icon: "↔", color: "yellow", className: "would-rather-card" },
-  who: { icon: "👥", color: "mint", className: "question-card" },
-  challenge: { icon: "⚡", color: "pink", className: "question-card" },
-  both: { icon: "🍻", color: "yellow", className: "both-card" },
+const CARD_UI: Record<string, { icon: ReactNode; color: string; className: string }> = {
+  honto: { icon: <Icon name="lie"/>, color: "yellow", className: "writer" },
+  preference: { icon: <Icon name="brain"/>, color: "blue", className: "preference-card" },
+  estimate: { icon: <Icon name="target"/>, color: "pink", className: "estimate-card" },
+  wouldrather: { icon: <Icon name="swap"/>, color: "yellow", className: "would-rather-card" },
+  who: { icon: <Icon name="users"/>, color: "mint", className: "question-card" },
+  challenge: { icon: <Icon name="bolt"/>, color: "pink", className: "question-card" },
+  both: { icon: <Icon name="toast"/>, color: "yellow", className: "both-card" },
   hidden: { icon: "?", color: "yellow", className: "deck-draw" },
 };
 
@@ -39,7 +40,7 @@ function GroupWheel({ values, value, spinning }: { values: number[]; value: numb
 }
 
 function WaitingCard({ title }: { title: string }) {
-  return <div className="waiting"><div className="bobble">🃏</div><h2>{title}</h2><div className="typing"><i/><i/><i/></div></div>;
+  return <div className="waiting"><div className="bobble"><Icon name="cards"/></div><h2>{title}</h2><div className="typing"><i/><i/><i/></div></div>;
 }
 
 function GroupDrawCard({ mine, busy, cardNumber, actorName, send, t }: { mine: boolean; busy: boolean; cardNumber: number; actorName: string; send: Send; t: Translate }) {
@@ -92,7 +93,7 @@ function RoundContent({ group, meId, busy, send, t, locale, roomCode, sessionTok
   if (group.phase === "duel") {
     const dueling = author || meId === group.opponentId;
     const pair = [group.authorId, group.opponentId].filter((id): id is string => Boolean(id));
-    return <>{group.round > 0 && <p className="mp-progress" role="status">{card.challenge === "rps" ? t("A tie! Choose again.", "引き分け！もう一度選んでください。") : t("The confirmations differed. Play again and agree on who laughed first.", "確認が一致しませんでした。もう一度対決してください。")}</p>}<p className="mp-copy">{pair.map(playerName).join(" × ")}</p>{card.challenge === "rps" ? <><p>{t("Choose secretly. A tie starts another round.", "秘密で選んでください。引き分けならもう一度。")}</p>{dueling && !answered && <div className="mp-choices">{[["rock", "✊", t("Rock", "グー")], ["paper", "✋", t("Paper", "パー")], ["scissors", "✌", t("Scissors", "チョキ")]].map(([value, icon, label]) => <button key={value} className="mp-choice" disabled={busy} onClick={() => send("duel", { value })}>{icon} {label}</button>)}</div>}{(!dueling || answered) && <p className="mp-progress" role="status">{t("Waiting for both secret choices…", "2人の選択を待っています…")}</p>}</> : <><p>{t("First to laugh loses. Confirm once each. If you disagree, both choices reset so you can play again.", "先に笑った人が負けです。2人とも一度ずつ確認します。意見が違えば回答がリセットされ、再対決できます。")}</p>{dueling ? <div className="mp-choices">{pair.map((id) => <button key={id} className="mp-choice" disabled={busy || Boolean(group.confirmations[meId])} aria-pressed={group.confirmations[meId] === id} onClick={() => send("confirmLoser", { playerId: id })}>{t(`${playerName(id)} laughed first`, `${playerName(id)}が先に笑った`)}</button>)}</div> : <p className="mp-progress">{t("The two players are confirming the result.", "対戦した2人が結果を確認しています。")}</p>}</>}{meId === group.opponentId && !answered && !group.confirmations[meId] && <SkipButton busy={busy} send={send} t={t} label={t("Decline challenge · 2–4 sips", "対決を断る · 2〜4シップ")}/>}</>;
+    return <>{group.round > 0 && <p className="mp-progress" role="status">{card.challenge === "rps" ? t("A tie! Choose again.", "引き分け！もう一度選んでください。") : t("The confirmations differed. Play again and agree on who laughed first.", "確認が一致しませんでした。もう一度対決してください。")}</p>}<p className="mp-copy">{pair.map(playerName).join(" × ")}</p>{card.challenge === "rps" ? <><p>{t("Choose secretly. A tie starts another round.", "秘密で選んでください。引き分けならもう一度。")}</p>{dueling && !answered && <div className="mp-choices">{([["rock", t("Rock", "グー")], ["paper", t("Paper", "パー")], ["scissors", t("Scissors", "チョキ")]] as Array<["rock" | "paper" | "scissors", string]>).map(([value, label]) => <button key={value} className="mp-choice" disabled={busy} onClick={() => send("duel", { value })}><Icon name={value}/> {label}</button>)}</div>}{(!dueling || answered) && <p className="mp-progress" role="status">{t("Waiting for both secret choices…", "2人の選択を待っています…")}</p>}</> : <><p>{t("First to laugh loses. Confirm once each. If you disagree, both choices reset so you can play again.", "先に笑った人が負けです。2人とも一度ずつ確認します。意見が違えば回答がリセットされ、再対決できます。")}</p>{dueling ? <div className="mp-choices">{pair.map((id) => <button key={id} className="mp-choice" disabled={busy || Boolean(group.confirmations[meId])} aria-pressed={group.confirmations[meId] === id} onClick={() => send("confirmLoser", { playerId: id })}>{t(`${playerName(id)} laughed first`, `${playerName(id)}が先に笑った`)}</button>)}</div> : <p className="mp-progress">{t("The two players are confirming the result.", "対戦した2人が結果を確認しています。")}</p>}</>}{meId === group.opponentId && !answered && !group.confirmations[meId] && <SkipButton busy={busy} send={send} t={t} label={t("Decline challenge · 2–4 sips", "対決を断る · 2〜4シップ")}/>}</>;
   }
   if (group.phase === "answer") return <><p className="mini-game-question">{card.prompt ?? (isGuess ? t("Which answer is true?", "正しい答えは？") : "")}</p>{isGuess && <p className="hint">{t("One secret guess each. No changes after submitting.", "1人1回、秘密で回答します。送信後は変更できません。")}</p>}{card.type === "wouldrather" && <p className="hint">{t("The minority spins 1–3. A tie is safe. A skip spins 2–4 and does not count as a vote.", "少数派は1〜3シップ。同数なら罰なし。スキップは2〜4で、投票には数えません。")}</p>}{card.type === "who" && <p className="hint">{t("Vote secretly for someone else. The most voted players each spin 1–3; ties share the lead.", "自分以外に秘密で投票。最多票の人はそれぞれ1〜3シップ。同票なら全員が対象です。")}</p>}{answered || (isGuess && author) ? <WaitingCard title={answered ? t("Your answer is locked. Waiting for the table…", "回答を確定しました。みんなを待っています…") : t("Your answer stays secret until everyone has guessed.", "全員の回答が揃うまで正解は秘密です。")}/> : <><div className={choiceClass}>{card.challenge === "surprise" ? [true, false].map((value) => <button type="button" key={String(value)} className="mp-choice" disabled={busy} onClick={() => send("answer", { value })}>{value ? t("Yes, that's me", "はい、当てはまります") : t("No", "いいえ")}</button>) : card.type === "who" ? group.players.filter((player) => player.id !== meId).map((player) => <button type="button" key={player.id} className="mp-choice" disabled={busy} onClick={() => send("answer", { value: player.id })}>{player.name}</button>) : card.options?.map((option, index) => <button type="button" key={index} className={card.type === "honto" ? "" : "mp-choice"} disabled={busy} onClick={() => send("answer", { value: index })}>{card.type === "honto" && <span>0{index + 1}</span>}<p>{option}</p>{card.type === "honto" && <b>{t("THIS IS TRUE", "これは本当")}</b>}</button>)}</div>{["wouldrather", "who"].includes(card.type) && <SkipButton busy={busy} send={send} t={t}/>}</>}<p className="mp-progress" role="status">{group.answeredIds.length}/{expected} {t("answers locked · revealed together", "回答済み · 全員揃ったら公開")}</p></>;
   return <p role="status">{t("Waiting for the table…", "みんなを待っています…")}</p>;

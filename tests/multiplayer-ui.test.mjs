@@ -10,9 +10,15 @@ import { createMultiplayerState, publicMultiplayer, reduceMultiplayer } from '..
 // Render the real TSX component with React; assertions cover visible choices and gates.
 const source = readFileSync(new URL('../app/multiplayer-client.tsx', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source + '\nexport { GroupFinished };', { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+const transpile = (code) => ts.transpileModule(code, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+const compiled = transpile(source + '\nexport { GroupFinished };');
+const baseRequire = createRequire(import.meta.url);
+// The component imports its sibling ./icons (TSX), so transpile that one the same way.
+const iconExports = {};
+new Function('require', 'exports', transpile(readFileSync(new URL('../app/icons.tsx', import.meta.url), 'utf8')))(baseRequire, iconExports);
+const appRequire = (id) => (id === './icons' ? iconExports : baseRequire(id));
 const exports = {};
-new Function('require', 'exports', compiled)(createRequire(import.meta.url), exports);
+new Function('require', 'exports', compiled)(appRequire, exports);
 const { MultiplayerGame } = exports;
 const players = ['a', 'b', 'c'].map((id, index) => ({ id, name: `Player ${id}`, isHost: Number(index === 0), sips: 0, hasWager: true, wager: `Wager ${id}`, connected: false }));
 function state(type = 'honto', extra = {}) { return createMultiplayerState({ players, cards: [{ id: 'card-1', type, ...extra }] }); }

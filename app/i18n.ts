@@ -86,7 +86,7 @@ export const messages = {
     loading: "Connecting you two…",
     room: "ROOM",
     round: "ROUND",
-    groupSipIn: "🥂 group sip in",
+    groupSipIn: "group sip in",
     session: "SESSION", pause: "PAUSE", resume: "RESUME", paused: "PAUSED",
     minutesShort: "min",
     landing: {
@@ -141,9 +141,9 @@ export const messages = {
     reveal: {
       correct: "NAILED IT!", wrong: "YOU FELL FOR THE BLUFF!", bluffSuccess: "BLUFF SUCCESS!", busted: "OOPS, BUSTED!", foundTruth: "THEY FOUND YOUR TRUTH.", drinks: "takes a sip.", guessedWrong: "guessed wrong.", theySip: "They take a sip.", yourSip: "Take a sip.",
       yourTurn: "your drink is waiting.", truthWas: "The truth was:",
-      group: "🥂 Optional toast: both of you take a sip.", next: "NEXT ROUND →",
+      group: "Optional toast: both of you take a sip.", next: "NEXT ROUND →",
     },
-    reminder: { title: "LITTLE TOAST", body: "Optional: raise whatever you’re drinking to each other.", ok: "CHEERS →", icon: "🥂" },
+    reminder: { title: "LITTLE TOAST", body: "Optional: raise whatever you’re drinking to each other.", ok: "CHEERS →" },
     miniGame: { title: "TRUTH OR SIPS", ask: "What question would you like to ask?", askHint: "Ask something that fits your game, then choose how many sips this question is worth based on how heavy it feels.", questionPlaceholder: "Type your question…", getQuestionIdea: "GET AN AI QUESTION ✦", closeQuestionOptions: "CLOSE AI OPTIONS", questionCategory: "What should it be about?", sessionThemes: "Use the session themes", customSubject: "Custom session subject", questionDirection: "Extra direction (optional)", questionDirectionPlaceholder: "e.g. keep it playful and about a first date", generateQuestion: "GENERATE 3 QUESTIONS →", generateMoreQuestions: "GENERATE 3 MORE →", thinkingQuestion: "THINKING…", questionOptions: "Choose one question", sipsLabel: "Sips if they choose sips", sendQuestion: "SEND QUESTION →", writing: "is writing a question…", ready: "Your question will appear here in a moment.", wantsToKnow: "wants to know", chooseHint: "Answer truthfully out loud, or choose sips based on how heavy the question feels.", truth: "TRUTH · ANSWER OUT LOUD", dare: "SIPS", take: "TAKE", yourTruth: "Answer out loud", answerPlaceholder: "No typing needed", sendTruth: "DONE →", choosing: "is choosing…", waitingChoice: "Truth or sips. The choice is theirs." },
     finished: {
       kicker: "THAT'S ALL. FOR NOW.", title: "The sharpest bluff detector was…",
