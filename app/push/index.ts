@@ -89,9 +89,11 @@ export async function notifyPartner(coupleId: string, fromUserId: string, event:
 
     const apns = apnsConfig();
     const fcm = fcmConfig();
+    const moved: { id: string; env: ApnsEnv }[] = [];
     const tally = (sent: { device: DeviceRow }[], results: (ApnsResult | FcmResult)[], dead: string[]) => results.forEach((result, i) => {
       if (result.status >= 200 && result.status < 300) summary.sent += 1; else summary.failed += 1;
       if (result.prune) dead.push(sent[i].device.id);
+      if ("env" in result && result.env) moved.push({ id: sent[i].device.id, env: result.env });
     });
     const dead: string[] = [];
     const [apnsResults, fcmResults] = await Promise.all([
@@ -103,6 +105,7 @@ export async function notifyPartner(coupleId: string, fromUserId: string, event:
     if (apnsResults) tally(apnsDevices, apnsResults, dead); else summary.failed += apnsDevices.length;
     if (fcmResults) tally(fcmDevices.map((device) => ({ device })), fcmResults, dead); else summary.failed += fcmDevices.length;
     await prune(sql, dead);
+    for (const { id, env } of moved) await sql`UPDATE push_devices SET env = ${env} WHERE id = ${id}`;
     summary.pruned = dead.length;
     console.info(`[push] ${event.type}: ${summary.sent} sent, ${summary.failed} failed, ${summary.pruned} pruned, ${summary.skipped} skipped`);
   } catch (error) {
