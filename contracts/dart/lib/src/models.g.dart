@@ -2366,7 +2366,7 @@ enum PushEventType {
 /// APNs alert: top-level key `honto` next to `aps` (with `mutable-content: 1` for photo.new / nudge.new
 /// so the NSE refreshes the App Group snapshot). APNs widget push (iOS 26): `{"aps":{"content-changed":true}}` only.
 class PushData {
-  const PushData({required this.type, required this.coupleId, required this.sentAt, this.photoId, this.thumbUrl, this.nudgeId, this.tripId, this.fromName, this.reason});
+  const PushData({required this.type, required this.coupleId, required this.sentAt, this.photoId, this.thumbUrl, this.nudgeId, this.createdAt, this.tripId, this.fromName, this.reason});
 
   final PushEventType type;
   final String coupleId;
@@ -2375,6 +2375,8 @@ class PushData {
   /// Signed thumb URL so the NSE / FCM service can update the widget without an API call.
   final String? thumbUrl;
   final String? nudgeId;
+  /// nudge.new: when the nudge was created (server time), for the receiver widget.
+  final DateTime? createdAt;
   final String? tripId;
   final String? fromName;
   /// couple.unpaired only.
@@ -2387,6 +2389,7 @@ class PushData {
         photoId: json['photoId'] == null ? null : json['photoId'] as String,
         thumbUrl: json['thumbUrl'] == null ? null : json['thumbUrl'] as String,
         nudgeId: json['nudgeId'] == null ? null : json['nudgeId'] as String,
+        createdAt: json['createdAt'] == null ? null : DateTime.parse(json['createdAt'] as String),
         tripId: json['tripId'] == null ? null : json['tripId'] as String,
         fromName: json['fromName'] == null ? null : json['fromName'] as String,
         reason: json['reason'] == null ? null : UnpairReason.fromJson(json['reason'] as String),
@@ -2399,6 +2402,7 @@ class PushData {
         if (photoId != null) 'photoId': photoId!,
         if (thumbUrl != null) 'thumbUrl': thumbUrl!,
         if (nudgeId != null) 'nudgeId': nudgeId!,
+        if (createdAt != null) 'createdAt': createdAt!.toUtc().toIso8601String(),
         if (tripId != null) 'tripId': tripId!,
         if (fromName != null) 'fromName': fromName!,
         if (reason != null) 'reason': reason!.toJson(),

@@ -760,6 +760,8 @@ export interface PushData {
   /** Signed thumb URL so the NSE / FCM service can update the widget without an API call. */
   thumbUrl?: string;
   nudgeId?: string;
+  /** nudge.new: when the nudge was created (server time), for the receiver widget. */
+  createdAt?: IsoDateTime;
   tripId?: string;
   fromName?: string;
   /** couple.unpaired only. */

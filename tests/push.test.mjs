@@ -120,9 +120,10 @@ test('apnsJwt: ES256 provider token (kid, iss), cached ~50 minutes', async () =>
 test('sendApns: per-token sandbox/production host, alert and widget topics, prunes 410 and BadDeviceToken', async () => {
   apnsRequests.length = 0;
   apnsSessions.length = 0;
-  apnsRespond = ({ headers }) => {
+  apnsRespond = ({ headers, origin }) => {
     if (headers[':path'].endsWith('/gone')) return { status: 410, body: JSON.stringify({ reason: 'Unregistered', timestamp: 1 }) };
     if (headers[':path'].endsWith('/bad')) return { status: 400, body: JSON.stringify({ reason: 'BadDeviceToken' }) };
+    if (headers[':path'].endsWith('/wrongenv')) return origin === 'https://api.sandbox.push.apple.com' ? { status: 200, body: '' } : { status: 400, body: JSON.stringify({ reason: 'BadDeviceToken' }) };
     if (headers[':path'].endsWith('/topic')) return { status: 400, body: JSON.stringify({ reason: 'DeviceTokenNotForTopic' }) };
     return { status: 200, body: '' };
   };
@@ -132,12 +133,14 @@ test('sendApns: per-token sandbox/production host, alert and widget topics, prun
     { token: 'gone', env: 'production', pushType: 'alert', payload: {} },
     { token: 'bad', env: 'production', pushType: 'widgets', payload: push.WIDGET_PAYLOAD },
     { token: 'topic', env: 'production', pushType: 'alert', payload: {} },
+    { token: 'wrongenv', env: 'production', pushType: 'widgets', payload: push.WIDGET_PAYLOAD },
   ], config);
   assert.deepEqual(results, [
     { status: 200, reason: null, prune: false },
     { status: 410, reason: 'Unregistered', prune: true },
     { status: 400, reason: 'BadDeviceToken', prune: true },
     { status: 400, reason: 'DeviceTokenNotForTopic', prune: false },
+    { status: 200, reason: null, prune: false, env: 'sandbox' },
   ]);
   assert.deepEqual(apnsSessions.map((s) => [s.origin, s.closed]), [['https://api.sandbox.push.apple.com', true], ['https://api.push.apple.com', true]], 'one session per host, closed after the batch');
   const ok = apnsRequests.find((r) => r.headers[':path'] === '/3/device/ok');

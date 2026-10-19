@@ -8,7 +8,8 @@ export type ApnsConfig = { keyP8: string; keyId: string; teamId: string; bundleI
 /** One push. `pushType: "widgets"` is the iOS 26 widget push (topic `<bundle>.push-type.widgets`). */
 export type ApnsMessage = { token: string; env: ApnsEnv; pushType: "alert" | "widgets"; payload: unknown; collapseId?: string };
 /** `prune` = the token is dead (410 Unregistered or 400 BadDeviceToken) and must be revoked. */
-export type ApnsResult = { status: number; reason: string | null; prune: boolean };
+/** `env` is set when the token only worked on the other APNs host (the stored env was wrong): update the row. */
+export type ApnsResult = { status: number; reason: string | null; prune: boolean; env?: ApnsEnv };
 
 export const APNS_HOSTS: Record<ApnsEnv, string> = { production: "https://api.push.apple.com", sandbox: "https://api.sandbox.push.apple.com" };
 const JWT_TTL_MS = 50 * 60 * 1000;
@@ -77,11 +78,23 @@ export async function sendApns(messages: ApnsMessage[], config: ApnsConfig): Pro
         "content-type": "application/json",
       };
       if (message.collapseId) headers["apns-collapse-id"] = message.collapseId;
-      try {
-        const response = await post(session(message.env), headers, JSON.stringify(message.payload));
+      const attempt = async (env: ApnsEnv) => {
+        const response = await post(session(env), headers, JSON.stringify(message.payload));
         let reason: string | null = null;
         try { reason = response.body ? (JSON.parse(response.body) as { reason?: string }).reason ?? null : null; } catch { reason = null; }
-        return { status: response.status, reason, prune: response.status === 410 || (response.status === 400 && reason === "BadDeviceToken") };
+        return { status: response.status, reason };
+      };
+      try {
+        const first = await attempt(message.env);
+        if (first.status === 400 && first.reason === "BadDeviceToken") {
+          // APNs also answers BadDeviceToken when a token goes to the wrong host (e.g. a TestFlight build that
+          // registered as sandbox). Try the other host once before pruning; on success report the right env.
+          const other: ApnsEnv = message.env === "production" ? "sandbox" : "production";
+          const second = await attempt(other).catch(() => null);
+          if (second && second.status >= 200 && second.status < 300) return { status: second.status, reason: null, prune: false, env: other };
+          return { status: first.status, reason: first.reason, prune: true };
+        }
+        return { status: first.status, reason: first.reason, prune: first.status === 410 };
       } catch {
         return { status: 0, reason: "connection_error", prune: false };
       }

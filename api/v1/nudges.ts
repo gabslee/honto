@@ -75,6 +75,6 @@ export async function sendNudgeResponse(request: Request, options: { now?: Date;
     const existing = (await sql`SELECT id, to_char(created_at AT TIME ZONE 'UTC', ${ISO}) AS "createdAt" FROM couple_nudges WHERE from_user_id = ${user.id} AND client_id = ${clientId}`)[0];
     return Response.json(result(existing), { status: 201, headers: noStore });
   }
-  await (options.send ?? notifyPartner)(couple.id, user.id, { type: "nudge.new", nudgeId: id, fromName: user.displayName });
+  await (options.send ?? notifyPartner)(couple.id, user.id, { type: "nudge.new", nudgeId: id, createdAt: String(rows[0].createdAt), fromName: user.displayName });
   return Response.json(result(rows[0]), { status: 201, headers: noStore });
 }

@@ -1854,6 +1854,7 @@ components:
         photoId: { type: string }
         thumbUrl: { type: string, format: uri, description: 'Signed thumb URL so the NSE / FCM service can update the widget without an API call.' }
         nudgeId: { type: string }
+        createdAt: { type: string, format: date-time, description: 'nudge.new: when the nudge was created (server time), for the receiver widget.' }
         tripId: { type: string }
         fromName: { type: string }
         reason: { $ref: '#/components/schemas/UnpairReason', description: 'couple.unpaired only.' }
