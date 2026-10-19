@@ -162,6 +162,26 @@ test('photos, memories and devices', async (t) => {
       }
     });
 
+    await t.test('POST /api/v1/photos: 503 matches the OpenAPI example whenever an S3 setting is missing', async () => {
+      const operation = spec.paths['/api/v1/photos'].post;
+      assert.equal(operation.responses['503'].$ref, '#/components/responses/StorageNotConfigured');
+      const example = spec.components.responses.StorageNotConfigured.content['application/json'].example;
+      assertContract('Error', example);
+      assert.deepEqual(example, fixture('createPhoto.503'));
+      const unset = Object.fromEntries(Object.keys(s3Env).map((k) => [k, undefined]));
+      for (const missing of [unset, { S3_ACCESS_KEY_ID: undefined }, { S3_SECRET_ACCESS_KEY: undefined }, { S3_ENDPOINT: undefined }, { S3_BUCKET: undefined }, { S3_ENDPOINT: 'not a url' }]) {
+        setEnv(missing);
+        try {
+          const res = await create(request());
+          expectError(res, 503, 'storage_not_configured');
+          assert.deepEqual(res.json, example, JSON.stringify(missing));
+        } finally {
+          setEnv(s3Env);
+        }
+      }
+      assert.equal((await db.query('SELECT count(*)::int AS n FROM couple_photos WHERE storage = $1', ['s3'])).rows[0].n, 0, 'nothing is reserved without storage');
+    });
+
     let firstId;
     await t.test('POST /api/v1/photos: presigned PUTs (10 min) for full + thumb, idempotent by clientId', async () => {
       const body = request();
