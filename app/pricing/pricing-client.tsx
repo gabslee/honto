@@ -16,7 +16,7 @@ function subscribeLocale(onChange: () => void) { window.addEventListener("storag
 
 export default function PricingClient({ currency = "USD" }: { currency?: "USD" | "BRL" }) {
   const locale = useSyncExternalStore(subscribeLocale, readLocale, () => "en" as const);
-  const prices = priceLabels(currency, locale); const c = PRICING_COPY[locale];
+  const prices = priceLabels(currency); const c = PRICING_COPY[locale];
   const [loading, setLoading] = useState<"month" | "year" | null>(null);
   const [error, setError] = useState("");
   const [accepted, setAccepted] = useState(false);
@@ -31,7 +31,7 @@ export default function PricingClient({ currency = "USD" }: { currency?: "USD" |
       if (!accepted) throw new Error(c.errTerms);
       const consent = await fetch("/api/account/consent", { method: "POST" });
       if (!consent.ok) throw new Error(c.errTerms);
-      const response = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ interval }) });
+      const response = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ interval, currency }) });
       const data = await response.json();
       if (response.status === 401) { window.location.href = "/api/auth/google/start"; return; }
       if (!response.ok || !data.url) throw new Error(data.error ?? c.errCheckout);

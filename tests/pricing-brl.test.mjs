@@ -22,16 +22,19 @@ test("price ids: defaults to the live prices, env overrides win", () => {
 });
 
 test("BRL display and savings math", () => {
-  assert.deepEqual(PRICE_DISPLAY.BRL, { month: "R$ 14,90", year: "R$ 99,00", yearlySavings: "R$ 79,80" });
+  assert.deepEqual(PRICE_DISPLAY.BRL, { month: "R$14,90", year: "R$99", yearlySavings: "R$79,80" });
   assert.equal((14.9 * 12 - 99).toFixed(2), "79.80");
+  assert.deepEqual(PRICE_DISPLAY.USD, { month: "US$4.99", year: "US$29.99", yearlySavings: "US$29.89" });
+  assert.equal((4.99 * 12 - 29.99).toFixed(2), "29.89");
 });
 
 test("checkout uses the Vercel IP country; pages and legal text show BRL", async () => {
   const route = await readFile(new URL("../app/api/billing/checkout/route.ts", import.meta.url), "utf8");
-  assert.match(route, /currencyForCountry\(request\.headers\.get\("x-vercel-ip-country"\)\)/);
+  assert.match(route, /checkoutCurrency\(request\.headers\.get\("x-vercel-ip-country"\), body\.currency\)/);
   assert.match(route, /priceFor\(/);
   const subs = await readFile(new URL("../app/subscriptions/page.tsx", import.meta.url), "utf8");
-  assert.match(subs, /R\$ 14,90 per month or R\$ 99,00 per year/);
+  assert.match(subs, /R\$14,90 per month or R\$99 per year/);
+  assert.match(subs, /currencyForCountry\(\(await headers\(\)\)\.get\("x-vercel-ip-country"\)\)/);
   assert.doesNotMatch(subs, /displayed in US dollars/);
   const i18n = await readFile(new URL("../app/i18n.ts", import.meta.url), "utf8");
   assert.match(i18n, /R\$14,90\/mês ou R\$99\/ano/);
@@ -40,10 +43,10 @@ test("checkout uses the Vercel IP country; pages and legal text show BRL", async
 });
 
 import { priceLabels } from "../app/pricing-config.js";
-test("price labels stay consistent with the page locale", () => {
-  assert.deepEqual(priceLabels("BRL", "pt-BR"), { month: "R$ 14,90", year: "R$ 99,00", yearlySavings: "R$ 79,80" });
-  assert.deepEqual(priceLabels("BRL", "en"), { month: "R$14.90", year: "R$99.00", yearlySavings: "R$79.80" });
-  assert.deepEqual(priceLabels("USD", "en"), { month: "US$4.99", year: "US$29.99", yearlySavings: "US$29.89" });
+test("price labels are the same in every locale: R$14,90 / R$99 for Brazil, US$4.99 / US$29.99 elsewhere", () => {
+  assert.deepEqual(priceLabels("BRL"), { month: "R$14,90", year: "R$99", yearlySavings: "R$79,80" });
+  assert.deepEqual(priceLabels("USD"), { month: "US$4.99", year: "US$29.99", yearlySavings: "US$29.89" });
+  assert.deepEqual(priceLabels(undefined), priceLabels("USD"));
 });
 
 test("pricing page is localized for en, pt-BR and ja", async () => {
