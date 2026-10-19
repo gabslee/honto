@@ -106,6 +106,30 @@ function linkOrigin(request: Request, env: Env = process.env) {
   try { return new URL(request.url).origin; } catch { return PRODUCTION_ORIGIN; }
 }
 
+// ---------------------------------------------------------------------------------------------------
+// App Review demo login. Apple reviewers cannot read a mailbox, so a short allowlist of demo addresses
+// (HONTO_REVIEW_EMAILS, comma separated) accepts one fixed 6-digit code (HONTO_REVIEW_CODE) instead of an
+// emailed one. Both must be set or the feature is off. For these addresses start sends no email and stores
+// no token (same 202 as everyone else); verify checks the code in constant time, limited to 10 tries per
+// address per hour (on top of the per-IP limit). Never applies to any address outside the allowlist.
+// ---------------------------------------------------------------------------------------------------
+export const REVIEW_CODE_TRIES_PER_HOUR = 10;
+
+export function reviewLogin(email: string | null, env: Env = process.env): { code: string } | null {
+  if (!email) return null;
+  const code = env.HONTO_REVIEW_CODE?.trim() ?? "";
+  if (!/^\d{6}$/.test(code)) return null;
+  const allowed = (env.HONTO_REVIEW_EMAILS ?? "").split(",").map(normalizeEmail).filter((value): value is string => Boolean(value));
+  return allowed.includes(email) ? { code } : null;
+}
+
+function sameCode(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 const rateLimited = (seconds: number, error: string) => Response.json({ error, code: "rate_limited", retryAfterSeconds: seconds }, { status: 429, headers: { ...noStore, "Retry-After": String(seconds) } });
 
 async function readJson(request: Request): Promise<Record<string, unknown> | null> {
@@ -135,6 +159,10 @@ export async function startEmailSignIn(request: Request) {
   if (Number(recent.hour) >= 5) return rateLimited(Math.max(1, Number(recent.hourWait)), "Too many emails. Try again later.");
   const ipWait = await hitRateLimit(sql, "email_start_ip", await saltedHash("ip", clientIp(request)), 20, 60 * 60);
   if (ipWait) return rateLimited(ipWait, "Too many emails. Try again later.");
+  if (reviewLogin(email)) {
+    const review: EmailStartResponse = { sent: true, expiresInSeconds: EMAIL_TOKEN_MINUTES * 60, resendAfterSeconds: EMAIL_RESEND_SECONDS };
+    return Response.json(review, { status: 202, headers: noStore });
+  }
 
   const token = `ml_${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url")}`;
   const code = newSignInCode();
@@ -184,6 +212,14 @@ export async function verifyEmailSignIn(request: Request) {
   const ipWait = await hitRateLimit(sql, "email_verify_ip", await saltedHash("ip", clientIp(request)), 30, 15 * 60);
   if (ipWait) return rateLimited(ipWait, "Too many tries. Try again in a few minutes.");
 
+  const review = token ? null : reviewLogin(email);
+  if (review && email) {
+    const reviewWait = await hitRateLimit(sql, "review_code", await saltedHash("email", email), REVIEW_CODE_TRIES_PER_HOUR, 60 * 60);
+    if (reviewWait) return rateLimited(reviewWait, "Too many tries. Try again in a few minutes.");
+    if (!sameCode(code, review.code)) return apiError(401, "invalid_token", "That code is not right or has expired.");
+    return emailSession(sql, email, body.name, platform);
+  }
+
   const used = token
     ? await sql`UPDATE email_login_tokens SET used_at = now() WHERE token_hash = ${await saltedHash("email-link", token)} AND used_at IS NULL AND expires_at > now() AND attempts < ${MAX_CODE_ATTEMPTS}::int RETURNING email`
     : await sql`UPDATE email_login_tokens SET used_at = now() WHERE token_hash = (SELECT token_hash FROM email_login_tokens WHERE email = ${email} AND code_hash = ${await saltedHash("email-code", `${email}:${code}`)} AND used_at IS NULL AND expires_at > now() AND attempts < ${MAX_CODE_ATTEMPTS}::int ORDER BY created_at DESC LIMIT 1) AND used_at IS NULL RETURNING email`;
@@ -191,7 +227,12 @@ export async function verifyEmailSignIn(request: Request) {
     if (!token) await sql`UPDATE email_login_tokens SET attempts = attempts + 1 WHERE email = ${email} AND used_at IS NULL AND expires_at > now()`;
     return apiError(401, "invalid_token", token ? "This link has expired or was already used." : "That code is not right or has expired.");
   }
-  const { userId, created } = await findOrCreateEmailUser(sql, String(used[0].email), body.name);
+  return emailSession(sql, String(used[0].email), body.name, platform);
+}
+
+/** Account for a verified email plus the session response (bearer + refresh for the apps, cookie for the web). */
+async function emailSession(sql: Sql, verifiedEmail: string, name: unknown, platform: Platform) {
+  const { userId, created } = await findOrCreateEmailUser(sql, verifiedEmail, name);
   const users = await sql`SELECT id, email, display_name AS "displayName", time_zone AS "timeZone", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt" FROM users WHERE id = ${userId}`;
   const user = users[0] as User;
   const headers: Record<string, string> = { ...noStore };

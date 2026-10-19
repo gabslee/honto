@@ -184,6 +184,69 @@ async function isPaired(sql: Sql, userId: string) {
 }
 
 // ---------------------------------------------------------------------------------------------------
+// Account deletion (DELETE /api/v1/me, App Store 5.1.1(v))
+// ---------------------------------------------------------------------------------------------------
+
+/**
+ * Deletes the account now. Order:
+ * 1. an active couple is unpaired with the same rules as `DELETE /api/v1/couple` (the partner keeps their
+ *    account and their own photos for 30 days; the shared history goes at once);
+ * 2. my photos and export ZIPs: rows deleted and their object keys queued in `storage_deletions` in the same
+ *    statement (no 30-day grace for a deleted account), then deleted from the bucket right away when storage
+ *    is wired (anything that fails stays queued for the retention cron);
+ * 3. pending email sign-in codes for my address, the legacy web game's `players.user_id` link and legacy
+ *    `couples.host_user_id`;
+ * 4. the users row. Foreign keys cascade to sessions, mobile and refresh tokens, push devices, linked
+ *    Apple/Google identities, couple memberships, invites, calendar mirrors, weather, nudges, milestones
+ *    seen and entitlements; match history keeps the game row with the user link cleared (SET NULL).
+ * Returns false when the user no longer exists.
+ */
+export async function deleteAccount(sql: Sql, userId: string, store = getObjectStore()): Promise<boolean> {
+  await ensureLifecycleSchema(sql);
+  const user = (await sql`SELECT email FROM users WHERE id = ${userId}`)[0];
+  if (!user) return false;
+  const active = await sql`SELECT m.couple_id AS id FROM couple_members m JOIN couples c ON c.id = m.couple_id AND c.legacy = false AND c.unpaired_at IS NULL WHERE m.user_id = ${userId} AND m.left_at IS NULL`;
+  for (const couple of active) await unpairCouple(sql, String(couple.id));
+
+  const tables = await optionalTables(sql);
+  const keys: string[] = [];
+  if (tables.photos) {
+    const rows = await sql`WITH d AS (
+        DELETE FROM couple_photos WHERE author_user_id = ${userId} RETURNING object_key, thumb_key
+      ), q AS (
+        INSERT INTO storage_deletions (object_key, reason) SELECT k.key, 'account' FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) WHERE k.key IS NOT NULL ON CONFLICT (object_key) DO NOTHING
+      ) SELECT k.key FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) WHERE k.key IS NOT NULL`;
+    keys.push(...rows.map((row) => String(row.key)));
+  }
+  const exports = await sql`WITH d AS (
+      DELETE FROM photo_exports WHERE user_id = ${userId} RETURNING object_key
+    ), q AS (
+      INSERT INTO storage_deletions (object_key, reason) SELECT object_key, 'account' FROM d WHERE object_key IS NOT NULL ON CONFLICT (object_key) DO NOTHING
+    ) SELECT object_key AS key FROM d WHERE object_key IS NOT NULL`;
+  keys.push(...exports.map((row) => String(row.key)));
+
+  if (typeof user.email === "string") await sql`DELETE FROM email_login_tokens WHERE email = ${user.email.toLowerCase()}`;
+  const legacy = (await sql`SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'players' AND column_name = 'user_id') AS players`)[0];
+  if (legacy?.players) await sql`UPDATE players SET user_id = NULL WHERE user_id = ${userId}`;
+  await sql`UPDATE couples SET host_user_id = NULL WHERE host_user_id = ${userId}`;
+  await sql`DELETE FROM users WHERE id = ${userId}`;
+
+  if (store && keys.length) {
+    for (let i = 0; i < keys.length; i += 1000) {
+      const batch = keys.slice(i, i + 1000);
+      try {
+        await store.deleteObjects(batch);
+        for (const key of batch) await sql`DELETE FROM storage_deletions WHERE object_key = ${key}`;
+      } catch (cause) {
+        console.error("[v1/account] object delete failed, left for the retention cron", cause instanceof Error ? cause.message : cause);
+        break;
+      }
+    }
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------------------------------
 // Export of my own photos (ZIP in exports/<userId>/<exportId>.zip)
 // ---------------------------------------------------------------------------------------------------
 type ExportRow = { id: string; status: "pending" | "ready" | "failed"; objectKey: string | null; photoCount: number; readyAt: string | null; expiresAt: string | null; expired: boolean; stale: boolean; fresh: boolean };
