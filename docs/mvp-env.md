@@ -50,3 +50,13 @@ App Store Connect / Play builds. Never commit values.
 
 No new variables. `api/v1/context.ts` (`requireUser`, `requireCouple`, `isCouplePremium`) and
 `PUT /api/v1/me/timezone` only use the existing `DATABASE_URL` and `AUTH_SESSION_SALT` (token and cookie hashes).
+
+## feat/web-app-memories (W4, `hontogame.com/app`)
+
+| Name | Where | Notes |
+|---|---|---|
+| `HONTO_WEB_APP_FIXTURES` | Vercel Preview / local only | `1` = render `/app` from `contracts/fixtures/*.json` (switch state with `?fixture=premium\|free\|unpaired\|signed-out`). Ignored when `VERCEL_ENV=production`. Remove once `/api/v1/me`, `/today` and `/memories` are on main. |
+| `HONTO_API_BASE_URL` | Vercel (optional) | Origin `/app` calls for `/api/v1/*` with the visitor's `honto_session` cookie. Default: the request's own origin. Local mock: `http://localhost:4010`. |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | Vercel system variable (optional) | Sent as `x-vercel-protection-bypass` on the server-side `/api/v1` calls, so protected Preview deployments can call themselves. |
+
+Existing names reused: `APPLE_CLIENT_ID` (shows "Continue with Apple" on the `/app` sign-in), `GOOGLE_CLIENT_ID`.

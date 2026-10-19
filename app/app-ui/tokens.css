@@ -1,0 +1,93 @@
+/*
+ * Honto design tokens for hontogame.com/app (web, read-only).
+ * Values come from design/produto/README.md (Cor, Tipografia, Forma e espaço, Vidro, Movimento).
+ * The app's token generator will replace this file later with the same variable names.
+ *   bg = paper · surface = card · text = ink · text-muted = ink-2 · accent = shu · border = line
+ *   partner = sakura · me = ai · free = matcha · busy = amber status dot
+ */
+:root {
+  --honto-color-bg: #F7F2E9;
+  --honto-color-surface: #FFFCF7;
+  --honto-color-surface-opaque: #FFFCF7;
+  --honto-color-text: #17243D;
+  --honto-color-text-muted: #55607A;
+  --honto-color-accent: #D2483A;
+  --honto-color-accent-contrast: #FFFFFF;
+  --honto-color-border: rgba(23, 36, 61, 0.10);
+  --honto-color-danger: #B3261E;
+  --honto-color-partner: #F0C7CE;
+  --honto-color-me: #C8D4EA;
+  --honto-color-free: #7D9B69;
+  --honto-color-busy: #E8A23A;
+
+  /* Glass over photos: white 16%, blur 26 + saturate 170%, 1px white 34% stroke. */
+  --honto-glass-blur: 26px;
+  --honto-glass-tint: #FFFFFF;
+  --honto-glass-opacity: 0.16;
+  --honto-glass-stroke: rgba(255, 255, 255, 0.34);
+
+  --honto-radius-sm: 12px;
+  --honto-radius-md: 18px;
+  --honto-radius-lg: 24px;
+  --honto-radius-pill: 999px;
+
+  --honto-space-1: 4px;
+  --honto-space-2: 8px;
+  --honto-space-3: 12px;
+  --honto-space-4: 16px;
+  --honto-space-5: 24px;
+  --honto-space-6: 32px;
+  --honto-space-7: 48px;
+  --honto-space-8: 64px;
+
+  --honto-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --honto-font-size-xs: 11px;
+  --honto-font-size-sm: 13px;
+  --honto-font-size-md: 16px;
+  --honto-font-size-lg: 20px;
+  --honto-font-size-xl: 24px;
+  --honto-font-size-2xl: 34px;
+
+  --honto-motion-fast: 150ms;
+  --honto-motion-base: 350ms;
+  --honto-motion-slow: 400ms;
+  --honto-motion-curve: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --honto-color-bg: #0F141E;
+    --honto-color-surface: #1A2130;
+    --honto-color-surface-opaque: #1A2130;
+    --honto-color-text: #F1ECE3;
+    --honto-color-text-muted: #B5BAC5;
+    --honto-color-accent: #E5604E;
+    --honto-color-accent-contrast: #0F141E;
+    --honto-color-border: rgba(255, 255, 255, 0.08);
+    --honto-color-danger: #F2B8B5;
+    --honto-color-partner: #5A3A44;
+    --honto-color-me: #2F3D5A;
+    --honto-color-free: #93B27F;
+    --honto-color-busy: #E8A23A;
+    /* Over photos nothing changes in dark mode. */
+  }
+}
+
+/* Reduce Transparency: glass becomes the solid card. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --honto-glass-blur: 0px;
+    --honto-glass-tint: var(--honto-color-surface-opaque);
+    --honto-glass-opacity: 1;
+    --honto-glass-stroke: var(--honto-color-border);
+  }
+}
+
+/* Reduce Motion: no movement, state changes are instant. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --honto-motion-fast: 0ms;
+    --honto-motion-base: 0ms;
+    --honto-motion-slow: 0ms;
+  }
+}
