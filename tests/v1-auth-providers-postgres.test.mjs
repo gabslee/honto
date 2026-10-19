@@ -240,7 +240,7 @@ test('v1 Google / Apple sign-in relinks existing accounts; logout revokes the cu
         const url = String(input);
         if (url === 'https://oauth2.googleapis.com/token') return Response.json({ access_token: 'at' });
         if (url === 'https://openidconnect.googleapis.com/v1/userinfo') return Response.json(googleProfile);
-        if (url === 'https://appleid.apple.com/auth/token') return Response.json({ id_token: appleIdToken });
+        if (url === 'https://appleid.apple.com/auth/token') return Response.json({ id_token: appleIdToken, refresh_token: 'apple-refresh-web' });
         if (url === 'https://appleid.apple.com/auth/keys') return Response.json({ keys: [publicJwk] });
         throw new Error(`unexpected fetch ${url}`);
       };
@@ -273,11 +273,45 @@ test('v1 Google / Apple sign-in relinks existing accounts; logout revokes the cu
         // Linked subject with Ana's verified email: still Kenji, nothing moved.
         assert.equal(await sessionUser(await viaApple({ email: 'ana@example.com', email_verified: 'true' }, 'a-kenji')), 'usr_kenji');
         assert.deepEqual((await db.query("SELECT user_id FROM auth_accounts WHERE provider = 'apple' AND provider_account_id = 'a-kenji'")).rows, [{ user_id: 'usr_kenji' }]);
+        // Apple's refresh token is kept (services id) so the account deletion can revoke it.
+        assert.deepEqual((await db.query("SELECT client_id, refresh_token FROM apple_tokens WHERE user_id = 'usr_kenji'")).rows, [{ client_id: 'com.hontogame.web', refresh_token: 'apple-refresh-web' }]);
         // Unknown subject without a verified email is refused.
         assert.match((await viaApple({ email: 'web@example.com', email_verified: 'false' }, 'a-unknown-web')).headers.get('location'), /error/);
         assert.equal(await userCount(), before);
       } finally {
         globalThis.fetch = realFetch;
+        for (const [key, value] of Object.entries(env)) if (value === undefined) delete process.env[key]; else process.env[key] = value;
+      }
+    });
+
+
+    await t.test('Apple native: an authorizationCode is exchanged (bundle id) and its refresh token stored; failures never block sign-in', async () => {
+      const env = { APPLE_TEAM_ID: process.env.APPLE_TEAM_ID, APPLE_KEY_ID: process.env.APPLE_KEY_ID, APPLE_PRIVATE_KEY: process.env.APPLE_PRIVATE_KEY };
+      const { exportPKCS8, generateKeyPair: es } = await import('jose');
+      Object.assign(process.env, { APPLE_TEAM_ID: 'TEAM', APPLE_KEY_ID: 'KEY', APPLE_PRIVATE_KEY: await exportPKCS8((await es('ES256', { extractable: true })).privateKey) });
+      const realFetch = globalThis.fetch;
+      const sent = [];
+      let answer = () => Response.json({ access_token: 'a', refresh_token: 'apple-refresh-native', id_token: 'x' });
+      globalThis.fetch = async (input, init = {}) => {
+        if (String(input) !== 'https://appleid.apple.com/auth/token') throw new Error(`unexpected fetch ${input}`);
+        sent.push(new URLSearchParams(String(init.body)));
+        return answer();
+      };
+      const quiet = console.warn; console.warn = () => {};
+      try {
+        const idToken = await sign({}, { iss: APPLE, aud: 'com.hontogame.app', sub: 'a-kenji' });
+        const ok = await post(apple.POST, { idToken, platform: 'ios', authorizationCode: 'c-native-1' });
+        assert.equal(ok.status, 200);
+        assert.deepEqual([sent[0].get('client_id'), sent[0].get('code'), sent[0].get('grant_type'), sent[0].get('redirect_uri')], ['com.hontogame.app', 'c-native-1', 'authorization_code', null]);
+        assert.deepEqual((await db.query("SELECT refresh_token FROM apple_tokens WHERE user_id = 'usr_kenji' AND client_id = 'com.hontogame.app'")).rows, [{ refresh_token: 'apple-refresh-native' }]);
+        answer = () => Response.json({ error: 'invalid_grant' }, { status: 400 });
+        assert.equal((await post(apple.POST, { idToken, platform: 'ios', authorizationCode: 'c-used' })).status, 200, 'a refused code does not block sign-in');
+        assert.equal((await db.query("SELECT refresh_token FROM apple_tokens WHERE user_id = 'usr_kenji' AND client_id = 'com.hontogame.app'")).rows[0].refresh_token, 'apple-refresh-native', 'previous token kept');
+        sent.length = 0;
+        assert.equal((await post(apple.POST, { idToken, platform: 'ios' })).status, 200);
+        assert.equal(sent.length, 0, 'no code, no exchange');
+      } finally {
+        globalThis.fetch = realFetch; console.warn = quiet;
         for (const [key, value] of Object.entries(env)) if (value === undefined) delete process.env[key]; else process.env[key] = value;
       }
     });

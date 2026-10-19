@@ -2,6 +2,8 @@ import { generateAppleClientSecret, verifyAppleIdToken } from "../../../../apple
 import { googleReturnWithAuth } from "../../../../google-return.js";
 import { findOrCreateProviderUser } from "../../../../mobile-auth";
 import { createUserSession, database, ensureIdentitySchema, userCookie } from "../../../../server-auth";
+import { storeAppleRefreshToken } from "../../../../../api/v1/account-cleanup";
+import { ensureLifecycleSchema } from "../../../../../api/v1/lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
       body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, code, grant_type: "authorization_code", redirect_uri: redirectUri }),
     });
     if (!tokenResponse.ok) throw new Error(`Apple token exchange failed (${tokenResponse.status})`);
-    const tokens = await tokenResponse.json() as { id_token?: string };
+    const tokens = await tokenResponse.json() as { id_token?: string; refresh_token?: string };
     if (!tokens.id_token) throw new Error("Apple did not return an id_token");
     const claims = await verifyAppleIdToken(tokens.id_token, clientId, nonceCookie);
     // A verified email is only needed when the Apple subject is not linked yet (findOrCreateProviderUser).
@@ -67,6 +69,15 @@ export async function POST(request: Request) {
     // linked without ever moving it to another user.
     const { userId } = await findOrCreateProviderUser({ provider: "apple", sub: claims.sub, email, emailVerified: verified, name: null }, name);
     if (role === "admin") await sql`UPDATE users SET role = 'admin', plan = 'premium', subscription_status = 'active', updated_at = now() WHERE id = ${userId}`;
+    // Apple's refresh token, revoked when the account is deleted (App Store 5.1.1(v)). Never blocks the sign-in.
+    if (tokens.refresh_token) {
+      try {
+        await ensureLifecycleSchema(sql);
+        await storeAppleRefreshToken(sql, userId, clientId, tokens.refresh_token);
+      } catch (cause) {
+        console.error("[auth/apple] storing the Apple refresh token failed", cause instanceof Error ? cause.message : cause);
+      }
+    }
     const session = await createUserSession(userId);
     return redirect(request, withAuth("success"), [userCookie(session), ...clears]);
   } catch (error) {

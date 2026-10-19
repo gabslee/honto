@@ -30,7 +30,8 @@ export function ensureIdentitySchema() {
     await sql`CREATE INDEX IF NOT EXISTS idx_admin_sessions_expiry ON admin_sessions(expires_at)`;
     await sql`CREATE TABLE IF NOT EXISTS ai_usage (scope text NOT NULL, scope_key text NOT NULL, window_start timestamptz NOT NULL, uses integer NOT NULL DEFAULT 0, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(scope, scope_key, window_start))`;
     await sql`CREATE INDEX IF NOT EXISTS idx_ai_usage_updated_at ON ai_usage(updated_at)`;
-    await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS user_id text REFERENCES users(id)`;
+    // ON DELETE SET NULL (drizzle/0016_account_deletion.sql fixes databases created with the old NO ACTION link).
+    await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS user_id text REFERENCES users(id) ON DELETE SET NULL`;
     // Mobile bearer tokens: kind 'user' (signed-in account) or 'device' (account-free partner, couple-scoped via partner_key).
     await sql`CREATE TABLE IF NOT EXISTS mobile_tokens (token_hash text PRIMARY KEY, kind text NOT NULL, user_id text REFERENCES users(id) ON DELETE CASCADE, partner_key text, room_id text, platform text, created_at timestamptz NOT NULL DEFAULT now(), last_used_at timestamptz, expires_at timestamptz NOT NULL, revoked_at timestamptz)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_mobile_tokens_user ON mobile_tokens(user_id)`;

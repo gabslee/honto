@@ -6,6 +6,7 @@ import * as module from 'node:module';
 import { readFileSync } from 'node:fs';
 import { loadSpec } from '../contracts/scripts/spec.mjs';
 import { schemaRef, validate } from '../contracts/scripts/validate-schema.mjs';
+import { pgliteSql } from './helpers/pglite-sql.mjs';
 
 const spec = loadSpec();
 const assertContract = (schema, value) => assert.deepEqual(validate(spec, schemaRef(schema), value), [], `${schema}: ${JSON.stringify(value)}`);
@@ -76,7 +77,7 @@ const deviceUpload = (target, size = Number(target.headers['Content-Length'])) =
 test('profile photo and profile edit', async (t) => {
   const { PGlite } = await import('@electric-sql/pglite');
   const db = new PGlite();
-  globalThis.__hontoTestSql = async (parts, ...values) => (await db.query(parts.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, ''), values)).rows;
+  globalThis.__hontoTestSql = pgliteSql(db);
   const hooks = module.registerHooks({ resolve(specifier, context, next) {
     if (specifier === '@neondatabase/serverless') return { url: 'data:text/javascript,export const neon=()=>globalThis.__hontoTestSql', shortCircuit: true };
     if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier)) return next(new URL(specifier + '.ts', context.parentURL).href, context);

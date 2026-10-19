@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { crc32 as zlibCrc32 } from 'node:zlib';
 import { loadSpec } from '../contracts/scripts/spec.mjs';
 import { schemaRef, validate } from '../contracts/scripts/validate-schema.mjs';
+import { pgliteSql } from './helpers/pglite-sql.mjs';
 
 const spec = loadSpec();
 const assertContract = (schema, value) => assert.deepEqual(validate(spec, schemaRef(schema), value), [], `${schema}: ${JSON.stringify(value)}`);
@@ -82,10 +83,43 @@ test('drizzle/0012_couple_lifecycle.sql is idempotent on top of 0008', async () 
   await db.close();
 });
 
+test('drizzle/0016_account_deletion.sql and 0017_billing_tables.sql are idempotent; players.user_id becomes ON DELETE SET NULL', async () => {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const db = new PGlite();
+  // Production shape before 0016: players.user_id REFERENCES users(id) with NO ACTION.
+  await db.exec(baseTables.replace('CREATE TABLE players (id text PRIMARY KEY);', ''));
+  await db.exec('CREATE TABLE players (id text PRIMARY KEY, user_id text REFERENCES users(id));');
+  await db.exec(foundation);
+  await db.exec("INSERT INTO users (id, email, display_name) VALUES ('u1', 'u1@example.com', 'U1'); INSERT INTO players (id, user_id) VALUES ('p1', 'u1');");
+  await assert.rejects(db.query("DELETE FROM users WHERE id = 'u1'"), /foreign key/, 'NO ACTION blocks the delete before 0016');
+  const m16 = read('../drizzle/0016_account_deletion.sql');
+  const m17 = read('../drizzle/0017_billing_tables.sql');
+  await db.exec(m16);
+  await db.exec(m16);
+  const fks = (await db.query("SELECT conname, confdeltype FROM pg_constraint WHERE conrelid = 'players'::regclass AND contype = 'f'")).rows;
+  assert.deepEqual(fks, [{ conname: 'players_user_id_fkey', confdeltype: 'n' }]);
+  await db.query("DELETE FROM users WHERE id = 'u1'");
+  assert.deepEqual((await db.query("SELECT user_id FROM players WHERE id = 'p1'")).rows, [{ user_id: null }]);
+  await assert.rejects(db.query("UPDATE couples SET unpair_reason = 'other'"), /check constraint/);
+  // 0017 after the lazy definition (0010 / ensureEntitlementsSchema created the tables first), and twice.
+  await db.exec(section('0010_calendar_entitlements (W3)', '0011_trips_nudges (W2b)'));
+  await db.exec("INSERT INTO users (id, email, display_name) VALUES ('u2', 'u2@example.com', 'U2'); INSERT INTO entitlements (user_id, source) VALUES ('u2', 'revenuecat'); INSERT INTO revenuecat_events (id, type, app_user_id, payload) VALUES ('e1', 'TEST', 'u2', '{}')");
+  await db.exec(m17);
+  await db.exec(m17);
+  assert.deepEqual((await db.query('SELECT (SELECT count(*)::int FROM entitlements) AS e, (SELECT count(*)::int FROM revenuecat_events) AS r')).rows[0], { e: 1, r: 1 }, 'existing rows kept');
+  // And on a database without them.
+  const fresh = new PGlite();
+  await fresh.exec(baseTables);
+  await fresh.exec(m17);
+  assert.equal((await fresh.query("SELECT to_regclass('entitlements') IS NOT NULL AND to_regclass('revenuecat_events') IS NOT NULL AS ok")).rows[0].ok, true);
+  await fresh.close();
+  await db.close();
+});
+
 test('W1b couple lifecycle over the real route handlers', async (t) => {
   const { PGlite } = await import('@electric-sql/pglite');
   const db = new PGlite();
-  globalThis.__hontoTestSql = async (parts, ...values) => (await db.query(parts.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, ''), values)).rows;
+  globalThis.__hontoTestSql = pgliteSql(db);
   const hooks = module.registerHooks({ resolve(specifier, context, next) {
     if (specifier === '@neondatabase/serverless') return { url: 'data:text/javascript,export const neon=()=>globalThis.__hontoTestSql', shortCircuit: true };
     if (specifier === 'next/server') return next('next/server.js', context);
@@ -107,9 +141,13 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
     const todayRoute = await import('../app/api/v1/today/route.ts');
     const exportRoute = await import('../app/api/v1/me/export/route.ts');
     const cronRoute = await import('../app/api/cron/retention/route.ts');
+    const adminRoute = await import('../app/api/admin/route.ts');
     const sql = auth.database();
     await lifecycle.ensureLifecycleSchema(sql);
     await lifecycle.ensureLifecycleSchema(sql);
+    // couple.unpaired pushes are recorded here instead of going to APNs / FCM.
+    const pushes = [];
+    lifecycle.setUnpairNotifier(async (coupleId, fromUserId, toUserId, event) => { pushes.push({ coupleId, fromUserId, toUserId, event }); });
 
     const people = ['ana', 'kenji', 'zoe', 'yuki', 'max', 'lee', 'solo'];
     await db.query(`INSERT INTO users (id, email, display_name, created_at) VALUES ${people.map((p) => `('usr_${p}', '${p}@example.com', '${p[0].toUpperCase()}${p.slice(1)}', '2026-10-01T13:20:00Z')`).join(', ')}`);
@@ -408,6 +446,7 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
 
     let unpaired;
     await t.test('DELETE /api/v1/couple: shared history disappears at once for both', async () => {
+      pushes.length = 0;
       const res = await call(coupleRoute.DELETE, 'ana', { method: 'DELETE' });
       assert.equal(res.status, 200, JSON.stringify(res.json));
       assertContract('UnpairResult', res.json);
@@ -421,7 +460,12 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
       const me = await call(meRoute.GET, 'kenji');
       assertContract('Me', me.json);
       assert.equal(me.json.couple, null);
-      assert.deepEqual(me.json.pendingUnpair, unpaired);
+      assert.deepEqual(me.json.pendingUnpair, { ...unpaired, reason: 'unpaired' });
+      const anaMe = await call(meRoute.GET, 'ana');
+      assertContract('Me', anaMe.json);
+      assert.deepEqual(anaMe.json.pendingUnpair, { ...unpaired, reason: 'unpaired' }, 'both partners see the unpair and its reason');
+      assert.deepEqual(pushes, [{ coupleId, fromUserId: 'usr_ana', toUserId: 'usr_kenji', event: { type: 'couple.unpaired', reason: 'unpaired' } }], 'only the other partner is notified');
+      assert.equal((await db.query('SELECT unpair_reason FROM couples WHERE id = $1', [coupleId])).rows[0].unpair_reason, 'unpaired');
       const row = (await db.query('SELECT started_on, reunion_at, reunion_city, unpaired_at IS NOT NULL AS unpaired FROM couples WHERE id = $1', [coupleId])).rows[0];
       assert.deepEqual(row, { started_on: null, reunion_at: null, reunion_city: null, unpaired: true });
       const left = (await db.query('SELECT count(*)::int AS n FROM couple_members WHERE couple_id = $1 AND left_at IS NOT NULL', [coupleId])).rows[0].n;
@@ -512,7 +556,7 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
 
       const pending = await lifecycle.runRetention(sql, null);
       assertContract('CronRetentionResult', pending);
-      assert.deepEqual({ ...pending, tokensRevoked: 0, invitesDeleted: 0, calendarBlocksDeleted: 0 }, { ok: true, photosDeleted: 8, couplesPurged: 1, exportsDeleted: 2, calendarBlocksDeleted: 0, tokensRevoked: 0, invitesDeleted: 0, objectsDeleted: 0, objectsPending: 18 });
+      assert.deepEqual({ ...pending, tokensRevoked: 0, invitesDeleted: 0, calendarBlocksDeleted: 0 }, { ok: true, couplesRepaired: 0, photosDeleted: 8, couplesPurged: 1, exportsDeleted: 2, calendarBlocksDeleted: 0, tokensRevoked: 0, invitesDeleted: 0, objectsDeleted: 0, objectsPending: 18 });
       assert.equal((await db.query('SELECT count(*)::int AS n FROM couples WHERE id = $1', [coupleId])).rows[0].n, 0);
       assert.equal((await db.query('SELECT count(*)::int AS n FROM couple_members WHERE couple_id = $1', [coupleId])).rows[0].n, 0);
       assert.equal((await db.query('SELECT count(*)::int AS n FROM couple_photos WHERE couple_id = $1', [coupleId])).rows[0].n, 0);
@@ -552,6 +596,7 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
       await db.query("INSERT INTO email_login_tokens (token_hash, email, code_hash, platform, expires_at) VALUES ('zoe-tok', 'zoe@example.com', 'c', 'ios', now() + interval '10 minutes')");
       const zoeKeys = ['full', 'thumb'].map((kind) => `couples/${zoeCouple}/photos/ph_zoe_1/${kind}.jpg`).concat('exports/usr_zoe/exp_zoe.zip');
       lifecycle.setObjectStore(store);
+      pushes.length = 0;
 
       expectError(await call(meRoute.DELETE, null, { method: 'DELETE' }), 401, 'unauthorized');
       const res = await call(meRoute.DELETE, 'zoe', { method: 'DELETE' });
@@ -571,6 +616,10 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
       assert.equal(yuki.status, 200);
       assert.equal(yuki.json.couple, null);
       assert.ok(yuki.json.pendingUnpair?.photosAvailableUntil);
+      assert.equal(yuki.json.pendingUnpair.reason, 'partner_deleted');
+      assertContract('Me', yuki.json);
+      assert.deepEqual(pushes, [{ coupleId: zoeCouple, fromUserId: 'usr_zoe', toUserId: 'usr_yuki', event: { type: 'couple.unpaired', reason: 'partner_deleted' } }]);
+      assert.equal((await db.query('SELECT unpair_reason FROM couples WHERE id = $1', [zoeCouple])).rows[0].unpair_reason, 'partner_deleted');
       assert.equal(await count("SELECT count(*)::int AS n FROM couple_photos WHERE author_user_id = 'usr_yuki' AND delete_after IS NOT NULL"), 1);
       assert.ok(store.objects.has(`couples/${zoeCouple}/photos/ph_yuki_1/full.jpg`));
       assert.equal(await count("SELECT count(*)::int AS n FROM calendar_busy WHERE user_id = 'usr_yuki'"), 0, 'shared calendar mirror goes with the couple');
@@ -580,6 +629,171 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
       assert.equal((await call(meRoute.DELETE, 'solo', { method: 'DELETE' })).status, 204);
       expectError(await call(meRoute.DELETE, 'solo', { method: 'DELETE' }), 401, 'unauthorized');
       assert.equal(await lifecycle.deleteAccount(sql, 'usr_nobody', store), false);
+    });
+
+
+    // Two accounts paired directly in the database (fresh names per subtest), each with a session token.
+    const pairDirect = async (a, b) => {
+      for (const p of [a, b]) {
+        await db.query("INSERT INTO users (id, email, display_name) VALUES ($1, $2, $3)", [`usr_${p}`, `${p}@example.com`, p]);
+        tokens[p] = await auth.createMobileToken({ kind: 'user', userId: `usr_${p}`, platform: 'ios' });
+      }
+      const id = `cpl_${a}_${b}`;
+      await db.query("INSERT INTO couples (id, legacy, paired_at) VALUES ($1, false, now())", [id]);
+      await db.query("INSERT INTO couple_members (couple_id, user_id, role) VALUES ($1, $2, 'a'), ($1, $3, 'b')", [id, `usr_${a}`, `usr_${b}`]);
+      return id;
+    };
+    const n = async (query, params = []) => (await db.query(query, params)).rows[0].n;
+
+    await t.test('DELETE /api/v1/me: keys queued in the transaction, partner pushed, RevenueCat + Apple called after the commit', async () => {
+      const cpl = await pairDirect('rio', 'sam');
+      await photo('ph_rio_1', 'rio', '2026-10-19', 'UTC', '2026-10-19T10:00:00Z', { daily: true, coupleOf: cpl });
+      await db.query("INSERT INTO photo_exports (id, user_id, status, object_key, photo_count, ready_at, expires_at) VALUES ('exp_rio', 'usr_rio', 'ready', 'exports/usr_rio/exp_rio.zip', 1, now(), now() + interval '7 days')");
+      await db.query("INSERT INTO apple_tokens (user_id, client_id, refresh_token) VALUES ('usr_rio', 'com.hontogame.app', 'apple-refresh-rio')");
+      await db.query("INSERT INTO push_devices (id, user_id, installation_id, platform, kind, token) VALUES ('dev_rio', 'usr_rio', 'i1', 'ios', 'apns_alert', 'tok-rio')");
+      await db.query("INSERT INTO players (id, user_id) VALUES ('pl_rio', 'usr_rio')");
+      await db.query("UPDATE couples SET host_user_id = 'usr_rio' WHERE id = 'legacy1'");
+      const keys = [`couples/${cpl}/photos/ph_rio_1/full.jpg`, `couples/${cpl}/photos/ph_rio_1/thumb.jpg`, 'exports/usr_rio/exp_rio.zip'];
+
+      const { generateKeyPairSync } = await import('node:crypto');
+      const appleKey = generateKeyPairSync('ec', { namedCurve: 'prime256v1', privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } }).privateKey;
+      const env = { REVENUECAT_SECRET_API_KEY: 'sk_test_value', REVENUECAT_PROJECT_ID: 'projtest1', APPLE_TEAM_ID: 'TEAM123456', APPLE_KEY_ID: 'KEY1234567', APPLE_PRIVATE_KEY: appleKey };
+      const savedEnv = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]));
+      Object.assign(process.env, env);
+      const calls = [];
+      const realFetch = globalThis.fetch;
+      globalThis.fetch = async (input, init = {}) => {
+        calls.push({ url: String(input), method: init.method, authorization: init.headers?.authorization, body: init.body ? String(init.body) : null });
+        return new Response(null, { status: 200 });
+      };
+      // Storage down: the keys must stay queued for the cron (they were queued inside the transaction).
+      lifecycle.setObjectStore({ ...fakeStore(), async deleteObjects() { throw new Error('R2 503'); } });
+      pushes.length = 0;
+      try {
+        assert.equal((await call(meRoute.DELETE, 'rio', { method: 'DELETE' })).status, 204);
+      } finally {
+        globalThis.fetch = realFetch;
+        for (const [k, v] of Object.entries(savedEnv)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+        lifecycle.setObjectStore(store);
+      }
+      assert.deepEqual((await db.query('SELECT object_key, reason FROM storage_deletions WHERE object_key = ANY($1) ORDER BY object_key', [keys])).rows.map((r) => [r.object_key, r.reason]), [...keys].sort().map((k) => [k, 'account']));
+      for (const table of ['push_devices', 'mobile_tokens', 'v1_refresh_tokens', 'user_sessions', 'apple_tokens', 'couple_members']) assert.equal(await n(`SELECT count(*)::int AS n FROM ${table} WHERE user_id = 'usr_rio'`), 0, table);
+      assert.equal(await n("SELECT count(*)::int AS n FROM players WHERE id = 'pl_rio' AND user_id IS NULL"), 1, 'legacy player kept, unlinked');
+      assert.equal(await n("SELECT count(*)::int AS n FROM couples WHERE id = 'legacy1' AND host_user_id IS NULL"), 1);
+      assert.deepEqual(pushes, [{ coupleId: cpl, fromUserId: 'usr_rio', toUserId: 'usr_sam', event: { type: 'couple.unpaired', reason: 'partner_deleted' } }]);
+      const sam = await call(meRoute.GET, 'sam');
+      assertContract('Me', sam.json);
+      assert.deepEqual([sam.json.couple, sam.json.pendingUnpair?.reason], [null, 'partner_deleted']);
+      const rc = calls.find((c) => c.url.startsWith('https://api.revenuecat.com/'));
+      assert.deepEqual([rc.url, rc.method, rc.authorization], ['https://api.revenuecat.com/v2/projects/projtest1/customers/usr_rio', 'DELETE', 'Bearer sk_test_value']);
+      const revoke = calls.find((c) => c.url === 'https://appleid.apple.com/auth/revoke');
+      const form = new URLSearchParams(revoke.body);
+      assert.deepEqual([revoke.method, form.get('client_id'), form.get('token'), form.get('token_type_hint')], ['POST', 'com.hontogame.app', 'apple-refresh-rio', 'refresh_token']);
+      assert.match(form.get('client_secret'), /^eyJ/, 'ES256 client secret');
+      assert.equal(calls.length, 2);
+      // The cron deletes the queued keys once storage is back.
+      const drained = await lifecycle.runRetention(sql, store);
+      assert.equal(await n('SELECT count(*)::int AS n FROM storage_deletions WHERE object_key = ANY($1)', [keys]), 0);
+      assert.ok(drained.objectsDeleted >= 3);
+    });
+
+    await t.test('DELETE /api/v1/me without REVENUECAT_SECRET_API_KEY or Apple settings: account deleted, warnings logged, no network', async () => {
+      await pairDirect('una', 'vic');
+      await db.query("INSERT INTO apple_tokens (user_id, client_id, refresh_token) VALUES ('usr_una', 'com.hontogame.app', 'apple-refresh-una')");
+      const saved = { rc: process.env.REVENUECAT_SECRET_API_KEY, key: process.env.APPLE_PRIVATE_KEY };
+      delete process.env.REVENUECAT_SECRET_API_KEY; delete process.env.APPLE_PRIVATE_KEY;
+      const warnings = [];
+      const realWarn = console.warn; const realFetch = globalThis.fetch;
+      console.warn = (...args) => warnings.push(args.join(' '));
+      globalThis.fetch = async (input) => { throw new Error(`unexpected network call to ${input}`); };
+      try {
+        assert.equal((await call(meRoute.DELETE, 'una', { method: 'DELETE' })).status, 204);
+      } finally {
+        console.warn = realWarn; globalThis.fetch = realFetch;
+        if (saved.rc !== undefined) process.env.REVENUECAT_SECRET_API_KEY = saved.rc;
+        if (saved.key !== undefined) process.env.APPLE_PRIVATE_KEY = saved.key;
+      }
+      assert.equal(await n("SELECT count(*)::int AS n FROM users WHERE id = 'usr_una'"), 0);
+      assert.ok(warnings.some((w) => w.includes('REVENUECAT_SECRET_API_KEY')));
+      assert.ok(warnings.some((w) => w.includes('APPLE_PRIVATE_KEY')));
+      for (const line of warnings) assert.doesNotMatch(line, /apple-refresh/);
+    });
+
+    await t.test('deleteAccount is one transaction: a failing statement rolls everything back', async () => {
+      const cpl = await pairDirect('tom', 'kim');
+      await photo('ph_tom_1', 'tom', '2026-10-19', 'UTC', '2026-10-19T10:00:00Z', { daily: true, coupleOf: cpl });
+      await db.query("INSERT INTO push_devices (id, user_id, installation_id, platform, kind, token) VALUES ('dev_tom', 'usr_tom', 'i1', 'ios', 'apns_alert', 'tok-tom')");
+      await db.exec(`CREATE FUNCTION honto_test_block_delete() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF OLD.id = 'usr_tom' THEN RAISE EXCEPTION 'blocked by test'; END IF; RETURN OLD; END $$;
+        CREATE TRIGGER honto_test_block_delete BEFORE DELETE ON users FOR EACH ROW EXECUTE FUNCTION honto_test_block_delete();`);
+      pushes.length = 0;
+      try {
+        await assert.rejects(lifecycle.deleteAccount(sql, 'usr_tom', store), /blocked by test/);
+      } finally {
+        await db.exec('DROP TRIGGER honto_test_block_delete ON users; DROP FUNCTION honto_test_block_delete();');
+      }
+      assert.equal(await n("SELECT count(*)::int AS n FROM users WHERE id = 'usr_tom'"), 1);
+      assert.equal(await n('SELECT count(*)::int AS n FROM couples WHERE id = $1 AND unpaired_at IS NULL AND unpair_reason IS NULL', [cpl]), 1, 'couple still paired');
+      assert.equal(await n('SELECT count(*)::int AS n FROM couple_members WHERE couple_id = $1 AND left_at IS NULL', [cpl]), 2);
+      assert.equal(await n("SELECT count(*)::int AS n FROM couple_photos WHERE id = 'ph_tom_1' AND delete_after IS NULL"), 1);
+      assert.equal(await n("SELECT count(*)::int AS n FROM storage_deletions WHERE object_key LIKE '%ph_tom_1%'"), 0, 'no key queued');
+      assert.equal(await n("SELECT count(*)::int AS n FROM push_devices WHERE user_id = 'usr_tom'"), 1);
+      assert.equal(await n("SELECT count(*)::int AS n FROM mobile_tokens WHERE user_id = 'usr_tom'"), 1);
+      assert.ok(store.objects.has(`couples/${cpl}/photos/ph_tom_1/full.jpg`), 'objects untouched');
+      assert.deepEqual(pushes, [], 'nothing sent for a rolled back deletion');
+      assert.equal((await call(coupleRoute.GET, 'kim')).status, 200);
+      // Once the failure is gone the same call succeeds.
+      assert.equal(await lifecycle.deleteAccount(sql, 'usr_tom', store), true);
+      assert.equal((await call(meRoute.GET, 'kim')).json.pendingUnpair.reason, 'partner_deleted');
+    });
+
+    await t.test('repair: a raw users delete leaves a half-ended couple; /me, pairing and the cron close it', async () => {
+      const cpl = await pairDirect('ivy', 'ned');
+      await db.query("DELETE FROM users WHERE id = 'usr_ned'");
+      assert.equal(await n('SELECT count(*)::int AS n FROM couples WHERE id = $1 AND unpaired_at IS NULL', [cpl]), 1, 'half-ended: couple open, one member left');
+      expectError(await call(coupleRoute.GET, 'ivy'), 409, 'not_paired');
+      pushes.length = 0;
+      // Pairing endpoints use the same rule as requireCouple: not stuck on 409 already_paired.
+      const code = await invite('ivy');
+      assert.equal(code.status, 201, JSON.stringify(code.json));
+      await db.query("UPDATE couple_invites SET revoked_at = now() WHERE created_by = 'usr_ivy' AND used_at IS NULL");
+      assert.deepEqual(pushes, [{ coupleId: cpl, fromUserId: '', toUserId: 'usr_ivy', event: { type: 'couple.unpaired', reason: 'partner_deleted' } }]);
+      const ivy = await call(meRoute.GET, 'ivy');
+      assertContract('Me', ivy.json);
+      assert.deepEqual([ivy.json.couple, ivy.json.pendingUnpair?.reason], [null, 'partner_deleted']);
+      assert.equal(await n('SELECT count(*)::int AS n FROM couple_members WHERE couple_id = $1 AND left_at IS NOT NULL', [cpl]), 1);
+
+      // The daily cron repairs couples nobody touched.
+      const other = await pairDirect('ola', 'pia');
+      await db.query("DELETE FROM users WHERE id = 'usr_pia'");
+      const repaired = await lifecycle.runRetention(sql, store);
+      assertContract('CronRetentionResult', repaired);
+      assert.equal(repaired.couplesRepaired, 1);
+      assert.deepEqual(await (await db.query('SELECT unpair_reason, unpaired_at IS NOT NULL AS done FROM couples WHERE id = $1', [other])).rows[0], { unpair_reason: 'partner_deleted', done: true });
+      assert.equal((await call(meRoute.GET, 'ola')).json.pendingUnpair.reason, 'partner_deleted');
+      assert.equal((await lifecycle.runRetention(sql, store)).couplesRepaired, 0, 'idempotent');
+    });
+
+    await t.test('admin deleteUser: admin only, email must match, never self, same deletion as DELETE /me', async () => {
+      await pairDirect('gus', 'hal');
+      await db.query("INSERT INTO users (id, email, display_name, role) VALUES ('usr_boss', 'boss@example.com', 'Boss', 'admin')");
+      tokens.boss = await auth.createMobileToken({ kind: 'user', userId: 'usr_boss', platform: 'ios' });
+      const admin = (who, body) => call(adminRoute.POST, who, { method: 'POST', body: { action: 'deleteUser', ...body } });
+      assert.equal((await admin('hal', { userId: 'usr_gus', confirmEmail: 'gus@example.com' })).status, 401, 'not an admin');
+      assert.equal((await admin(null, { userId: 'usr_gus', confirmEmail: 'gus@example.com' })).status, 401);
+      assert.equal((await admin('boss', { userId: 'usr_gus' })).status, 400);
+      const mismatch = await admin('boss', { userId: 'usr_gus', confirmEmail: 'hal@example.com' });
+      assert.deepEqual([mismatch.status, mismatch.json.error], [400, 'The confirmation email does not match this account.']);
+      assert.equal(await n("SELECT count(*)::int AS n FROM users WHERE id = 'usr_gus'"), 1, 'nothing deleted on a mismatch');
+      assert.equal((await admin('boss', { userId: 'usr_boss', confirmEmail: 'boss@example.com' })).status, 403, 'an admin cannot delete themselves');
+      assert.equal((await admin('boss', { userId: 'usr_ghost', confirmEmail: 'ghost@example.com' })).status, 404);
+      pushes.length = 0;
+      const ok = await admin('boss', { userId: 'usr_gus', confirmEmail: '  GUS@example.com ' });
+      assert.deepEqual([ok.status, ok.json], [200, { ok: true, deleted: true, userId: 'usr_gus' }]);
+      assert.equal(await n("SELECT count(*)::int AS n FROM users WHERE id = 'usr_gus'"), 0);
+      expectError(await call(meRoute.GET, 'gus'), 401, 'unauthorized');
+      assert.deepEqual(pushes.map((p) => [p.toUserId, p.event.reason]), [['usr_hal', 'partner_deleted']]);
+      assert.equal((await call(meRoute.GET, 'hal')).json.pendingUnpair.reason, 'partner_deleted');
+      assert.equal((await admin('boss', { userId: 'usr_gus', confirmEmail: 'gus@example.com' })).status, 404);
     });
 
     await t.test('date helpers', () => {
@@ -595,6 +809,7 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
       assert.equal(lifecycle.crc32(new TextEncoder().encode('honto')), zlibCrc32(Buffer.from('honto')) >>> 0);
     });
   } finally {
+    (await import('../api/v1/lifecycle.ts')).setUnpairNotifier(null);
     hooks.deregister();
     for (const [key, value] of Object.entries(saved)) if (value === undefined) delete process.env[key]; else process.env[key] = value;
     await db.close();

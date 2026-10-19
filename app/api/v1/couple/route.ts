@@ -16,12 +16,15 @@ export async function PATCH(request: Request) {
   return patchCoupleResponse(request);
 }
 
-/** DELETE /api/v1/couple: unpair. Shared history goes now; each keeps their own photos for 30 days. */
+/**
+ * DELETE /api/v1/couple: unpair (reason `unpaired`), in one transaction. Shared history goes now; each keeps their
+ * own photos read-only and exportable for 30 days. The partner gets push `couple.unpaired` plus a widget reload.
+ */
 export async function DELETE(request: Request) {
   const auth = await requireCouple(request);
   if (auth instanceof Response) return auth;
-  const result: UnpairResult | null = await unpairCouple(database()!, auth.couple.id);
+  const result: UnpairResult | null = await unpairCouple(database()!, auth.couple.id, { reason: "unpaired", actorId: auth.user.id });
   if (!result) return apiError(409, "not_paired", "Pair with your partner first.");
-  // TODO(W2a push): send couple.unpaired to the partner and end the couple's Live Activities.
+  // TODO(W2b): end the couple's Live Activities.
   return Response.json(result, { headers: noStore });
 }

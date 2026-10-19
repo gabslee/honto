@@ -91,6 +91,8 @@ export interface AppleSignInRequest {
   nonce?: string;
   name?: string;
   platform: AuthPlatform;
+  /** Optional `authorizationCode` of the Apple credential (single use, 5 minutes). The server exchanges it for an Apple refresh token so the account deletion can revoke the Sign in with Apple grant; sign-in still succeeds when it is missing or the exchange fails. */
+  authorizationCode?: string;
 }
 
 export interface EmailStartRequest {
@@ -227,9 +229,14 @@ export interface ExportStatus {
   photosAvailableUntil: IsoDateTime | null;
 }
 
+/** `unpaired` = one of us unpaired (DELETE /api/v1/couple); `partner_deleted` = my partner deleted their account. */
+export const UnpairReasonValues = ["unpaired", "partner_deleted"] as const;
+export type UnpairReason = (typeof UnpairReasonValues)[number];
+
 export interface UnpairState {
   unpairedAt: IsoDateTime;
   photosAvailableUntil: IsoDateTime;
+  reason: UnpairReason;
 }
 
 export interface Me {
@@ -723,6 +730,8 @@ export interface CronTripsResult {
 
 export interface CronRetentionResult {
   ok: boolean;
+  /** Couples not unpaired that had fewer than 2 active members (e.g. a member deleted outside the account deletion), unpaired in this run. */
+  couplesRepaired: number;
   photosDeleted: number;
   couplesPurged: number;
   exportsDeleted: number;
@@ -755,6 +764,8 @@ export interface PushData {
   createdAt?: IsoDateTime;
   tripId?: string;
   fromName?: string;
+  /** couple.unpaired only. */
+  reason?: UnpairReason;
 }
 
 export const TripActivityPhaseValues = ["before", "inTransit", "landed"] as const;
