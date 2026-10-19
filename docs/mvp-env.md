@@ -68,3 +68,21 @@ No new variables for the refresh tokens or the AASA file (app ID `4AW8H42XNA.com
 `POST /api/v1/auth/google` and `/apple` reuse the existing `GOOGLE_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`,
 `GOOGLE_ANDROID_CLIENT_ID` (accepted Google audiences; none set = `503 missing_config`) and `APPLE_IOS_BUNDLE_ID`
 (Apple audience, default `com.hontogame.app`). No new variables.
+
+## feat/api-v1-photos-push (W2a photos, memories, devices, push)
+
+| Name | Used by | Notes |
+|---|---|---|
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET` | `app/storage.ts` | already set (see above); the object host is derived from `S3_ENDPOINT`, never hardcoded |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | `app/storage.ts` | **pending**: while empty, `/api/v1/photos*` and `/api/v1/memories*` answer `503 storage_not_configured`, W1b's Today photo URLs are null, `POST /api/v1/me/export` answers `503 missing_config` and the retention cron only queues deletions |
+| `APNS_KEY_P8` | `app/push/apns.ts` | **pending**: contents of the `.p8` key (PEM; `\n` escapes accepted). Replaces the W0 placeholder name `APNS_PRIVATE_KEY` |
+| `APNS_KEY_ID` | `app/push/apns.ts` | **pending**: key id of the `.p8` (JWT `kid`) |
+| `APNS_TEAM_ID` | `app/push/apns.ts` | set (`4AW8H42XNA`, JWT `iss`) |
+| `APNS_BUNDLE_ID` | `app/push/apns.ts` | optional, default `com.hontogame.app` (alert topic; widget topic `<bundle>.push-type.widgets`) |
+| `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`, `FCM_PRIVATE_KEY` | `app/push/fcm.ts` | **pending**: Firebase service account (`FCM_PRIVATE_KEY` is the PEM, `\n` escapes accepted) |
+
+While the APNs or FCM keys are empty, sending is a logged no-op (`[push] … not configured, skipped N device(s)`);
+device tokens are never logged. APNs host is per token (`env`: sandbox / production). Migration record:
+`drizzle/0009_photos_push.sql` (applied lazily by `ensurePhotosSchema()` in `api/v1/photos-schema.ts`).
+The same bucket backs W1b's object-store seam (`getObjectStore()` in `api/v1/lifecycle.ts` defaults to
+`app/storage.ts` once `S3_*` is complete): Today photo URLs, the export ZIP (`exports/`) and the retention cron.
