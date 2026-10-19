@@ -9,5 +9,7 @@
     "displayName": "Ana",
     "timeZone": "America/Sao_Paulo",
     "createdAt": "2026-10-01T13:20:00Z"
-  }
+  },
+  "refreshToken": "hm_r_fixture000000000000000000000000000000000",
+  "refreshExpiresInDays": 365
 }
