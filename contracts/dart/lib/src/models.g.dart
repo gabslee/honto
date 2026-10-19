@@ -32,6 +32,7 @@ enum ErrorCode {
   emailRequired('email_required'),
   exportUnavailable('export_unavailable'),
   missingConfig('missing_config'),
+  storageNotConfigured('storage_not_configured'),
   internal('internal'),
   /// A value added to the API after this client was built.
   unrecognized('');

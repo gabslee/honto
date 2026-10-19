@@ -20,6 +20,7 @@ info:
       or the `honto_session` cookie (web, read-only screens).
     - Photos live in a private S3-compatible bucket (object storage; currently Railway Storage Buckets).
       Uploads are presigned PUTs, reads are presigned GETs (SigV4, service `s3`, region `auto`).
+      Photo and memories endpoints answer `503 storage_not_configured` while the bucket credentials are unset.
     - Premium is per couple: the couple is Premium when either member has an active entitlement.
     - Clients: iOS 17.0+ (portrait only; push-to-start Live Activities need 17.2, widget push needs 26),
       Android minSdk 26 (proposal), web read-only.
@@ -376,6 +377,7 @@ paths:
         '415': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Error' }
   /api/v1/photos/{photoId}/complete:
     post:
       tags: [photos]
@@ -396,6 +398,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
   /api/v1/photos/{photoId}:
     delete:
       tags: [photos]
@@ -408,6 +411,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
   /api/v1/memories:
     get:
       tags: [memories]
@@ -430,6 +434,7 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
   /api/v1/memories/{day}:
     get:
       tags: [memories]
@@ -451,6 +456,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
   /api/v1/devices:
     post:
       tags: [devices]
@@ -837,6 +843,7 @@ components:
         - email_required
         - export_unavailable
         - missing_config
+        - storage_not_configured
         - internal
     Error:
       type: object
