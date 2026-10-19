@@ -2,7 +2,8 @@ import type { NeonQueryFunction } from "@neondatabase/serverless";
 import type { AuthSession, EmailStartResponse, Platform, User } from "../../contracts/honto-api";
 import { createMobileToken, createUserSession, database, userCookie } from "../../app/server-auth";
 import { apiError, noStore } from "./context";
-import { ensureLifecycleSchema, hitRateLimit } from "./lifecycle";
+import { clientIp, ensureLifecycleSchema, hitRateLimit, saltedHash } from "./lifecycle";
+import { issueRefreshToken, REFRESH_TTL_DAYS } from "./refresh-tokens";
 
 type Sql = NeonQueryFunction<false, false>;
 type Env = Record<string, string | undefined>;
@@ -84,12 +85,6 @@ export function signInEmail(to: string, link: string, code: string): EmailMessag
 // Tokens
 // ---------------------------------------------------------------------------------------------------
 
-/** Salted SHA-256, same salt as user_sessions / mobile_tokens; `scope` keeps link, code and IP hashes apart. */
-async function saltedHash(scope: string, value: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${process.env.AUTH_SESSION_SALT ?? "honto-auth"}:${scope}:${value}`));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
 export function normalizeEmail(value: unknown) {
   if (typeof value !== "string") return null;
   const email = value.trim().toLowerCase();
@@ -103,10 +98,6 @@ export function newSignInCode() {
     const value = crypto.getRandomValues(new Uint32Array(1))[0];
     if (value < limit) return String(value % 1_000_000).padStart(6, "0");
   }
-}
-
-function clientIp(request: Request) {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
 /** Link origin: always hontogame.com in Production (universal links); the request's own origin elsewhere, so Preview links work. */
@@ -177,7 +168,7 @@ async function findOrCreateEmailUser(sql: Sql, email: string, name: unknown) {
  * POST /api/v1/auth/email/verify `{ token }` or `{ email, code }`, plus `platform`. Single use: the row is
  * consumed by the same statement that checks it. A wrong code counts against every open token of that
  * email (5 tries each). 30 verify calls per IP per 15 minutes. Same response as `/api/mobile/auth/google`
- * (`hm_u_` token, 365 days); `platform: web` sets the 30-day `honto_session` cookie and returns `token: null`.
+ * (`hm_u_` token, 365 days) plus a rotating `hm_r_` refresh token; `platform: web` sets the 30-day `honto_session` cookie and returns `token: null`.
  */
 export async function verifyEmailSignIn(request: Request) {
   const body = await readJson(request);
@@ -205,8 +196,12 @@ export async function verifyEmailSignIn(request: Request) {
   const user = users[0] as User;
   const headers: Record<string, string> = { ...noStore };
   let bearer: string | null = null;
+  let refreshToken: string | null = null;
   if (platform === "web") headers["Set-Cookie"] = userCookie(await createUserSession(userId));
-  else bearer = await createMobileToken({ kind: "user", userId, platform });
-  const result: AuthSession = { token: bearer, tokenType: "Bearer", expiresInDays: platform === "web" ? 30 : 365, created, user: { id: user.id, email: user.email, displayName: user.displayName, timeZone: user.timeZone ?? null, createdAt: user.createdAt } };
+  else {
+    bearer = await createMobileToken({ kind: "user", userId, platform });
+    refreshToken = await issueRefreshToken(sql, userId, platform);
+  }
+  const result: AuthSession = { token: bearer, tokenType: "Bearer", expiresInDays: platform === "web" ? 30 : 365, created, user: { id: user.id, email: user.email, displayName: user.displayName, timeZone: user.timeZone ?? null, createdAt: user.createdAt }, refreshToken, refreshExpiresInDays: refreshToken ? REFRESH_TTL_DAYS : null };
   return Response.json(result, { status: created ? 201 : 200, headers });
 }

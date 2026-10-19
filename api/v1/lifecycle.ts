@@ -26,6 +26,10 @@ export function ensureLifecycleSchema(sql: Sql) {
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_couple_invites_open ON couple_invites(created_by) WHERE used_at IS NULL AND revoked_at IS NULL`;
     await sql`CREATE TABLE IF NOT EXISTS email_login_tokens (token_hash text PRIMARY KEY, email text NOT NULL, code_hash text NOT NULL, platform text NOT NULL CHECK (platform IN ('ios', 'android', 'web')), attempts integer NOT NULL DEFAULT 0, expires_at timestamptz NOT NULL, used_at timestamptz, created_at timestamptz NOT NULL DEFAULT now())`;
     await sql`CREATE INDEX IF NOT EXISTS idx_email_login_tokens_email ON email_login_tokens(email, created_at DESC)`;
+    // Rotating refresh tokens for the apps (hm_r_, single use). A family is one sign-in and all its rotations.
+    await sql`CREATE TABLE IF NOT EXISTS v1_refresh_tokens (token_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, family_id text NOT NULL, platform text NOT NULL CHECK (platform IN ('ios', 'android')), created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL, used_at timestamptz, revoked_at timestamptz)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_v1_refresh_tokens_family ON v1_refresh_tokens(family_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_v1_refresh_tokens_user ON v1_refresh_tokens(user_id)`;
     await sql`CREATE TABLE IF NOT EXISTS v1_rate_limits (scope text NOT NULL, subject text NOT NULL, window_start timestamptz NOT NULL, hits integer NOT NULL DEFAULT 0, PRIMARY KEY (scope, subject, window_start))`;
     await sql`CREATE TABLE IF NOT EXISTS photo_exports (id text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'ready', 'failed')), object_key text, photo_count integer NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now(), ready_at timestamptz, expires_at timestamptz)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_photo_exports_user ON photo_exports(user_id, created_at DESC)`;
@@ -71,6 +75,17 @@ export async function optionalTables(sql: Sql): Promise<OptionalTables> {
   const tables = { photos: Number(row.photoColumns) === PHOTO_COLUMNS, exports: Boolean(row.exports), calendar: Boolean(row.calendar), trips: Boolean(row.trips), nudges: Boolean(row.nudges), entitlements: Boolean(row.entitlements) };
   if (Object.values(tables).every(Boolean)) allTables = tables;
   return tables;
+}
+
+/** Salted SHA-256 (same salt as user_sessions / mobile_tokens); `scope` keeps link, code, refresh and IP hashes apart. */
+export async function saltedHash(scope: string, value: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${process.env.AUTH_SESSION_SALT ?? "honto-auth"}:${scope}:${value}`));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** First hop of x-forwarded-for (set by Vercel), for per-IP limits. Only ever stored through saltedHash. */
+export function clientIp(request: Request) {
+  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
 /** `prefix` + 20 random base32 chars (lowercase), e.g. `cpl_k3v…`. */
@@ -343,7 +358,8 @@ export async function runRetention(sql: Sql, store = getObjectStore()): Promise<
   }
 
   const invitesDeleted = count(await sql`WITH d AS (DELETE FROM couple_invites WHERE used_at IS NULL AND (expires_at <= now() OR revoked_at IS NOT NULL) RETURNING code) SELECT count(*)::int AS n FROM d`);
-  const tokensRevoked = count(await sql`WITH d AS (DELETE FROM email_login_tokens WHERE expires_at <= now() - interval '1 day' RETURNING token_hash) SELECT count(*)::int AS n FROM d`);
+  const tokensRevoked = count(await sql`WITH d AS (DELETE FROM email_login_tokens WHERE expires_at <= now() - interval '1 day' RETURNING token_hash) SELECT count(*)::int AS n FROM d`)
+    + count(await sql`WITH d AS (DELETE FROM v1_refresh_tokens WHERE expires_at <= now() OR revoked_at <= now() - interval '30 days' OR used_at <= now() - interval '30 days' RETURNING token_hash) SELECT count(*)::int AS n FROM d`);
   await sql`DELETE FROM v1_rate_limits WHERE window_start <= now() - interval '2 days'`;
   const calendarBlocksDeleted = tables.calendar
     ? count(await sql`WITH d AS (DELETE FROM calendar_busy WHERE ends_at < now() - interval '1 day' OR starts_at > now() + interval '14 days' RETURNING 1) SELECT count(*)::int AS n FROM d`)

@@ -138,6 +138,12 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
     const req = (who, headers = {}) => new Request('https://hontogame.com/api/v1/x', { headers: { authorization: `Bearer ${tokens[who]}`, ...headers } });
     const body = async (response) => ({ status: response.status, json: response.status === 304 ? null : await response.json(), etag: response.headers.get('etag') });
 
+    // Fills the current and the next fixed window of a limiter, so the next call is limited even if the
+    // clock crosses a window boundary mid-test (looping up to the limit would flake at :00 / :15 / ...).
+    const fillWindows = (scope, subject, hits, seconds) => db.query(`INSERT INTO v1_rate_limits (scope, subject, window_start, hits)
+      SELECT $1, $2, to_timestamp(floor(extract(epoch FROM now()) / $3::int) * $3::int) + k * make_interval(secs => $3::int), $4::int FROM generate_series(0, 1) k
+      ON CONFLICT (scope, subject, window_start) DO UPDATE SET hits = EXCLUDED.hits`, [scope, subject, seconds, hits]);
+
     let anaCode;
     await t.test('invite: create, replace, read; 401 without a session', async () => {
       expectError(await invite(null), 401, 'unauthorized');
@@ -207,7 +213,8 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
     });
 
     await t.test('join: 10 tries per 10 minutes', async () => {
-      for (let i = 0; i < 10; i++) expectError(await join('lee', 'QQQQQQ'), 404, 'invalid_code');
+      for (let i = 0; i < 3; i++) expectError(await join('lee', 'QQQQQQ'), 404, 'invalid_code');
+      await fillWindows('join', 'usr_lee', 10, 600);
       const limited = await join('lee', 'QQQQQQ');
       expectError(limited, 429, 'rate_limited');
       assert.ok(Number(limited.headers.get('retry-after')) > 0);
