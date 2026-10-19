@@ -12,11 +12,17 @@ abstract class HontoApi {
   /// `POST /api/v1/auth/apple`: Native Sign in with Apple; returns an hm_u_ token.
   Future<AuthSession> signInWithApple(AppleSignInRequest body);
 
+  /// `POST /api/v1/auth/link/{provider}`: Add a Google or Apple sign-in to the signed-in account.
+  Future<ProviderLinkResult> linkProviderIdentity(String provider, ProviderLinkRequest body);
+
   /// `POST /api/v1/auth/email/start`: Send a magic link plus a 6-digit fallback code.
   Future<EmailStartResponse> startEmailSignIn(EmailStartRequest body);
 
   /// `POST /api/v1/auth/email/verify`: Exchange the magic-link token (or email + code) for a session.
   Future<AuthSession> verifyEmailSignIn(EmailVerifyRequest body);
+
+  /// `POST /api/v1/auth/refresh`: Rotate a refresh token for a new hm_u_ access token (instead of sending the user back to sign-in).
+  Future<AuthSession> refreshSession(RefreshRequest body);
 
   /// `POST /api/v1/auth/logout`: Revoke the bearer token (or clear the web cookie).
   Future<LogoutResponse> logout();
@@ -131,6 +137,12 @@ class HttpHontoApi implements HontoApi {
   }
 
   @override
+  Future<ProviderLinkResult> linkProviderIdentity(String provider, ProviderLinkRequest body) async {
+    final json = await transport.send('POST', '/api/v1/auth/link/${Uri.encodeComponent(provider)}', body: body.toJson());
+    return ProviderLinkResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
   Future<EmailStartResponse> startEmailSignIn(EmailStartRequest body) async {
     final json = await transport.send('POST', '/api/v1/auth/email/start', body: body.toJson());
     return EmailStartResponse.fromJson(json as Map<String, dynamic>);
@@ -139,6 +151,12 @@ class HttpHontoApi implements HontoApi {
   @override
   Future<AuthSession> verifyEmailSignIn(EmailVerifyRequest body) async {
     final json = await transport.send('POST', '/api/v1/auth/email/verify', body: body.toJson());
+    return AuthSession.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<AuthSession> refreshSession(RefreshRequest body) async {
+    final json = await transport.send('POST', '/api/v1/auth/refresh', body: body.toJson());
     return AuthSession.fromJson(json as Map<String, dynamic>);
   }
 

@@ -4,5 +4,8 @@
   "couplesPurged": 1,
   "exportsDeleted": 2,
   "calendarBlocksDeleted": 340,
-  "tokensRevoked": 3
+  "tokensRevoked": 3,
+  "invitesDeleted": 4,
+  "objectsDeleted": 26,
+  "objectsPending": 0
 }
