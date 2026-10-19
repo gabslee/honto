@@ -45,3 +45,8 @@ App Store Connect / Play builds. Never commit values.
   or `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` with `forcePathStyle: false`.
 - Keys: `couples/<coupleId>/photos/<photoId>/{full,thumb}.<ext>`, `exports/<userId>/<exportId>.zip`.
 - No lifecycle rules: `GET /api/cron/retention` deletes unpaired photos after 30 days and exports after 7 days.
+
+## claude/api-v1-foundation-b38rye (W1a foundation)
+
+No new variables. `api/v1/context.ts` (`requireUser`, `requireCouple`, `isCouplePremium`) and
+`PUT /api/v1/me/timezone` only use the existing `DATABASE_URL` and `AUTH_SESSION_SALT` (token and cookie hashes).
