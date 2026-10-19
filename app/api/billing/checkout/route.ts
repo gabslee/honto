@@ -1,6 +1,6 @@
 import { getCurrentUser, hasPremiumAccess } from "../../../server-auth";
 import { priceFor, stripeRequest, stripeSecret } from "../../../stripe";
-import { currencyForCountry } from "../../../pricing-config.js";
+import { checkoutCurrency } from "../../../pricing-config.js";
 
 export const dynamic = "force-dynamic";
 
@@ -10,10 +10,11 @@ export async function POST(request: Request) {
   if (!user.termsAcceptedAt) return Response.json({ error: "Accept the Terms of Use and Privacy Policy before starting Premium." }, { status: 428 });
   if (user.role === "admin" || hasPremiumAccess(user)) return Response.json({ error: "Premium is already active." }, { status: 409 });
   if (!stripeSecret()) return Response.json({ error: "Stripe is not configured yet." }, { status: 503 });
-  let body: { interval?: string } = {};
+  let body: { interval?: string; currency?: string } = {};
   try { body = await request.json(); } catch { /* use monthly */ }
-  // Brazil pays in BRL (card); everyone else in USD.
-  const currency = currencyForCountry(request.headers.get("x-vercel-ip-country"));
+  // Brazil pays in BRL (card); everyone else in USD. The server decides; `currency` is what the page showed.
+  const { currency, matches } = checkoutCurrency(request.headers.get("x-vercel-ip-country"), body.currency);
+  if (!matches) return Response.json({ error: "The price for your location changed. Reload the page to see it." }, { status: 409 });
   const price = priceFor(body.interval === "year" ? "year" : "month", currency);
   const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "https://repo-two-jet-78.vercel.app";
   const params = new URLSearchParams({ mode: "subscription", "line_items[0][price]": price, "line_items[0][quantity]": "1", customer_email: user.email, payment_method_collection: "if_required", "subscription_data[trial_period_days]": "7", "subscription_data[trial_settings][end_behavior][missing_payment_method]": "cancel", success_url: `${origin}/?billing=success`, cancel_url: `${origin}/?billing=cancelled`, client_reference_id: user.id, "metadata[user_id]": user.id, "subscription_data[metadata][user_id]": user.id });

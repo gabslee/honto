@@ -30,7 +30,7 @@ test("BRL display and savings math", () => {
 
 test("checkout uses the Vercel IP country; pages and legal text show BRL", async () => {
   const route = await readFile(new URL("../app/api/billing/checkout/route.ts", import.meta.url), "utf8");
-  assert.match(route, /currencyForCountry\(request\.headers\.get\("x-vercel-ip-country"\)\)/);
+  assert.match(route, /checkoutCurrency\(request\.headers\.get\("x-vercel-ip-country"\), body\.currency\)/);
   assert.match(route, /priceFor\(/);
   const subs = await readFile(new URL("../app/subscriptions/page.tsx", import.meta.url), "utf8");
   assert.match(subs, /R\$14,90 per month or R\$99 per year/);

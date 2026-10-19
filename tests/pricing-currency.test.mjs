@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PRICE_DISPLAY, currencyForCountry, resolvePriceId } from "../app/pricing-config.js";
+import { PRICE_DISPLAY, checkoutCurrency, currencyForCountry, resolvePriceId } from "../app/pricing-config.js";
 
 // One currency per page: Brazil sees only R$14,90 / R$99, everyone else only US$4.99 / US$29.99.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -88,5 +88,16 @@ test("checkout charges the displayed currency: BRL price ids for Brazil, USD ids
   assert.equal(resolvePriceId("month", currencyForCountry("US"), {}), "price_1UEbQpRQHXAQ6ftMKfSBbsdS");
   assert.equal(resolvePriceId("year", currencyForCountry("US"), {}), "price_1UQi29RQHXAQ6ftM65UMcRaC");
   const route = readFileSync(join(root, "app/api/billing/checkout/route.ts"), "utf8");
-  assert.match(route, /currencyForCountry\(request\.headers\.get\("x-vercel-ip-country"\)\)/);
+  assert.match(route, /checkoutCurrency\(request\.headers\.get\("x-vercel-ip-country"\), body\.currency\)/);
+  assert.match(route, /if \(!matches\) return Response\.json\([^)]*\{ status: 409 \}\)/);
+  assert.match(route, /priceFor\(body\.interval === "year" \? "year" : "month", currency\)/);
+  assert.match(readFileSync(join(root, "app/pricing/pricing-client.tsx"), "utf8"), /JSON\.stringify\(\{ interval, currency \}\)/);
+});
+
+test("checkout refuses a currency other than the one the visitor's country gets", () => {
+  assert.deepEqual(checkoutCurrency("BR", "BRL"), { currency: "BRL", matches: true });
+  assert.deepEqual(checkoutCurrency("US", "USD"), { currency: "USD", matches: true });
+  assert.deepEqual(checkoutCurrency("BR", "USD"), { currency: "BRL", matches: false });
+  assert.deepEqual(checkoutCurrency("US", "BRL"), { currency: "USD", matches: false });
+  assert.deepEqual(checkoutCurrency("US", undefined), { currency: "USD", matches: true }, "account menu checkout sends no currency");
 });

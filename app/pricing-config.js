@@ -21,6 +21,15 @@ export function resolvePriceId(interval, currency, env = {}) {
   return yearly ? env.STRIPE_YEARLY_PRICE_ID || env.STRIPE_ANNUAL_PRICE_ID || PRICE_IDS.USD.year : env.STRIPE_MONTHLY_PRICE_ID || PRICE_IDS.USD.month;
 }
 
+/**
+ * Checkout charges the currency the page showed. A mismatch (the visitor's country changed) asks for a reload.
+ * @returns {{ currency: "BRL" | "USD"; matches: boolean }}
+ */
+export function checkoutCurrency(country, shownCurrency) {
+  const currency = currencyForCountry(country);
+  return { currency, matches: !shownCurrency || shownCurrency === currency };
+}
+
 /** Price labels for a currency. The locale no longer changes the format, so a page never shows two styles. */
 export function priceLabels(currency) {
   return PRICE_DISPLAY[currency === "BRL" ? "BRL" : "USD"];

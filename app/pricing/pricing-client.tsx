@@ -31,7 +31,7 @@ export default function PricingClient({ currency = "USD" }: { currency?: "USD" |
       if (!accepted) throw new Error(c.errTerms);
       const consent = await fetch("/api/account/consent", { method: "POST" });
       if (!consent.ok) throw new Error(c.errTerms);
-      const response = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ interval }) });
+      const response = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ interval, currency }) });
       const data = await response.json();
       if (response.status === 401) { window.location.href = "/api/auth/google/start"; return; }
       if (!response.ok || !data.url) throw new Error(data.error ?? c.errCheckout);
