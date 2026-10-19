@@ -12,7 +12,7 @@ export type YearMonth = string;
 /** IANA time zone id. */
 export type TimeZoneId = string;
 
-export const ErrorCodeValues = ["bad_request", "unauthorized", "invalid_token", "forbidden", "not_found", "not_paired", "already_paired", "invalid_code", "code_expired", "own_invite", "premium_required", "rate_limited", "too_large", "unsupported_media_type", "invalid_local_day", "upload_missing", "upload_size_mismatch", "email_required", "email_unavailable", "identity_in_use", "export_unavailable", "missing_config", "internal"] as const;
+export const ErrorCodeValues = ["bad_request", "unauthorized", "invalid_token", "forbidden", "not_found", "not_paired", "already_paired", "invalid_code", "code_expired", "own_invite", "premium_required", "rate_limited", "too_large", "unsupported_media_type", "invalid_local_day", "upload_missing", "upload_size_mismatch", "email_required", "email_unavailable", "identity_in_use", "export_unavailable", "missing_config", "storage_not_configured", "internal"] as const;
 export type ErrorCode = (typeof ErrorCodeValues)[number];
 
 export interface ApiError {
@@ -590,7 +590,8 @@ export interface NudgeResult {
 export interface RevenueCatEvent {
   id: string;
   type: string;
-  app_user_id: string;
+  /** Required for every type except `TRANSFER`, which only has `transferred_from` / `transferred_to`. */
+  app_user_id?: string;
   original_app_user_id?: string;
   aliases?: Array<string>;
   transferred_from?: Array<string>;
@@ -761,15 +762,15 @@ export interface Operations {
   /** GET /api/v1/today: One call for the Today screen and for the widgets (timeline fetch, NSE, Android service). */
   getToday: { method: "GET"; path: "/api/v1/today"; pathParams: never; query: never; body: never; responses: { 200: Today; 304: void; 401: ApiError; 409: ApiError } };
   /** POST /api/v1/photos: Reserve a photo and get presigned PUT URLs (full + thumb) in the private object storage bucket. */
-  createPhoto: { method: "POST"; path: "/api/v1/photos"; pathParams: never; query: never; body: PhotoCreateRequest; responses: { 201: PhotoCreateResponse; 400: ApiError; 401: ApiError; 409: ApiError; 413: ApiError; 415: ApiError; 422: ApiError; 429: ApiError } };
+  createPhoto: { method: "POST"; path: "/api/v1/photos"; pathParams: never; query: never; body: PhotoCreateRequest; responses: { 201: PhotoCreateResponse; 400: ApiError; 401: ApiError; 409: ApiError; 413: ApiError; 415: ApiError; 422: ApiError; 429: ApiError; 503: ApiError } };
   /** POST /api/v1/photos/{photoId}/complete: Confirm both uploads; the photo becomes `ready` and the partner gets `photo.new`. */
-  completePhoto: { method: "POST"; path: "/api/v1/photos/{photoId}/complete"; pathParams: { photoId: string }; query: never; body: never; responses: { 200: Photo; 401: ApiError; 404: ApiError; 422: ApiError } };
+  completePhoto: { method: "POST"; path: "/api/v1/photos/{photoId}/complete"; pathParams: { photoId: string }; query: never; body: never; responses: { 200: Photo; 401: ApiError; 404: ApiError; 422: ApiError; 503: ApiError } };
   /** DELETE /api/v1/photos/{photoId}: Delete one of my photos (author only). If it was the daily photo, the next one is promoted. */
-  deletePhoto: { method: "DELETE"; path: "/api/v1/photos/{photoId}"; pathParams: { photoId: string }; query: never; body: never; responses: { 204: void; 401: ApiError; 403: ApiError; 404: ApiError } };
+  deletePhoto: { method: "DELETE"; path: "/api/v1/photos/{photoId}"; pathParams: { photoId: string }; query: never; body: never; responses: { 204: void; 401: ApiError; 403: ApiError; 404: ApiError; 503: ApiError } };
   /** GET /api/v1/memories: Month grid with both daily thumbnails per day. */
-  getMemoriesMonth: { method: "GET"; path: "/api/v1/memories"; pathParams: never; query: { month: string }; body: never; responses: { 200: MemoriesMonth; 400: ApiError; 401: ApiError; 409: ApiError } };
+  getMemoriesMonth: { method: "GET"; path: "/api/v1/memories"; pathParams: never; query: { month: string }; body: never; responses: { 200: MemoriesMonth; 400: ApiError; 401: ApiError; 409: ApiError; 503: ApiError } };
   /** GET /api/v1/memories/{day}: All ready photos of both partners for a local day (daily first, then gallery by time). */
-  getMemoryDay: { method: "GET"; path: "/api/v1/memories/{day}"; pathParams: { day: string }; query: never; body: never; responses: { 200: MemoryDay; 400: ApiError; 401: ApiError; 403: ApiError; 409: ApiError } };
+  getMemoryDay: { method: "GET"; path: "/api/v1/memories/{day}"; pathParams: { day: string }; query: never; body: never; responses: { 200: MemoryDay; 400: ApiError; 401: ApiError; 403: ApiError; 409: ApiError; 503: ApiError } };
   /** POST /api/v1/devices: Register or refresh a push token (upsert by token). */
   registerDevice: { method: "POST"; path: "/api/v1/devices"; pathParams: never; query: never; body: DeviceRegistration; responses: { 201: Device; 400: ApiError; 401: ApiError } };
   /** DELETE /api/v1/devices/{deviceId}: Revoke a push token (logout, notifications disabled). */
@@ -781,7 +782,7 @@ export interface Operations {
   /** PUT /api/v1/calendar/busy: Atomically replace my busy blocks for a window (max 14 days ahead). */
   uploadCalendarBusy: { method: "PUT"; path: "/api/v1/calendar/busy"; pathParams: never; query: never; body: CalendarBusyUpload; responses: { 200: CalendarBusyResult; 400: ApiError; 401: ApiError; 409: ApiError } };
   /** GET /api/v1/calendar: My blocks and my partner's, plus the partner's current status. Premium. */
-  getCalendar: { method: "GET"; path: "/api/v1/calendar"; pathParams: never; query: { from: string; to: string }; body: never; responses: { 200: CalendarView; 400: ApiError; 401: ApiError; 403: ApiError; 409: ApiError } };
+  getCalendar: { method: "GET"; path: "/api/v1/calendar"; pathParams: never; query: { from: string; to: string }; body: never; responses: { 200: CalendarView; 400: ApiError; 401: ApiError; 402: ApiError; 409: ApiError } };
   /** GET /api/v1/calendar/shares: My per-calendar title opt-ins. */
   getCalendarShares: { method: "GET"; path: "/api/v1/calendar/shares"; pathParams: never; query: never; body: never; responses: { 200: CalendarShares; 401: ApiError } };
   /** PUT /api/v1/calendar/shares: Replace my per-calendar title opt-ins (default off). Turning one on requires Premium. */

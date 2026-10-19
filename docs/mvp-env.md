@@ -69,11 +69,38 @@ No new variables for the refresh tokens or the AASA file (app ID `4AW8H42XNA.com
 `GOOGLE_ANDROID_CLIENT_ID` (accepted Google audiences; none set = `503 missing_config`) and `APPLE_IOS_BUNDLE_ID`
 (Apple audience, default `com.hontogame.app`). No new variables.
 
+## feat/api-v1-photos-push (W2a photos, memories, devices, push)
+
+| Name | Used by | Notes |
+|---|---|---|
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET` | `app/storage.ts` | already set (see above); the object host is derived from `S3_ENDPOINT`, never hardcoded |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | `app/storage.ts` | **pending**: while empty, `/api/v1/photos*` and `/api/v1/memories*` answer `503 storage_not_configured`, W1b's Today photo URLs are null, `POST /api/v1/me/export` answers `503 missing_config` and the retention cron only queues deletions |
+| `APNS_KEY_P8` | `app/push/apns.ts` | **pending**: contents of the `.p8` key (PEM; `\n` escapes accepted). Replaces the W0 placeholder name `APNS_PRIVATE_KEY` |
+| `APNS_KEY_ID` | `app/push/apns.ts` | **pending**: key id of the `.p8` (JWT `kid`) |
+| `APNS_TEAM_ID` | `app/push/apns.ts` | set (`4AW8H42XNA`, JWT `iss`) |
+| `APNS_BUNDLE_ID` | `app/push/apns.ts` | optional, default `com.hontogame.app` (alert topic; widget topic `<bundle>.push-type.widgets`) |
+| `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`, `FCM_PRIVATE_KEY` | `app/push/fcm.ts` | **pending**: Firebase service account (`FCM_PRIVATE_KEY` is the PEM, `\n` escapes accepted) |
+
+While the APNs or FCM keys are empty, sending is a logged no-op (`[push] … not configured, skipped N device(s)`);
+device tokens are never logged. APNs host is per token (`env`: sandbox / production). Migration record:
+`drizzle/0009_photos_push.sql` (applied lazily by `ensurePhotosSchema()` in `api/v1/photos-schema.ts`).
+The same bucket backs W1b's object-store seam (`getObjectStore()` in `api/v1/lifecycle.ts` defaults to
+`app/storage.ts` once `S3_*` is complete): Today photo URLs, the export ZIP (`exports/`) and the retention cron.
+
+## claude/api-v1-calendar-billing-37k6wl (W3 calendar + RevenueCat)
+
+| Name | Used by | Notes |
+|---|---|---|
+| `REVENUECAT_WEBHOOK_SECRET` | `POST /api/v1/billing/revenuecat` | exact `Authorization` header value configured in the RevenueCat webhook (secret). Replaces the `REVENUECAT_WEBHOOK_AUTH` name above. Unset or empty: every webhook call gets 401 |
+
+The calendar endpoints (`PUT /api/v1/calendar/busy`, `GET /api/v1/calendar`) need no new variables
+(`DATABASE_URL`, `AUTH_SESSION_SALT`). `REVENUECAT_SECRET_API_KEY` is not used yet.
+
 ## feat/web-app-memories (W4, `hontogame.com/app`)
 
 | Name | Where | Notes |
 |---|---|---|
-| `HONTO_WEB_APP_FIXTURES` | Vercel Preview / local only | `1` = render `/app` from `contracts/fixtures/*.json` (switch state with `?fixture=premium\|free\|unpaired\|signed-out`). Ignored when `VERCEL_ENV=production`. Remove once `/api/v1/memories` (W2a) is on main; `/me` and `/today` already are (W1b). |
+| `HONTO_WEB_APP_FIXTURES` | Vercel Preview / local only | `1` = render `/app` from `contracts/fixtures/*.json` (switch state with `?fixture=premium\|free\|unpaired\|signed-out`). Ignored when `VERCEL_ENV=production`. Kept only for reviewing states without real data; `/me`, `/today` (W1b) and `/memories` (W2a) are on main, so `/app` uses the real API when the flag is unset. |
 | `HONTO_API_BASE_URL` | Vercel (optional) | Origin `/app` calls for `/api/v1/*` with the visitor's `honto_session` cookie. Default: the request's own origin. Local mock: `http://localhost:4010`. |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Vercel system variable (optional) | Sent as `x-vercel-protection-bypass` on the server-side `/api/v1` calls, so protected Preview deployments can call themselves. |
 

@@ -20,6 +20,7 @@ info:
       or the `honto_session` cookie (web, read-only screens).
     - Photos live in a private S3-compatible bucket (object storage; currently Railway Storage Buckets).
       Uploads are presigned PUTs, reads are presigned GETs (SigV4, service `s3`, region `auto`).
+      Photo and memories endpoints answer `503 storage_not_configured` while the bucket credentials are unset.
     - Premium is per couple: the couple is Premium when either member has an active entitlement.
     - Clients: iOS 17.0+ (portrait only; push-to-start Live Activities need 17.2, widget push needs 26),
       Android minSdk 26 (proposal), web read-only.
@@ -455,6 +456,7 @@ paths:
         '415': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/photos/{photoId}/complete:
     post:
       tags: [photos]
@@ -475,6 +477,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/photos/{photoId}:
     delete:
       tags: [photos]
@@ -487,6 +490,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/memories:
     get:
       tags: [memories]
@@ -509,6 +513,7 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/memories/{day}:
     get:
       tags: [memories]
@@ -530,6 +535,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/devices:
     post:
       tags: [devices]
@@ -629,6 +635,7 @@ paths:
       tags: [calendar]
       operationId: getCalendar
       summary: My blocks and my partner's, plus the partner's current status. Premium.
+      description: A couple without Premium gets 402 `premium_required` (uploading stays allowed on Free).
       parameters:
         - name: from
           in: query
@@ -647,7 +654,7 @@ paths:
               schema: { $ref: '#/components/schemas/CalendarView' }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
+        '402': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
   /api/v1/calendar/shares:
     get:
@@ -771,9 +778,9 @@ paths:
       operationId: revenueCatWebhook
       summary: RevenueCat webhook → entitlements.
       description: |
-        RevenueCat sends the configured `Authorization` header value (`REVENUECAT_WEBHOOK_AUTH`). The app
-        calls `Purchases.logIn(<Honto user id>)`, so `app_user_id` is the Honto `users.id`. Entitlement id
-        `premium`; the 7-day free trial is the store intro offer (`period_type: TRIAL`). Idempotent by `event.id`.
+        RevenueCat sends the configured `Authorization` header value (`REVENUECAT_WEBHOOK_SECRET`; while it is
+        unset every request gets 401). The app calls `Purchases.logIn(<Honto user id>)`, so `app_user_id` is
+        the Honto `users.id`. Entitlement id `premium`; the 7-day free trial is the store intro offer (`period_type: TRIAL`). Idempotent by `event.id`.
         Unknown event types are acknowledged and ignored.
       security:
         - revenueCatAuth: []
@@ -833,7 +840,7 @@ components:
       type: apiKey
       in: header
       name: Authorization
-      description: Exact value configured in the RevenueCat dashboard (`REVENUECAT_WEBHOOK_AUTH`).
+      description: Exact value configured in the RevenueCat dashboard (`REVENUECAT_WEBHOOK_SECRET`).
     cronAuth:
       type: http
       scheme: bearer
@@ -871,6 +878,14 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    StorageNotConfigured:
+      description: Object storage is not configured (the S3_* settings, e.g. the bucket keys, are missing). Retry later.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: Photo storage is not configured yet.
+            code: storage_not_configured
     AuthSession:
       description: Signed in (200 existing account, 201 new account).
       content:
@@ -918,6 +933,7 @@ components:
         - identity_in_use
         - export_unavailable
         - missing_config
+        - storage_not_configured
         - internal
     Error:
       type: object
@@ -1500,13 +1516,13 @@ components:
     RevenueCatEvent:
       type: object
       x-dart: false
-      required: [id, type, app_user_id]
+      required: [id, type]
       additionalProperties: true
       description: Subset used by Honto; see RevenueCat "Webhook event types and fields".
       properties:
         id: { type: string }
         type: { type: string, examples: [INITIAL_PURCHASE] }
-        app_user_id: { type: string }
+        app_user_id: { type: string, description: 'Required for every type except `TRANSFER`, which only has `transferred_from` / `transferred_to`.' }
         original_app_user_id: { type: string }
         aliases: { type: array, items: { type: string } }
         transferred_from: { type: array, items: { type: string } }

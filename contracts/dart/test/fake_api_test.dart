@@ -31,7 +31,9 @@ void main() {
     expect(ready.isDaily, isTrue);
     expect((await api.getToday()).me.dailyPhoto?.id, ready.id);
     await expectLater(api.getCalendar(from: '2026-10-19T00:00:00Z', to: '2026-10-26T00:00:00Z'),
-        throwsA(isA<HontoApiException>().having((e) => e.code, 'code', ErrorCode.premiumRequired)));
+        throwsA(isA<HontoApiException>()
+            .having((e) => e.statusCode, 's', 402)
+            .having((e) => e.code, 'code', ErrorCode.premiumRequired)));
     await expectLater(api.getMemoryDay('2026-10-01'), throwsA(isA<HontoApiException>().having((e) => e.statusCode, 's', 403)));
     expect((await api.getMemoryDay('2026-10-18')).photos, isNotEmpty);
     expect((await api.getMemoriesMonth(month: '2026-10')).historyLimitDays, 7);
