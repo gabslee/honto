@@ -52,7 +52,8 @@ Auth is `Authorization: Bearer hm_u_…` (apps) or the `honto_session` cookie (w
 | POST | `/api/v1/auth/link/{provider}` | Signed in. Adds a Google / Apple identity to my account; 409 `identity_in_use` if it belongs to someone else |
 | POST | `/api/v1/auth/refresh` | Public. Rotates an `hm_r_` refresh token (single use, reuse revokes the chain) for a new `hm_u_` |
 | POST | `/api/v1/auth/logout` | Revokes the token |
-| GET / DELETE | `/api/v1/me` | User + couple + entitlement + `pendingUnpair`; DELETE = account deletion |
+| GET / PATCH / DELETE | `/api/v1/me` | User + couple + entitlement + `pendingUnpair`; PATCH = edit `displayName`; DELETE = account deletion (photos and profile photo included) |
+| POST | `/api/v1/me/avatar/upload`, `/api/v1/me/avatar/complete`; DELETE `/api/v1/me/avatar` | Profile photo: presigned PUTs (full 1 MB / thumb 128 KB, JPEG or WebP), then complete; exposed as `avatar` (24 h signed URLs) on `Me.user`, `PartnerInfo`, `TodaySelf`, `TodayPartner`. In-app only, not widgets |
 | PUT | `/api/v1/me/timezone` | IANA zone, on every open/foreground |
 | PUT / DELETE | `/api/v1/me/weather` | Coarse weather summary from the device (condition, °C, day/night); no location stored. `GET /api/v1/today` returns `me.weather` / `partner.weather` (null after 12 h) |
 | GET / POST | `/api/v1/me/export` | ZIP of my own photos (while paired and 30 days after unpairing) |

@@ -30,8 +30,20 @@ abstract class HontoApi {
   /// `GET /api/v1/me`: Current user, couple (or null), entitlement and pending-unpair state.
   Future<Me> getMe();
 
+  /// `PATCH /api/v1/me`: Edit my profile (display name).
+  Future<User> updateProfile(ProfilePatch body);
+
   /// `DELETE /api/v1/me`: Delete the account (App Store 5.1.1(v)).
   Future<void> deleteMe();
+
+  /// `DELETE /api/v1/me/avatar`: Remove my profile photo (the objects are deleted from storage).
+  Future<void> deleteAvatar();
+
+  /// `POST /api/v1/me/avatar/upload`: Reserve a profile photo and get presigned PUT URLs (full + thumb), like `POST /api/v1/photos`.
+  Future<AvatarUploadResponse> createAvatarUpload(AvatarUploadRequest body);
+
+  /// `POST /api/v1/me/avatar/complete`: Confirm both uploads; the photo becomes my profile photo and the previous one is deleted.
+  Future<Avatar> completeAvatar(AvatarCompleteRequest body);
 
   /// `PUT /api/v1/me/timezone`: Report the device IANA time zone (sent on every app open/foreground).
   Future<TimeZoneResult> updateTimeZone(TimeZoneUpdate body);
@@ -185,8 +197,31 @@ class HttpHontoApi implements HontoApi {
   }
 
   @override
+  Future<User> updateProfile(ProfilePatch body) async {
+    final json = await transport.send('PATCH', '/api/v1/me', body: body.toJson());
+    return User.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
   Future<void> deleteMe() async {
     await transport.send('DELETE', '/api/v1/me');
+  }
+
+  @override
+  Future<void> deleteAvatar() async {
+    await transport.send('DELETE', '/api/v1/me/avatar');
+  }
+
+  @override
+  Future<AvatarUploadResponse> createAvatarUpload(AvatarUploadRequest body) async {
+    final json = await transport.send('POST', '/api/v1/me/avatar/upload', body: body.toJson());
+    return AvatarUploadResponse.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Avatar> completeAvatar(AvatarCompleteRequest body) async {
+    final json = await transport.send('POST', '/api/v1/me/avatar/complete', body: body.toJson());
+    return Avatar.fromJson(json as Map<String, dynamic>);
   }
 
   @override

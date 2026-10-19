@@ -2,6 +2,7 @@ import { clearUserCookie, database } from "../../../server-auth";
 import { apiError, noStore, requireUser } from "../../../../api/v1/context";
 import { meResponse } from "../../../../api/v1/couple";
 import { deleteAccount } from "../../../../api/v1/lifecycle";
+import { updateProfileResponse } from "../../../../api/v1/profile";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +11,14 @@ export async function GET(request: Request) {
   return meResponse(request);
 }
 
+/** PATCH /api/v1/me `{ displayName }`: edits my display name (1 to 80 characters). Returns the User with my avatar. */
+export async function PATCH(request: Request) {
+  return updateProfileResponse(request);
+}
+
 /**
  * DELETE /api/v1/me: deletes the account (App Store 5.1.1(v)). Unpairs first (the partner keeps their account),
- * deletes my photos and exports from storage, then the user row (sessions, tokens, devices, calendar and the rest
+ * deletes my photos, exports and profile photo from storage, then the user row (sessions, tokens, devices, calendar and the rest
  * cascade). 204; the web session cookie is cleared too.
  */
 export async function DELETE(request: Request) {

@@ -191,7 +191,7 @@ async function isPaired(sql: Sql, userId: string) {
  * Deletes the account now. Order:
  * 1. an active couple is unpaired with the same rules as `DELETE /api/v1/couple` (the partner keeps their
  *    account and their own photos for 30 days; the shared history goes at once);
- * 2. my photos and export ZIPs: rows deleted and their object keys queued in `storage_deletions` in the same
+ * 2. my photos, export ZIPs and profile photo: rows deleted and their object keys queued in `storage_deletions` in the same
  *    statement (no 30-day grace for a deleted account), then deleted from the bucket right away when storage
  *    is wired (anything that fails stays queued for the retention cron);
  * 3. pending email sign-in codes for my address, the legacy web game's `players.user_id` link and legacy
@@ -224,6 +224,15 @@ export async function deleteAccount(sql: Sql, userId: string, store = getObjectS
       INSERT INTO storage_deletions (object_key, reason) SELECT object_key, 'account' FROM d WHERE object_key IS NOT NULL ON CONFLICT (object_key) DO NOTHING
     ) SELECT object_key AS key FROM d WHERE object_key IS NOT NULL`;
   keys.push(...exports.map((row) => String(row.key)));
+  // Profile photo (api/v1/profile.ts), when its table exists: same queue-then-delete as photos.
+  if ((await sql`SELECT to_regclass('user_avatars') IS NOT NULL AS present`)[0]?.present) {
+    const avatars = await sql`WITH d AS (
+        DELETE FROM user_avatars WHERE user_id = ${userId} RETURNING object_key, thumb_key
+      ), q AS (
+        INSERT INTO storage_deletions (object_key, reason) SELECT k.key, 'account' FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) WHERE k.key IS NOT NULL ON CONFLICT (object_key) DO NOTHING
+      ) SELECT k.key FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) WHERE k.key IS NOT NULL`;
+    keys.push(...avatars.map((row) => String(row.key)));
+  }
 
   if (typeof user.email === "string") await sql`DELETE FROM email_login_tokens WHERE email = ${user.email.toLowerCase()}`;
   const legacy = (await sql`SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'players' AND column_name = 'user_id') AS players`)[0];
@@ -409,6 +418,7 @@ export function zipStore(entries: ZipEntry[]): Uint8Array {
 /**
  * 1. photos past `delete_after` (and any photo of a v1 couple unpaired 30+ days ago) -> rows deleted, keys queued;
  * 2. v1 couples unpaired 30+ days ago -> deleted (members cascade);
+ *    pending profile photos older than a day -> rows deleted, keys queued;
  * 3. exports past their 7 days (or failed / stuck for a day) -> rows deleted, keys queued; with storage wired,
  *    `exports/` objects older than 7 days that no live export row references are queued too;
  * 4. unused invites that expired or were replaced, email sign-in tokens expired for a day, old rate-limit
@@ -433,6 +443,13 @@ export async function runRetention(sql: Sql, store = getObjectStore()): Promise<
   const stale = await sql`SELECT id FROM couples WHERE legacy = false AND unpaired_at IS NOT NULL AND unpaired_at <= now() - make_interval(days => ${UNPAIR_GRACE_DAYS}::int)`;
   for (const couple of stale) await purgeSharedHistory(sql, String(couple.id));
   const couplesPurged = count(await sql`WITH d AS (DELETE FROM couples WHERE legacy = false AND unpaired_at IS NOT NULL AND unpaired_at <= now() - make_interval(days => ${UNPAIR_GRACE_DAYS}::int) RETURNING id) SELECT count(*)::int AS n FROM d`);
+
+  // Profile photos reserved but never completed (api/v1/profile.ts): keys queued like photos.
+  if ((await sql`SELECT to_regclass('user_avatars') IS NOT NULL AS present`)[0]?.present) {
+    await sql`WITH d AS (
+        DELETE FROM user_avatars WHERE status = 'pending' AND created_at <= now() - interval '1 day' RETURNING object_key, thumb_key
+      ) INSERT INTO storage_deletions (object_key, reason) SELECT k.key, 'avatar' FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) ON CONFLICT (object_key) DO NOTHING`;
+  }
 
   let exportsDeleted = count(await sql`WITH d AS (
       DELETE FROM photo_exports WHERE (expires_at IS NOT NULL AND expires_at <= now()) OR (status <> 'ready' AND created_at <= now() - interval '1 day') RETURNING object_key

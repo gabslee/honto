@@ -1,0 +1,4 @@
+{
+  "error": "Display name must be 1 to 80 characters.",
+  "code": "bad_request"
+}

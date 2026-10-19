@@ -1,0 +1,16 @@
+{
+  "id": "usr_ana",
+  "email": "ana@example.com",
+  "displayName": "Ana Lima",
+  "timeZone": "America/Sao_Paulo",
+  "createdAt": "2026-10-01T13:20:00Z",
+  "avatar": {
+    "id": "av_ana_1019",
+    "urls": {
+      "full": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/avatars/usr_ana/av_ana_1019/full.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+      "thumb": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/avatars/usr_ana/av_ana_1019/thumb.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+      "expiresAt": "2026-10-20T12:00:00Z"
+    },
+    "updatedAt": "2026-10-19T12:01:00Z"
+  }
+}
