@@ -47,22 +47,61 @@ export async function verifyAppleNativeToken(idToken: string, options: { audienc
   return { provider: "apple", sub: payload.sub, email, emailVerified: truthy(payload.email_verified), name: null };
 }
 
+export const PRIVATE_RELAY_SUFFIX = "@privaterelay.appleid.com";
+/** Apple "Hide My Email" address: the account cannot be found by the person's real email later. */
+export function isPrivateRelayEmail(email: string | null | undefined) {
+  return Boolean(email && email.trim().toLowerCase().endsWith(PRIVATE_RELAY_SUFFIX));
+}
+
+/** User already linked to this provider subject, or null. */
+export async function findLinkedUser(provider: string, sub: string) {
+  const sql = database();
+  if (!sql) throw new Error("DATABASE_URL is not configured");
+  const rows = await sql`SELECT a.user_id FROM auth_accounts a JOIN users u ON u.id = a.user_id WHERE a.provider = ${provider} AND a.provider_account_id = ${sub} LIMIT 1`;
+  return rows[0] ? String(rows[0].user_id) : null;
+}
+
 /**
- * Same account as the web login: match by provider subject first (Apple only sends the email on the
- * first sign-in), then by verified email (the users.email unique key the web callbacks upsert on).
+ * Links a provider subject to a user. Never moves an identity: if the subject already belongs to someone,
+ * nothing is written. Returns the user the subject belongs to after the call (`userId` when linked now or
+ * already; another id when it was taken, which callers treat as a conflict or as the account to sign in to).
+ */
+export async function linkProviderIdentity(provider: string, sub: string, userId: string) {
+  const sql = database();
+  if (!sql) throw new Error("DATABASE_URL is not configured");
+  const inserted = await sql`INSERT INTO auth_accounts (id, user_id, provider, provider_account_id) VALUES (${crypto.randomUUID()}, ${userId}, ${provider}, ${sub}) ON CONFLICT (provider, provider_account_id) DO NOTHING RETURNING user_id`;
+  if (inserted[0]) return userId;
+  const owner = await sql`SELECT user_id FROM auth_accounts WHERE provider = ${provider} AND provider_account_id = ${sub} LIMIT 1`;
+  return owner[0] ? String(owner[0].user_id) : userId;
+}
+
+/**
+ * Same account as the web login:
+ * 1. the provider subject already linked in auth_accounts (Apple only sends the email on the first sign-in);
+ * 2. else, only when the provider says the email is verified, an existing user with that email
+ *    (`lower(email)`, so mixed-case rows from older flows match), and the subject is linked to it;
+ * 3. else a new user with that verified email.
+ * Throws `email_not_verified` when there is no linked subject and no verified email. Identities are never
+ * moved between users: if the subject was linked concurrently, that owner is the account returned.
  */
 export async function findOrCreateProviderUser(identity: ProviderIdentity, displayName?: string | null) {
   const sql = database();
   if (!sql) throw new Error("DATABASE_URL is not configured");
   await ensureIdentitySchema();
-  const linked = await sql`SELECT user_id FROM auth_accounts WHERE provider = ${identity.provider} AND provider_account_id = ${identity.sub} LIMIT 1`;
-  if (linked[0]) return { userId: String(linked[0].user_id), created: false };
-  if (!identity.email || !identity.emailVerified) throw new Error("email_not_verified");
-  const name = (displayName || identity.name || identity.email).trim().slice(0, 80);
-  const role = process.env.HONTO_ADMIN_EMAIL?.trim().toLowerCase() === identity.email ? "admin" : "user";
-  const existing = await sql`SELECT id FROM users WHERE email = ${identity.email} LIMIT 1`;
-  const users = existing[0] ? existing : await sql`INSERT INTO users (id, email, display_name, role, plan, subscription_status) VALUES (${crypto.randomUUID()}, ${identity.email}, ${name}, ${role}, ${role === "admin" ? "premium" : "free"}, ${role === "admin" ? "active" : "inactive"}) ON CONFLICT (email) DO UPDATE SET updated_at = now() RETURNING id`;
-  const userId = String(users[0].id);
-  await sql`INSERT INTO auth_accounts (id, user_id, provider, provider_account_id) VALUES (${crypto.randomUUID()}, ${userId}, ${identity.provider}, ${identity.sub}) ON CONFLICT (provider, provider_account_id) DO UPDATE SET user_id = EXCLUDED.user_id`;
-  return { userId, created: !existing[0] };
+  const linked = await findLinkedUser(identity.provider, identity.sub);
+  if (linked) return { userId: linked, created: false };
+  const email = identity.email?.trim().toLowerCase();
+  if (!email || !identity.emailVerified) throw new Error("email_not_verified");
+  let created = false;
+  let user = (await sql`SELECT id FROM users WHERE lower(email) = ${email} ORDER BY created_at, id LIMIT 1`)[0];
+  if (!user) {
+    const name = (displayName || identity.name || email).trim().slice(0, 80);
+    const role = process.env.HONTO_ADMIN_EMAIL?.trim().toLowerCase() === email ? "admin" : "user";
+    const inserted = await sql`INSERT INTO users (id, email, display_name, role, plan, subscription_status) VALUES (${crypto.randomUUID()}, ${email}, ${name}, ${role}, ${role === "admin" ? "premium" : "free"}, ${role === "admin" ? "active" : "inactive"}) ON CONFLICT (email) DO NOTHING RETURNING id`;
+    user = inserted[0] ?? (await sql`SELECT id FROM users WHERE lower(email) = ${email} ORDER BY created_at, id LIMIT 1`)[0];
+    created = Boolean(inserted[0]);
+  }
+  const userId = String(user.id);
+  const owner = await linkProviderIdentity(identity.provider, identity.sub, userId);
+  return { userId: owner, created: created && owner === userId };
 }

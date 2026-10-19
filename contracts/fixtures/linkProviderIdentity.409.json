@@ -1,0 +1,4 @@
+{
+  "error": "This Google account is already used by another Honto account.",
+  "code": "identity_in_use"
+}

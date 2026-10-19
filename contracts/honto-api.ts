@@ -12,7 +12,7 @@ export type YearMonth = string;
 /** IANA time zone id. */
 export type TimeZoneId = string;
 
-export const ErrorCodeValues = ["bad_request", "unauthorized", "invalid_token", "forbidden", "not_found", "not_paired", "already_paired", "invalid_code", "code_expired", "own_invite", "premium_required", "rate_limited", "too_large", "unsupported_media_type", "invalid_local_day", "upload_missing", "upload_size_mismatch", "email_required", "export_unavailable", "missing_config", "internal"] as const;
+export const ErrorCodeValues = ["bad_request", "unauthorized", "invalid_token", "forbidden", "not_found", "not_paired", "already_paired", "invalid_code", "code_expired", "own_invite", "premium_required", "rate_limited", "too_large", "unsupported_media_type", "invalid_local_day", "upload_missing", "upload_size_mismatch", "email_required", "email_unavailable", "identity_in_use", "export_unavailable", "missing_config", "internal"] as const;
 export type ErrorCode = (typeof ErrorCodeValues)[number];
 
 export interface ApiError {
@@ -45,6 +45,36 @@ export interface AuthSession {
   /** True when the account was created by this sign-in. */
   created: boolean;
   user: User;
+  /** `hm_r_…`, single use (see `POST /api/v1/auth/refresh`). Null or absent for `platform: web` and for sign-ins that do not issue one yet. */
+  refreshToken?: string | null;
+  /** Lifetime of `refreshToken`; every refresh issues a new one. */
+  refreshExpiresInDays?: number | null;
+  /** Google / Apple sign-in: the account was created now (same as `created`). Suggest linking another sign-in. */
+  isNewUser?: boolean;
+  /** Google / Apple sign-in: the account email is an Apple "Hide My Email" address (`@privaterelay.appleid.com`), so it will not match the person's real email later. Suggest linking Google. */
+  usedPrivateRelayEmail?: boolean;
+}
+
+export const LinkProviderValues = ["apple", "google"] as const;
+export type LinkProvider = (typeof LinkProviderValues)[number];
+
+export interface ProviderLinkRequest {
+  idToken: string;
+  /** Raw nonce, when the app sent one to the provider. */
+  nonce?: string;
+}
+
+export interface ProviderLinkResult {
+  provider: LinkProvider;
+  alreadyLinked: boolean;
+  /** Email in the provider token, if any (the account email is not changed). */
+  email: string | null;
+  usedPrivateRelayEmail: boolean;
+}
+
+export interface RefreshRequest {
+  refreshToken: string;
+  platform: AuthPlatform;
 }
 
 export interface GoogleSignInRequest {
@@ -600,7 +630,14 @@ export interface CronRetentionResult {
   couplesPurged: number;
   exportsDeleted: number;
   calendarBlocksDeleted: number;
+  /** Expired email sign-in tokens removed. */
   tokensRevoked: number;
+  /** Expired or replaced, never used pairing codes removed. */
+  invitesDeleted: number;
+  /** Object storage keys deleted in this run. */
+  objectsDeleted: number;
+  /** Keys still queued for deletion (object storage not configured or failed). */
+  objectsPending: number;
 }
 
 export const PushEventTypeValues = ["photo.new", "nudge.new", "couple.joined", "couple.unpaired", "reunion.changed", "trip.start", "trip.update", "trip.end"] as const;
@@ -690,10 +727,14 @@ export interface Operations {
   signInWithGoogle: { method: "POST"; path: "/api/v1/auth/google"; pathParams: never; query: never; body: GoogleSignInRequest; responses: { 200: AuthSession; 201: AuthSession; 400: ApiError; 401: ApiError; 503: ApiError } };
   /** POST /api/v1/auth/apple: Native Sign in with Apple; returns an hm_u_ token. */
   signInWithApple: { method: "POST"; path: "/api/v1/auth/apple"; pathParams: never; query: never; body: AppleSignInRequest; responses: { 200: AuthSession; 201: AuthSession; 400: ApiError; 401: ApiError; 503: ApiError } };
+  /** POST /api/v1/auth/link/{provider}: Add a Google or Apple sign-in to the signed-in account. */
+  linkProviderIdentity: { method: "POST"; path: "/api/v1/auth/link/{provider}"; pathParams: { provider: string }; query: never; body: ProviderLinkRequest; responses: { 200: ProviderLinkResult; 201: ProviderLinkResult; 400: ApiError; 401: ApiError; 404: ApiError; 409: ApiError; 503: ApiError } };
   /** POST /api/v1/auth/email/start: Send a magic link plus a 6-digit fallback code. */
-  startEmailSignIn: { method: "POST"; path: "/api/v1/auth/email/start"; pathParams: never; query: never; body: EmailStartRequest; responses: { 202: EmailStartResponse; 400: ApiError; 429: ApiError } };
+  startEmailSignIn: { method: "POST"; path: "/api/v1/auth/email/start"; pathParams: never; query: never; body: EmailStartRequest; responses: { 202: EmailStartResponse; 400: ApiError; 429: ApiError; 503: ApiError } };
   /** POST /api/v1/auth/email/verify: Exchange the magic-link token (or email + code) for a session. */
   verifyEmailSignIn: { method: "POST"; path: "/api/v1/auth/email/verify"; pathParams: never; query: never; body: EmailVerifyRequest; responses: { 200: AuthSession; 201: AuthSession; 400: ApiError; 401: ApiError; 429: ApiError } };
+  /** POST /api/v1/auth/refresh: Rotate a refresh token for a new hm_u_ access token (instead of sending the user back to sign-in). */
+  refreshSession: { method: "POST"; path: "/api/v1/auth/refresh"; pathParams: never; query: never; body: RefreshRequest; responses: { 200: AuthSession; 400: ApiError; 401: ApiError; 429: ApiError } };
   /** POST /api/v1/auth/logout: Revoke the bearer token (or clear the web cookie). */
   logout: { method: "POST"; path: "/api/v1/auth/logout"; pathParams: never; query: never; body: never; responses: { 200: LogoutResponse; 401: ApiError } };
   /** GET /api/v1/me: Current user, couple (or null), entitlement and pending-unpair state. */
@@ -705,7 +746,7 @@ export interface Operations {
   /** GET /api/v1/me/export: Status of the export of my own photos (ZIP). */
   getExport: { method: "GET"; path: "/api/v1/me/export"; pathParams: never; query: never; body: never; responses: { 200: ExportStatus; 401: ApiError } };
   /** POST /api/v1/me/export: Build a ZIP with my own photos. */
-  requestExport: { method: "POST"; path: "/api/v1/me/export"; pathParams: never; query: never; body: never; responses: { 202: ExportStatus; 401: ApiError; 410: ApiError; 429: ApiError } };
+  requestExport: { method: "POST"; path: "/api/v1/me/export"; pathParams: never; query: never; body: never; responses: { 202: ExportStatus; 401: ApiError; 410: ApiError; 429: ApiError; 503: ApiError } };
   /** GET /api/v1/couple/invite: My current unexpired invite, if any. */
   getInvite: { method: "GET"; path: "/api/v1/couple/invite"; pathParams: never; query: never; body: never; responses: { 200: Invite; 401: ApiError; 404: ApiError; 409: ApiError } };
   /** POST /api/v1/couple/invite: Create a pairing code (replaces my previous unused code). */
@@ -772,8 +813,10 @@ export type SuccessBody<Op extends OperationId> = { [S in keyof Operations[Op]["
 export const operations = {
   signInWithGoogle: { method: "POST", path: "/api/v1/auth/google", auth: [] },
   signInWithApple: { method: "POST", path: "/api/v1/auth/apple", auth: [] },
+  linkProviderIdentity: { method: "POST", path: "/api/v1/auth/link/{provider}", auth: ["bearerAuth","cookieAuth"] },
   startEmailSignIn: { method: "POST", path: "/api/v1/auth/email/start", auth: [] },
   verifyEmailSignIn: { method: "POST", path: "/api/v1/auth/email/verify", auth: [] },
+  refreshSession: { method: "POST", path: "/api/v1/auth/refresh", auth: [] },
   logout: { method: "POST", path: "/api/v1/auth/logout", auth: ["bearerAuth","cookieAuth"] },
   getMe: { method: "GET", path: "/api/v1/me", auth: ["bearerAuth","cookieAuth"] },
   deleteMe: { method: "DELETE", path: "/api/v1/me", auth: ["bearerAuth","cookieAuth"] },
