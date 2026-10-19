@@ -11,7 +11,7 @@ enum FakeScenario {
   /// Ana (São Paulo) paired with Kenji (Tokyo), Premium trial, photos today.
   pairedPremium,
 
-  /// Paired, Free, no photo yet today (Memories locked after 7 days, calendar 403).
+  /// Paired, Free, no photo yet today (Memories locked after 7 days, calendar 402).
   pairedFree,
 
   /// Signed in, not paired (onboarding / pairing screens).
@@ -67,8 +67,8 @@ class FakeHontoApi implements HontoApi {
     return body();
   }
 
-  HontoApiException _premiumRequired(String message) =>
-      HontoApiException(403, ApiError(error: message, code: ErrorCode.premiumRequired));
+  HontoApiException _premiumRequired(String message, {int statusCode = 403}) =>
+      HontoApiException(statusCode, ApiError(error: message, code: ErrorCode.premiumRequired));
 
   String _iso(DateTime d) => d.toUtc().toIso8601String();
 
@@ -266,7 +266,7 @@ class FakeHontoApi implements HontoApi {
 
   @override
   Future<CalendarView> getCalendar({required String from, required String to}) => _run('getCalendar', () {
-        if (!_premium) throw _premiumRequired('The couple calendar is part of Premium.');
+        if (!_premium) throw _premiumRequired('The couple calendar is part of Premium.', statusCode: 402);
         return CalendarView.fromJson(_json('getCalendar.200'));
       }, needsCouple: true);
 
