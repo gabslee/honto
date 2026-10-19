@@ -50,3 +50,19 @@ App Store Connect / Play builds. Never commit values.
 
 No new variables. `api/v1/context.ts` (`requireUser`, `requireCouple`, `isCouplePremium`) and
 `PUT /api/v1/me/timezone` only use the existing `DATABASE_URL` and `AUTH_SESSION_SALT` (token and cookie hashes).
+
+## feat/api-v1-photos-push (W2a photos, memories, devices, push)
+
+| Name | Used by | Notes |
+|---|---|---|
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET` | `app/storage.ts` | already set (see above); the object host is derived from `S3_ENDPOINT`, never hardcoded |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | `app/storage.ts` | **pending**: while empty, `/api/v1/photos*` and `/api/v1/memories*` answer `503 storage_not_configured` |
+| `APNS_KEY_P8` | `app/push/apns.ts` | **pending**: contents of the `.p8` key (PEM; `\n` escapes accepted). Replaces the W0 placeholder name `APNS_PRIVATE_KEY` |
+| `APNS_KEY_ID` | `app/push/apns.ts` | **pending**: key id of the `.p8` (JWT `kid`) |
+| `APNS_TEAM_ID` | `app/push/apns.ts` | set (`4AW8H42XNA`, JWT `iss`) |
+| `APNS_BUNDLE_ID` | `app/push/apns.ts` | optional, default `com.hontogame.app` (alert topic; widget topic `<bundle>.push-type.widgets`) |
+| `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`, `FCM_PRIVATE_KEY` | `app/push/fcm.ts` | **pending**: Firebase service account (`FCM_PRIVATE_KEY` is the PEM, `\n` escapes accepted) |
+
+While the APNs or FCM keys are empty, sending is a logged no-op (`[push] … not configured, skipped N device(s)`);
+device tokens are never logged. APNs host is per token (`env`: sandbox / production). Migration record:
+`drizzle/0009_photos_push.sql` (applied lazily by `ensurePhotosSchema()` in `api/v1/photos-schema.ts`).
