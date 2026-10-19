@@ -30,6 +30,7 @@ enum ErrorCode {
   uploadMissing('upload_missing'),
   uploadSizeMismatch('upload_size_mismatch'),
   emailRequired('email_required'),
+  emailUnavailable('email_unavailable'),
   exportUnavailable('export_unavailable'),
   missingConfig('missing_config'),
   internal('internal'),

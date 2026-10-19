@@ -47,13 +47,13 @@ Auth is `Authorization: Bearer hm_u_…` (apps) or the `honto_session` cookie (w
 | Method | Path | Notes |
 |---|---|---|
 | POST | `/api/v1/auth/google`, `/api/v1/auth/apple` | Public. Same behavior as `/api/mobile/auth/*` (which stays frozen for build 2). 200 existing / 201 new account |
-| POST | `/api/v1/auth/email/start` | Public. Magic link + 6-digit code, 15 min, always 202 |
+| POST | `/api/v1/auth/email/start` | Public. Magic link + 6-digit code, 15 min, 202 (503 `email_unavailable` with no provider) |
 | POST | `/api/v1/auth/email/verify` | Public. `token` or `email`+`code`; `platform: web` sets the cookie and returns `token: null` |
 | POST | `/api/v1/auth/logout` | Revokes the token |
 | GET / DELETE | `/api/v1/me` | User + couple + entitlement + `pendingUnpair`; DELETE = account deletion |
 | PUT | `/api/v1/me/timezone` | IANA zone, on every open/foreground |
 | GET / POST | `/api/v1/me/export` | ZIP of my own photos (while paired and 30 days after unpairing) |
-| GET / POST | `/api/v1/couple/invite` | 6-char code, 24h, single use |
+| GET / POST | `/api/v1/couple/invite` | 6-char code, 48h, single use |
 | POST | `/api/v1/couple/join` | 404 invalid, 410 expired, 409 already paired, 422 own code |
 | GET / PATCH / DELETE | `/api/v1/couple` | Partner + tz, `startedOn`, `reunion`, `daysTogether`; DELETE = unpair |
 | GET | `/api/v1/today` | Today screen **and** widgets; ETag/304 |
@@ -77,7 +77,7 @@ Auth is `Authorization: Bearer hm_u_…` (apps) or the `honto_session` cookie (w
 - **v1 auth endpoints**: `/api/v1/auth/{google,apple,email/*,logout}` exist so the new app never calls the frozen
   `/api/mobile`; implementations should share `app/mobile-auth.ts`. Same `hm_u_` tokens.
 - **Account deletion** (`DELETE /api/v1/me`) added for App Store 5.1.1(v); no 30-day grace for deleted accounts.
-- **Invite codes**: 6 chars Crockford base32, 24h TTL, creating a new one revokes the previous.
+- **Invite codes**: 6 chars Crockford base32, 48h TTL (W1b, per the plan), creating a new one revokes the previous.
 - **Photo day** = photographer's local day (`localDay` + `timeZone` sent by the device, accepted within ±1 day).
   Today returns each person's own `localDay`. `partner.latestPhoto` keeps the Locket-style widget filled.
 - **Photo formats**: JPEG/WebP only (no HEIC/PNG in v1), full ≤ 2 MB, thumb ≤ 256 KB, both made on the device.

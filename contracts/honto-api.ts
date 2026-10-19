@@ -12,7 +12,7 @@ export type YearMonth = string;
 /** IANA time zone id. */
 export type TimeZoneId = string;
 
-export const ErrorCodeValues = ["bad_request", "unauthorized", "invalid_token", "forbidden", "not_found", "not_paired", "already_paired", "invalid_code", "code_expired", "own_invite", "premium_required", "rate_limited", "too_large", "unsupported_media_type", "invalid_local_day", "upload_missing", "upload_size_mismatch", "email_required", "export_unavailable", "missing_config", "internal"] as const;
+export const ErrorCodeValues = ["bad_request", "unauthorized", "invalid_token", "forbidden", "not_found", "not_paired", "already_paired", "invalid_code", "code_expired", "own_invite", "premium_required", "rate_limited", "too_large", "unsupported_media_type", "invalid_local_day", "upload_missing", "upload_size_mismatch", "email_required", "email_unavailable", "export_unavailable", "missing_config", "internal"] as const;
 export type ErrorCode = (typeof ErrorCodeValues)[number];
 
 export interface ApiError {
@@ -599,7 +599,14 @@ export interface CronRetentionResult {
   couplesPurged: number;
   exportsDeleted: number;
   calendarBlocksDeleted: number;
+  /** Expired email sign-in tokens removed. */
   tokensRevoked: number;
+  /** Expired or replaced, never used pairing codes removed. */
+  invitesDeleted: number;
+  /** Object storage keys deleted in this run. */
+  objectsDeleted: number;
+  /** Keys still queued for deletion (object storage not configured or failed). */
+  objectsPending: number;
 }
 
 export const PushEventTypeValues = ["photo.new", "nudge.new", "couple.joined", "couple.unpaired", "reunion.changed", "trip.start", "trip.update", "trip.end"] as const;
@@ -690,7 +697,7 @@ export interface Operations {
   /** POST /api/v1/auth/apple: Native Sign in with Apple; returns an hm_u_ token. */
   signInWithApple: { method: "POST"; path: "/api/v1/auth/apple"; pathParams: never; query: never; body: AppleSignInRequest; responses: { 200: AuthSession; 201: AuthSession; 400: ApiError; 401: ApiError; 503: ApiError } };
   /** POST /api/v1/auth/email/start: Send a magic link plus a 6-digit fallback code. */
-  startEmailSignIn: { method: "POST"; path: "/api/v1/auth/email/start"; pathParams: never; query: never; body: EmailStartRequest; responses: { 202: EmailStartResponse; 400: ApiError; 429: ApiError } };
+  startEmailSignIn: { method: "POST"; path: "/api/v1/auth/email/start"; pathParams: never; query: never; body: EmailStartRequest; responses: { 202: EmailStartResponse; 400: ApiError; 429: ApiError; 503: ApiError } };
   /** POST /api/v1/auth/email/verify: Exchange the magic-link token (or email + code) for a session. */
   verifyEmailSignIn: { method: "POST"; path: "/api/v1/auth/email/verify"; pathParams: never; query: never; body: EmailVerifyRequest; responses: { 200: AuthSession; 201: AuthSession; 400: ApiError; 401: ApiError; 429: ApiError } };
   /** POST /api/v1/auth/logout: Revoke the bearer token (or clear the web cookie). */
@@ -704,7 +711,7 @@ export interface Operations {
   /** GET /api/v1/me/export: Status of the export of my own photos (ZIP). */
   getExport: { method: "GET"; path: "/api/v1/me/export"; pathParams: never; query: never; body: never; responses: { 200: ExportStatus; 401: ApiError } };
   /** POST /api/v1/me/export: Build a ZIP with my own photos. */
-  requestExport: { method: "POST"; path: "/api/v1/me/export"; pathParams: never; query: never; body: never; responses: { 202: ExportStatus; 401: ApiError; 410: ApiError; 429: ApiError } };
+  requestExport: { method: "POST"; path: "/api/v1/me/export"; pathParams: never; query: never; body: never; responses: { 202: ExportStatus; 401: ApiError; 410: ApiError; 429: ApiError; 503: ApiError } };
   /** GET /api/v1/couple/invite: My current unexpired invite, if any. */
   getInvite: { method: "GET"; path: "/api/v1/couple/invite"; pathParams: never; query: never; body: never; responses: { 200: Invite; 401: ApiError; 404: ApiError; 409: ApiError } };
   /** POST /api/v1/couple/invite: Create a pairing code (replaces my previous unused code). */

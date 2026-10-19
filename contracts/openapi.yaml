@@ -106,7 +106,8 @@ paths:
       description: |
         The email links to `https://hontogame.com/auth/email?token=…` (universal link / App Link opens the
         app; on the web the page calls verify). Single use, 15 min, stored hashed. Always answers 202 for a
-        well-formed address (no account enumeration).
+        well-formed address (no account enumeration). `503 email_unavailable` when the server has no email
+        provider configured (the app then offers Apple / Google instead).
       security: []
       requestBody:
         required: true
@@ -121,6 +122,7 @@ paths:
               schema: { $ref: '#/components/schemas/EmailStartResponse' }
         '400': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Error' }
   /api/v1/auth/email/verify:
     post:
       tags: [auth]
@@ -212,7 +214,8 @@ paths:
       description: |
         Available while paired and during the 30 days after unpairing. Built asynchronously into
         `exports/` in object storage; poll `GET /api/v1/me/export`. `url` is a signed GET valid 24h. The bucket has no lifecycle rules: the retention cron deletes export
-        objects 7 days after they are ready.
+        objects 7 days after they are ready. `410 export_unavailable` when there is nothing to export (never
+        paired, the 30 days are over, or no photos); `503 missing_config` while object storage is not configured.
       responses:
         '202':
           description: Export queued (or already ready; see `status`).
@@ -222,6 +225,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '410': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Error' }
   /api/v1/couple/invite:
     get:
       tags: [couple]
@@ -240,7 +244,7 @@ paths:
       tags: [couple]
       operationId: createInvite
       summary: Create a pairing code (replaces my previous unused code).
-      description: Codes are 6 characters (Crockford base32, no 0/O/1/I/L/U), valid 24h, single use.
+      description: Codes are 6 characters (Crockford base32, no 0/O/1/I/L/U), valid 48h, single use. One active code per user.
       responses:
         '201':
           description: Created.
@@ -835,6 +839,7 @@ components:
         - upload_missing
         - upload_size_mismatch
         - email_required
+        - email_unavailable
         - export_unavailable
         - missing_config
         - internal
@@ -1437,14 +1442,17 @@ components:
     CronRetentionResult:
       type: object
       x-dart: false
-      required: [ok, photosDeleted, couplesPurged, exportsDeleted, calendarBlocksDeleted, tokensRevoked]
+      required: [ok, photosDeleted, couplesPurged, exportsDeleted, calendarBlocksDeleted, tokensRevoked, invitesDeleted, objectsDeleted, objectsPending]
       properties:
         ok: { type: boolean }
         photosDeleted: { type: integer }
         couplesPurged: { type: integer }
         exportsDeleted: { type: integer }
         calendarBlocksDeleted: { type: integer }
-        tokensRevoked: { type: integer }
+        tokensRevoked: { type: integer, description: 'Expired email sign-in tokens removed.' }
+        invitesDeleted: { type: integer, description: 'Expired or replaced, never used pairing codes removed.' }
+        objectsDeleted: { type: integer, description: 'Object storage keys deleted in this run.' }
+        objectsPending: { type: integer, description: 'Keys still queued for deletion (object storage not configured or failed).' }
     # ---- Non-HTTP contracts (push payloads, Live Activity, widget snapshot). Not referenced by paths. ----
     PushEventType:
       type: string
