@@ -25,15 +25,15 @@ const FIXTURES = {
 // --- Minimal TSX loader: transpiles the real components (and their relative imports) to CommonJS. ---------
 const nodeRequire = createRequire(import.meta.url);
 const STUBS = {
-  "next/link": { __esModule: true, default: ({ href, children, scroll: _scroll, ...props }) => React.createElement("a", { href, ...props }, children) },
+  "next/link": { __esModule: true, default: ({ href, children, ...props }) => { delete props.scroll; return React.createElement("a", { href, ...props }, children); } },
   "next/navigation": { useRouter: () => ({ refresh() {}, push() {} }) },
 };
 const cache = new Map();
 function load(file) {
   const path = [file, `${file}.tsx`, `${file}.ts`, `${file}.js`].find((candidate) => existsSync(candidate) && statSync(candidate).isFile());
   if (cache.has(path)) return cache.get(path).exports;
-  const module = { exports: {} };
-  cache.set(path, module);
+  const mod = { exports: {} };
+  cache.set(path, mod);
   const source = readFileSync(path, "utf8");
   const output = ts.transpileModule(source, { fileName: path, compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText;
   const localRequire = (id) => {
@@ -41,8 +41,8 @@ function load(file) {
     if (id.startsWith(".")) return load(resolve(dirname(path), id));
     return nodeRequire(id);
   };
-  new Function("require", "module", "exports", output)(localRequire, module, module.exports);
-  return module.exports;
+  new Function("require", "module", "exports", output)(localRequire, mod, mod.exports);
+  return mod.exports;
 }
 const ui = (name) => load(join(root, "app/app-ui", name));
 const html = (element) => renderToStaticMarkup(element);
@@ -177,7 +177,7 @@ test("fixture photos are generated SVG tiles, never the fake bucket URLs", () =>
 });
 
 // --- Rendering -------------------------------------------------------------------------------------------------
-const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{200D}\u{20E3}]/u;
+const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]|\u{FE0F}|\u{200D}|\u{20E3}/u;
 
 test("signed-out: Google, Apple (when configured) and the email magic link", () => {
   const { SignInCard } = ui("sign-in");

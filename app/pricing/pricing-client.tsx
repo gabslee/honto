@@ -16,7 +16,7 @@ function subscribeLocale(onChange: () => void) { window.addEventListener("storag
 
 export default function PricingClient({ currency = "USD" }: { currency?: "USD" | "BRL" }) {
   const locale = useSyncExternalStore(subscribeLocale, readLocale, () => "en" as const);
-  const prices = priceLabels(currency, locale); const c = PRICING_COPY[locale];
+  const prices = priceLabels(currency); const c = PRICING_COPY[locale];
   const [loading, setLoading] = useState<"month" | "year" | null>(null);
   const [error, setError] = useState("");
   const [accepted, setAccepted] = useState(false);
