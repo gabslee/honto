@@ -9,7 +9,7 @@ test("privacy, terms and support describe the Honto app (App Review)", () => {
   assert.match(layout, /legalEmail = "support@hontogame\.com"/);
   for (const href of ["/privacy", "/terms", "/support"]) assert.ok(layout.includes(`href="${href}"`), href);
   const privacy = read("app/privacy/page.tsx");
-  for (const topic of [/Sign in with Apple/, /WeatherKit/, /never receive or store your location/, /RevenueCat/, /Resend/, /APNs/, /Delete account/, /under 13/, /do not sell/i, /do not show ads/i]) assert.match(privacy, topic);
+  for (const topic of [/Sign in with Apple/, /Cloudflare R2/, /WeatherKit/, /never receive or store your location/, /RevenueCat/, /Resend/, /APNs/, /Delete account/, /under 13/, /do not sell/i, /do not show ads/i]) assert.match(privacy, topic);
   const terms = read("app/terms/page.tsx");
   for (const topic of [/auto-renewable/, /24 hours/, /Restore purchases/, /under 13/, /Stripe/]) assert.match(terms, topic);
   const support = read("app/support/page.tsx");
@@ -19,3 +19,4 @@ test("privacy, terms and support describe the Honto app (App Review)", () => {
     assert.match(text, /<LegalLayout app /, `${name} uses the app style`);
   }
 });
+

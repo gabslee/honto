@@ -20,7 +20,7 @@ export default function PrivacyPage() {
       <h3>Your couple</h3>
       <p>When you pair with your partner we store the pairing, and any details you add: the date your relationship started and your next reunion (date, time, city and time zone). We store your device time zone so both of you see the right local times and day counters.</p>
       <h3>Photos</h3>
-      <p>Photos you take or choose in the app are compressed on your device and uploaded with a small thumbnail, their size and the local day they were taken. They are kept in a private cloud storage bucket that is not publicly accessible and are shown only to you and your partner through short-lived signed links.</p>
+      <p>Photos you take or choose in the app are compressed on your device and uploaded with a small thumbnail, their size and the local day they were taken. They are kept in a private Cloudflare R2 storage bucket that is not publicly accessible and are shown only to you and your partner through short-lived signed links.</p>
       <h3>Calendar (optional)</h3>
       <p>If you allow calendar access, the app reads your calendar on your device and uploads only the times you are busy for the next 14 days, so your partner can see when you are free. All-day events are never uploaded. Event titles are uploaded only if your couple has Premium and you turn on title sharing for a specific calendar, and never for events your device marks as private. Busy times are deleted one day after they end.</p>
       <h3>Weather (optional)</h3>
@@ -50,8 +50,7 @@ export default function PrivacyPage() {
         <li>Resend: delivery of sign-in emails.</li>
         <li>Vercel: hosting of our servers and website.</li>
         <li>Neon: our database.</li>
-        <li>A cloud object storage provider: the private bucket that holds photos and photo exports.</li>
-        <li>Cloudflare: domain name services, email forwarding for our support address and scheduled maintenance jobs.</li>
+        <li>Cloudflare: R2 storage for app photos and photo exports (private bucket), domain name services, email forwarding for our support address and scheduled maintenance jobs.</li>
       </ul>
       <p>We may also disclose information if required by law or to protect the safety of users.</p>
     </LegalSection>
@@ -81,7 +80,7 @@ export default function PrivacyPage() {
     </LegalSection>
 
     <LegalSection title="Security and transfers">
-      <p>Information is encrypted in transit, photos are kept in a private bucket, and session tokens, sign-in codes and IP addresses are stored only as hashes. Our providers may process information in the United States and other countries, with safeguards required by applicable law.</p>
+      <p>Information is encrypted in transit, photos are kept in a private Cloudflare R2 bucket, and session tokens, sign-in codes and IP addresses are stored only as hashes. Our providers may process information in the United States and other countries, with safeguards required by applicable law.</p>
     </LegalSection>
 
     <LegalSection title="Children">
