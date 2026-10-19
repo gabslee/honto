@@ -27,7 +27,8 @@
   },
   "pendingUnpair": {
     "unpairedAt": "2026-10-18T20:00:00Z",
-    "photosAvailableUntil": "2026-11-17T20:00:00Z"
+    "photosAvailableUntil": "2026-11-17T20:00:00Z",
+    "reason": "unpaired"
   },
   "hasPendingInvite": false
 }

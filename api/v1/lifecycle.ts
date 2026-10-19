@@ -1,6 +1,9 @@
 import type { NeonQueryFunction } from "@neondatabase/serverless";
-import type { CronRetentionResult, ExportStatus, UnpairResult, UnpairState } from "../../contracts/honto-api";
+import type { CronRetentionResult, ExportStatus, UnpairReason, UnpairResult, UnpairState } from "../../contracts/honto-api";
+import { ensureEntitlementsSchema } from "../../app/entitlements";
+import { notifyPartner, type NotifySummary, type PushEvent } from "../../app/push/index";
 import { deleteObjects, getObject, listPrefix, presignGet, putObject, storageConfig } from "../../app/storage";
+import { deleteRevenueCatSubscriber, revokeAppleTokens, type AppleToken } from "./account-cleanup";
 import { ensureFoundationSchema } from "./foundation-schema";
 
 type Sql = NeonQueryFunction<false, false>;
@@ -39,6 +42,27 @@ export function ensureLifecycleSchema(sql: Sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_photo_exports_user ON photo_exports(user_id, created_at DESC)`;
     // Keys whose rows are already gone; the retention cron deletes the objects (the bucket has no lifecycle rules).
     await sql`CREATE TABLE IF NOT EXISTS storage_deletions (object_key text PRIMARY KEY, reason text NOT NULL, queued_at timestamptz NOT NULL DEFAULT now(), attempts integer NOT NULL DEFAULT 0, last_error text)`;
+    // drizzle/0016_account_deletion.sql: why a couple ended, Apple refresh tokens to revoke on account deletion,
+    // and the legacy players.user_id link cleared (not blocking) when its user is deleted.
+    await sql`ALTER TABLE couples ADD COLUMN IF NOT EXISTS unpair_reason text CHECK (unpair_reason IN ('unpaired', 'partner_deleted'))`;
+    await sql`CREATE TABLE IF NOT EXISTS apple_tokens (user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, client_id text NOT NULL, refresh_token text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (user_id, client_id))`;
+    await sql`DO $$
+      DECLARE fk record;
+      BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'players' AND column_name = 'user_id') THEN
+          FOR fk IN SELECT con.conname FROM pg_constraint con JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = ANY (con.conkey)
+            WHERE con.conrelid = 'players'::regclass AND con.contype = 'f' AND a.attname = 'user_id' AND con.confdeltype <> 'n' LOOP
+            EXECUTE format('ALTER TABLE players DROP CONSTRAINT %I', fk.conname);
+          END LOOP;
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint con JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = ANY (con.conkey)
+            WHERE con.conrelid = 'players'::regclass AND con.contype = 'f' AND a.attname = 'user_id') THEN
+            ALTER TABLE players ADD CONSTRAINT players_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL NOT VALID;
+            ALTER TABLE players VALIDATE CONSTRAINT players_user_id_fkey;
+          END IF;
+        END IF;
+      END $$`;
+    // drizzle/0017_billing_tables.sql: entitlements + revenuecat_events exist up front, not only after the first webhook.
+    await ensureEntitlementsSchema(sql);
   })().catch((error) => { ready = null; throw error; });
   return ready;
 }
@@ -139,119 +163,224 @@ export async function hitRateLimit(sql: Sql, scope: string, subject: string, lim
 // Unpair
 // ---------------------------------------------------------------------------------------------------
 
+type Statement = ReturnType<Sql>;
+type UnpairedRow = { coupleId: string; unpairedAt: string; photosAvailableUntil: string; members: string[] };
+const UNPAIR_REASONS: UnpairReason[] = ["unpaired", "partner_deleted"];
+
+/** Notifies one member that their couple ended. Overridable for tests (`setUnpairNotifier`). */
+export type UnpairNotifier = (coupleId: string, fromUserId: string, toUserId: string, event: PushEvent) => Promise<NotifySummary | void>;
+const defaultNotifier: UnpairNotifier = (coupleId, fromUserId, toUserId, event) => notifyPartner(coupleId, fromUserId, event, { toUserId });
+let unpairNotifier: UnpairNotifier = defaultNotifier;
+export function setUnpairNotifier(notifier: UnpairNotifier | null | undefined) { unpairNotifier = notifier ?? defaultNotifier; }
+
 /**
- * DELETE /api/v1/couple. One statement ends the couple for both members (so every couple-scoped read stops
- * at once: they all require an active couple) and clears the shared couple fields. Then the shared history
- * of other workstreams is removed when their tables exist (trips with their Live Activity tokens, nudges,
- * both calendar mirrors) and each author's photos get `delete_after` = unpair + 30 days. The retention cron
- * finishes anything a failure here leaves behind. Returns null when the couple was already unpaired.
+ * Ends v1 couples and both memberships in one statement: `unpaired_at`, `unpair_reason`, every still-active
+ * member's `left_at` and the shared couple fields cleared. `target` picks the couples: given ids, or every
+ * active couple of a user (account deletion, evaluated inside its transaction). Rows: one per couple ended.
  */
-export async function unpairCouple(sql: Sql, coupleId: string): Promise<UnpairResult | null> {
-  await ensureLifecycleSchema(sql);
-  const rows = await sql`WITH c AS (
-      UPDATE couples SET unpaired_at = now(), updated_at = now(), started_on = NULL, reunion_at = NULL, reunion_city = NULL, reunion_time_zone = NULL
-      WHERE id = ${coupleId} AND legacy = false AND unpaired_at IS NULL RETURNING id, unpaired_at
+function unpairStatement(sql: Sql, target: { coupleIds: string[] } | { userId: string }, reason: UnpairReason): Statement {
+  if ("userId" in target) {
+    return sql`WITH c AS (
+        UPDATE couples SET unpaired_at = now(), unpair_reason = ${reason}, updated_at = now(), started_on = NULL, reunion_at = NULL, reunion_city = NULL, reunion_time_zone = NULL
+        WHERE legacy = false AND unpaired_at IS NULL AND id IN (SELECT couple_id FROM couple_members WHERE user_id = ${target.userId} AND left_at IS NULL) RETURNING id, unpaired_at
+      ), m AS (
+        UPDATE couple_members SET left_at = c.unpaired_at FROM c WHERE couple_members.couple_id = c.id AND couple_members.left_at IS NULL RETURNING couple_members.couple_id, couple_members.user_id
+      )
+      SELECT c.id AS "coupleId", to_char(c.unpaired_at AT TIME ZONE 'UTC', ${ISO}) AS "unpairedAt", to_char((c.unpaired_at + make_interval(days => ${UNPAIR_GRACE_DAYS}::int)) AT TIME ZONE 'UTC', ${ISO}) AS "photosAvailableUntil", COALESCE((SELECT jsonb_agg(m.user_id ORDER BY m.user_id) FROM m WHERE m.couple_id = c.id), '[]'::jsonb) AS members FROM c ORDER BY c.id`;
+  }
+  return sql`WITH c AS (
+      UPDATE couples SET unpaired_at = now(), unpair_reason = ${reason}, updated_at = now(), started_on = NULL, reunion_at = NULL, reunion_city = NULL, reunion_time_zone = NULL
+      WHERE legacy = false AND unpaired_at IS NULL AND id IN (SELECT jsonb_array_elements_text(${JSON.stringify(target.coupleIds)}::jsonb)) RETURNING id, unpaired_at
     ), m AS (
-      UPDATE couple_members SET left_at = c.unpaired_at FROM c WHERE couple_members.couple_id = c.id AND couple_members.left_at IS NULL RETURNING couple_members.user_id
+      UPDATE couple_members SET left_at = c.unpaired_at FROM c WHERE couple_members.couple_id = c.id AND couple_members.left_at IS NULL RETURNING couple_members.couple_id, couple_members.user_id
     )
-    SELECT to_char(c.unpaired_at AT TIME ZONE 'UTC', ${ISO}) AS "unpairedAt", to_char((c.unpaired_at + make_interval(days => ${UNPAIR_GRACE_DAYS}::int)) AT TIME ZONE 'UTC', ${ISO}) AS "photosAvailableUntil", (SELECT count(*)::int FROM m) AS members FROM c`;
-  if (!rows[0]) return null;
-  await purgeSharedHistory(sql, coupleId);
-  return { unpairedAt: String(rows[0].unpairedAt), photosAvailableUntil: String(rows[0].photosAvailableUntil) };
+    SELECT c.id AS "coupleId", to_char(c.unpaired_at AT TIME ZONE 'UTC', ${ISO}) AS "unpairedAt", to_char((c.unpaired_at + make_interval(days => ${UNPAIR_GRACE_DAYS}::int)) AT TIME ZONE 'UTC', ${ISO}) AS "photosAvailableUntil", COALESCE((SELECT jsonb_agg(m.user_id ORDER BY m.user_id) FROM m WHERE m.couple_id = c.id), '[]'::jsonb) AS members FROM c ORDER BY c.id`;
 }
 
-/** Removes what both partners shared. Safe to repeat (also run by the retention cron for unpaired couples). */
-async function purgeSharedHistory(sql: Sql, coupleId: string) {
+const unpairedRows = (rows: Row[]): UnpairedRow[] => rows.map((row) => ({
+  coupleId: String(row.coupleId), unpairedAt: String(row.unpairedAt), photosAvailableUntil: String(row.photosAvailableUntil),
+  members: (Array.isArray(row.members) ? row.members : JSON.parse(String(row.members ?? "[]"))).map(String),
+}));
+
+/**
+ * Statements that remove what both partners shared in the given (already unpaired) couples, when the other
+ * workstreams' tables exist: trips (with their Live Activity tokens), nudges, the calendar mirror of every
+ * member who has no active couple left, and `delete_after` = unpair + 30 days on every photo still kept.
+ * Safe to repeat (the retention cron runs them again for couples past the grace).
+ */
+function purgeStatements(sql: Sql, tables: OptionalTables, coupleIds: string[]): Statement[] {
+  const ids = JSON.stringify(coupleIds);
+  const statements: Statement[] = [];
+  if (tables.trips) statements.push(sql`DELETE FROM trips WHERE couple_id IN (SELECT jsonb_array_elements_text(${ids}::jsonb))`);
+  if (tables.nudges) statements.push(sql`DELETE FROM couple_nudges WHERE couple_id IN (SELECT jsonb_array_elements_text(${ids}::jsonb))`);
+  if (tables.calendar) statements.push(sql`DELETE FROM calendar_busy WHERE user_id IN (SELECT m.user_id FROM couple_members m WHERE m.couple_id IN (SELECT jsonb_array_elements_text(${ids}::jsonb)) AND NOT EXISTS (SELECT 1 FROM couple_members a WHERE a.user_id = m.user_id AND a.left_at IS NULL))`);
+  if (tables.photos) statements.push(sql`UPDATE couple_photos p SET delete_after = c.unpaired_at + make_interval(days => ${UNPAIR_GRACE_DAYS}::int) FROM couples c WHERE c.id = p.couple_id AND p.couple_id IN (SELECT jsonb_array_elements_text(${ids}::jsonb)) AND c.unpaired_at IS NOT NULL AND p.delete_after IS NULL`);
+  return statements;
+}
+
+/** Sends `couple.unpaired` (+ the widget reload every APNs widget token gets) to each member but the actor. Never throws. */
+async function notifyUnpaired(couples: UnpairedRow[], actorId: string, reason: UnpairReason) {
+  for (const couple of couples) {
+    for (const member of couple.members) {
+      if (member === actorId) continue;
+      try {
+        await unpairNotifier(couple.coupleId, actorId, member, { type: "couple.unpaired", reason });
+      } catch (cause) {
+        console.error(`[v1/unpair] couple.unpaired push failed: ${cause instanceof Error ? cause.message : "unknown error"}`);
+      }
+    }
+  }
+}
+
+/**
+ * DELETE /api/v1/couple (voluntary unpair, `reason` 'unpaired'). One transaction ends the couple for both
+ * members (every couple-scoped read stops at once: they all require an active couple), clears the shared couple
+ * fields and removes the shared history (see purgeStatements); each member keeps their own photos read-only and
+ * exportable for 30 days, then the retention cron deletes them and the couple. After the commit the other
+ * member gets push `couple.unpaired` `{ reason }` plus a widget reload. Returns null when the couple was
+ * already unpaired.
+ */
+export async function unpairCouple(sql: Sql, coupleId: string, options: { reason?: UnpairReason; actorId?: string } = {}): Promise<UnpairResult | null> {
+  await ensureLifecycleSchema(sql);
+  const reason = options.reason ?? "unpaired";
   const tables = await optionalTables(sql);
-  if (tables.trips) await sql`DELETE FROM trips WHERE couple_id = ${coupleId}`;
-  if (tables.nudges) await sql`DELETE FROM couple_nudges WHERE couple_id = ${coupleId}`;
-  if (tables.calendar) await sql`DELETE FROM calendar_busy WHERE user_id IN (SELECT m.user_id FROM couple_members m WHERE m.couple_id = ${coupleId} AND NOT EXISTS (SELECT 1 FROM couple_members a WHERE a.user_id = m.user_id AND a.left_at IS NULL))`;
-  if (tables.photos) await sql`UPDATE couple_photos p SET delete_after = c.unpaired_at + make_interval(days => ${UNPAIR_GRACE_DAYS}::int) FROM couples c WHERE c.id = p.couple_id AND p.couple_id = ${coupleId} AND c.unpaired_at IS NOT NULL AND p.delete_after IS NULL`;
+  const [rows] = await sql.transaction([unpairStatement(sql, { coupleIds: [coupleId] }, reason), ...purgeStatements(sql, tables, [coupleId])]) as Row[][];
+  const couples = unpairedRows(rows);
+  if (!couples[0]) return null;
+  await notifyUnpaired(couples, options.actorId ?? "", reason);
+  return { unpairedAt: couples[0].unpairedAt, photosAvailableUntil: couples[0].photosAvailableUntil };
+}
+
+/**
+ * Repairs couples left half-ended (e.g. a member's users row deleted outside deleteAccount): a v1 couple not
+ * unpaired with fewer than two active members is unpaired like DELETE /api/v1/couple, with reason
+ * 'partner_deleted' when a member row is gone and 'unpaired' otherwise, and the remaining member is notified.
+ * `userId` limits the check to that user's couples (pairing endpoints). Returns the number of couples repaired.
+ */
+export async function repairHalfCouples(sql: Sql, userId?: string): Promise<number> {
+  const broken = userId
+    ? await sql`SELECT c.id, (SELECT count(*)::int FROM couple_members a WHERE a.couple_id = c.id) AS members FROM couples c WHERE c.legacy = false AND c.unpaired_at IS NULL AND c.id IN (SELECT couple_id FROM couple_members WHERE user_id = ${userId} AND left_at IS NULL) AND (SELECT count(*) FROM couple_members a WHERE a.couple_id = c.id AND a.left_at IS NULL) < 2`
+    : await sql`SELECT c.id, (SELECT count(*)::int FROM couple_members a WHERE a.couple_id = c.id) AS members FROM couples c WHERE c.legacy = false AND c.unpaired_at IS NULL AND (SELECT count(*) FROM couple_members a WHERE a.couple_id = c.id AND a.left_at IS NULL) < 2`;
+  if (!broken.length) return 0;
+  const tables = await optionalTables(sql);
+  let repaired = 0;
+  for (const reason of UNPAIR_REASONS) {
+    const ids = broken.filter((row) => (Number(row.members) < 2 ? "partner_deleted" : "unpaired") === reason).map((row) => String(row.id));
+    if (!ids.length) continue;
+    const [rows] = await sql.transaction([unpairStatement(sql, { coupleIds: ids }, reason), ...purgeStatements(sql, tables, ids)]) as Row[][];
+    const couples = unpairedRows(rows);
+    repaired += couples.length;
+    if (couples.length) console.warn(`[v1/unpair] repaired ${couples.length} couple(s) with fewer than 2 active members`);
+    await notifyUnpaired(couples, "", reason);
+  }
+  return repaired;
 }
 
 /** Most recent unpair whose 30-day photo grace is still running for this user, or null. */
 export async function latestUnpair(sql: Sql, userId: string): Promise<UnpairState | null> {
-  const rows = await sql`SELECT to_char(c.unpaired_at AT TIME ZONE 'UTC', ${ISO}) AS "unpairedAt", to_char((c.unpaired_at + make_interval(days => ${UNPAIR_GRACE_DAYS}::int)) AT TIME ZONE 'UTC', ${ISO}) AS "photosAvailableUntil"
+  const rows = await sql`SELECT to_char(c.unpaired_at AT TIME ZONE 'UTC', ${ISO}) AS "unpairedAt", to_char((c.unpaired_at + make_interval(days => ${UNPAIR_GRACE_DAYS}::int)) AT TIME ZONE 'UTC', ${ISO}) AS "photosAvailableUntil", c.unpair_reason AS reason
     FROM couple_members m JOIN couples c ON c.id = m.couple_id
     WHERE m.user_id = ${userId} AND m.left_at IS NOT NULL AND c.unpaired_at IS NOT NULL AND c.unpaired_at > now() - make_interval(days => ${UNPAIR_GRACE_DAYS}::int)
     ORDER BY c.unpaired_at DESC LIMIT 1`;
-  return rows[0] ? { unpairedAt: String(rows[0].unpairedAt), photosAvailableUntil: String(rows[0].photosAvailableUntil) } : null;
+  if (!rows[0]) return null;
+  // Couples unpaired before unpair_reason existed were all voluntary unpairs.
+  const reason: UnpairReason = rows[0].reason === "partner_deleted" ? "partner_deleted" : "unpaired";
+  return { unpairedAt: String(rows[0].unpairedAt), photosAvailableUntil: String(rows[0].photosAvailableUntil), reason };
 }
 
+/** Same rule as requireCouple: an active membership in a couple not unpaired, with an active partner. */
 async function isPaired(sql: Sql, userId: string) {
-  const rows = await sql`SELECT 1 FROM couple_members m JOIN couples c ON c.id = m.couple_id AND c.unpaired_at IS NULL WHERE m.user_id = ${userId} AND m.left_at IS NULL LIMIT 1`;
+  const rows = await sql`SELECT 1 FROM couple_members m JOIN couples c ON c.id = m.couple_id AND c.unpaired_at IS NULL JOIN couple_members pm ON pm.couple_id = m.couple_id AND pm.user_id <> m.user_id AND pm.left_at IS NULL WHERE m.user_id = ${userId} AND m.left_at IS NULL LIMIT 1`;
   return rows.length > 0;
 }
 
 // ---------------------------------------------------------------------------------------------------
-// Account deletion (DELETE /api/v1/me, App Store 5.1.1(v))
+// Account deletion (DELETE /api/v1/me, admin deleteUser; App Store 5.1.1(v))
 // ---------------------------------------------------------------------------------------------------
 
 /**
- * Deletes the account now. Order:
- * 1. an active couple is unpaired with the same rules as `DELETE /api/v1/couple` (the partner keeps their
- *    account and their own photos for 30 days; the shared history goes at once);
- * 2. my photos, export ZIPs and profile photo: rows deleted and their object keys queued in `storage_deletions` in the same
- *    statement (no 30-day grace for a deleted account), then deleted from the bucket right away when storage
- *    is wired (anything that fails stays queued for the retention cron);
- * 3. pending email sign-in codes for my address, the legacy web game's `players.user_id` link and legacy
- *    `couples.host_user_id`;
- * 4. the users row. Foreign keys cascade to sessions, mobile and refresh tokens, push devices, linked
- *    Apple/Google identities, couple memberships, invites, calendar mirrors, weather, nudges, milestones
- *    seen and entitlements; match history keeps the game row with the user link cleared (SET NULL).
+ * Deletes the account now, in ONE transaction:
+ * 1. the users row is locked (FOR UPDATE);
+ * 2. every active v1 couple is unpaired like DELETE /api/v1/couple, with `unpair_reason` 'partner_deleted'
+ *    (the partner keeps their account and their own photos for 30 days; the shared history goes at once);
+ * 3. my photos, export ZIPs and profile photo: rows deleted and their object keys queued in `storage_deletions`
+ *    in the same statement (no 30-day grace for a deleted account);
+ * 4. my push devices, web/admin sessions, mobile and refresh tokens and pending email sign-in codes are deleted
+ *    explicitly; the legacy `players.user_id` and `couples.host_user_id` links are cleared;
+ * 5. the users row (anything left cascades: linked identities, invites, calendar, weather, milestones seen,
+ *    entitlements, ...).
+ * Any failure rolls all of it back. After the commit (best effort, never throws): the queued objects are deleted
+ * from storage (failures stay queued for the retention cron), the partner gets `couple.unpaired`
+ * `{ reason: partner_deleted }` plus a widget reload, the RevenueCat subscriber is deleted
+ * (REVENUECAT_SECRET_API_KEY) and the Sign in with Apple refresh tokens are revoked.
  * Returns false when the user no longer exists.
  */
 export async function deleteAccount(sql: Sql, userId: string, store = getObjectStore()): Promise<boolean> {
   await ensureLifecycleSchema(sql);
-  const user = (await sql`SELECT email FROM users WHERE id = ${userId}`)[0];
-  if (!user) return false;
-  const active = await sql`SELECT m.couple_id AS id FROM couple_members m JOIN couples c ON c.id = m.couple_id AND c.legacy = false AND c.unpaired_at IS NULL WHERE m.user_id = ${userId} AND m.left_at IS NULL`;
-  for (const couple of active) await unpairCouple(sql, String(couple.id));
-
   const tables = await optionalTables(sql);
-  const keys: string[] = [];
+  const present = (await sql`SELECT to_regclass('user_avatars') IS NOT NULL AS avatars, to_regclass('push_devices') IS NOT NULL AS devices, to_regclass('admin_sessions') IS NOT NULL AS "adminSessions",
+      EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'players' AND column_name = 'user_id') AS players`)[0] ?? {};
+  // Couples to purge: the active ones now (the unpair statement re-selects them inside the transaction).
+  const active = (await sql`SELECT m.couple_id AS id FROM couple_members m JOIN couples c ON c.id = m.couple_id AND c.legacy = false AND c.unpaired_at IS NULL WHERE m.user_id = ${userId} AND m.left_at IS NULL`).map((row) => String(row.id));
+
+  const statements: Statement[] = [
+    sql`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`,
+    unpairStatement(sql, { userId }, "partner_deleted"),
+    ...purgeStatements(sql, tables, active),
+  ];
+  const keyStatements: number[] = [];
   if (tables.photos) {
-    const rows = await sql`WITH d AS (
+    keyStatements.push(statements.push(sql`WITH d AS (
         DELETE FROM couple_photos WHERE author_user_id = ${userId} RETURNING object_key, thumb_key
       ), q AS (
         INSERT INTO storage_deletions (object_key, reason) SELECT k.key, 'account' FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) WHERE k.key IS NOT NULL ON CONFLICT (object_key) DO NOTHING
-      ) SELECT k.key FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) WHERE k.key IS NOT NULL`;
-    keys.push(...rows.map((row) => String(row.key)));
+      ) SELECT k.key FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) WHERE k.key IS NOT NULL`) - 1);
   }
-  const exports = await sql`WITH d AS (
+  keyStatements.push(statements.push(sql`WITH d AS (
       DELETE FROM photo_exports WHERE user_id = ${userId} RETURNING object_key
     ), q AS (
       INSERT INTO storage_deletions (object_key, reason) SELECT object_key, 'account' FROM d WHERE object_key IS NOT NULL ON CONFLICT (object_key) DO NOTHING
-    ) SELECT object_key AS key FROM d WHERE object_key IS NOT NULL`;
-  keys.push(...exports.map((row) => String(row.key)));
-  // Profile photo (api/v1/profile.ts), when its table exists: same queue-then-delete as photos.
-  if ((await sql`SELECT to_regclass('user_avatars') IS NOT NULL AS present`)[0]?.present) {
-    const avatars = await sql`WITH d AS (
+    ) SELECT object_key AS key FROM d WHERE object_key IS NOT NULL`) - 1);
+  if (present.avatars) {
+    keyStatements.push(statements.push(sql`WITH d AS (
         DELETE FROM user_avatars WHERE user_id = ${userId} RETURNING object_key, thumb_key
       ), q AS (
         INSERT INTO storage_deletions (object_key, reason) SELECT k.key, 'account' FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) WHERE k.key IS NOT NULL ON CONFLICT (object_key) DO NOTHING
-      ) SELECT k.key FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) WHERE k.key IS NOT NULL`;
-    keys.push(...avatars.map((row) => String(row.key)));
+      ) SELECT k.key FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) WHERE k.key IS NOT NULL`) - 1);
   }
+  // Apple refresh tokens, read in the transaction (they cascade with the user) and revoked after the commit.
+  const appleIndex = statements.push(sql`DELETE FROM apple_tokens WHERE user_id = ${userId} RETURNING client_id AS "clientId", refresh_token AS "refreshToken"`) - 1;
+  statements.push(sql`DELETE FROM email_login_tokens WHERE email = (SELECT lower(email) FROM users WHERE id = ${userId})`);
+  if (present.devices) statements.push(sql`DELETE FROM push_devices WHERE user_id = ${userId}`);
+  statements.push(sql`DELETE FROM mobile_tokens WHERE user_id = ${userId}`);
+  statements.push(sql`DELETE FROM v1_refresh_tokens WHERE user_id = ${userId}`);
+  statements.push(sql`DELETE FROM user_sessions WHERE user_id = ${userId}`);
+  if (present.adminSessions) statements.push(sql`DELETE FROM admin_sessions WHERE user_id = ${userId}`);
+  if (present.players) statements.push(sql`UPDATE players SET user_id = NULL WHERE user_id = ${userId}`);
+  statements.push(sql`UPDATE couples SET host_user_id = NULL WHERE host_user_id = ${userId}`);
+  const deleteIndex = statements.push(sql`DELETE FROM users WHERE id = ${userId} RETURNING id`) - 1;
 
-  if (typeof user.email === "string") await sql`DELETE FROM email_login_tokens WHERE email = ${user.email.toLowerCase()}`;
-  const legacy = (await sql`SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'players' AND column_name = 'user_id') AS players`)[0];
-  if (legacy?.players) await sql`UPDATE players SET user_id = NULL WHERE user_id = ${userId}`;
-  await sql`UPDATE couples SET host_user_id = NULL WHERE host_user_id = ${userId}`;
-  await sql`DELETE FROM users WHERE id = ${userId}`;
+  const results = await sql.transaction(statements) as Row[][];
+  if (!results[deleteIndex]?.length) return false;
+  const couples = unpairedRows(results[1]);
+  const keys = keyStatements.flatMap((index) => results[index].map((row) => String(row.key)));
+  const appleTokens = results[appleIndex].map((row) => ({ clientId: String(row.clientId), refreshToken: String(row.refreshToken) })) as AppleToken[];
 
   if (store && keys.length) {
     for (let i = 0; i < keys.length; i += 1000) {
       const batch = keys.slice(i, i + 1000);
       try {
         await store.deleteObjects(batch);
-        for (const key of batch) await sql`DELETE FROM storage_deletions WHERE object_key = ${key}`;
+        await sql`DELETE FROM storage_deletions WHERE object_key IN (SELECT jsonb_array_elements_text(${JSON.stringify(batch)}::jsonb))`;
       } catch (cause) {
         console.error("[v1/account] object delete failed, left for the retention cron", cause instanceof Error ? cause.message : cause);
         break;
       }
     }
   }
+  await notifyUnpaired(couples, userId, "partner_deleted");
+  await deleteRevenueCatSubscriber(userId);
+  await revokeAppleTokens(appleTokens);
   return true;
 }
 
@@ -416,6 +545,7 @@ export function zipStore(entries: ZipEntry[]): Uint8Array {
 // ---------------------------------------------------------------------------------------------------
 
 /**
+ * 0. v1 couples not unpaired with fewer than 2 active members -> unpaired (repairHalfCouples);
  * 1. photos past `delete_after` (and any photo of a v1 couple unpaired 30+ days ago) -> rows deleted, keys queued;
  * 2. v1 couples unpaired 30+ days ago -> deleted (members cascade);
  *    pending profile photos older than a day -> rows deleted, keys queued;
@@ -430,6 +560,8 @@ export async function runRetention(sql: Sql, store = getObjectStore()): Promise<
   await ensureLifecycleSchema(sql);
   const tables = await optionalTables(sql);
   const count = (rows: Row[]) => Number(rows[0]?.n ?? 0);
+  // 0. Couples left half-ended (a member deleted outside deleteAccount) are unpaired first.
+  const couplesRepaired = await repairHalfCouples(sql);
   let photosDeleted = 0;
   if (tables.photos) {
     photosDeleted = count(await sql`WITH d AS (
@@ -440,8 +572,8 @@ export async function runRetention(sql: Sql, store = getObjectStore()): Promise<
         INSERT INTO storage_deletions (object_key, reason) SELECT k.key, 'photo' FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) WHERE k.key IS NOT NULL ON CONFLICT (object_key) DO NOTHING
       ) SELECT count(*)::int AS n FROM d`);
   }
-  const stale = await sql`SELECT id FROM couples WHERE legacy = false AND unpaired_at IS NOT NULL AND unpaired_at <= now() - make_interval(days => ${UNPAIR_GRACE_DAYS}::int)`;
-  for (const couple of stale) await purgeSharedHistory(sql, String(couple.id));
+  const stale = (await sql`SELECT id FROM couples WHERE legacy = false AND unpaired_at IS NOT NULL AND unpaired_at <= now() - make_interval(days => ${UNPAIR_GRACE_DAYS}::int)`).map((row) => String(row.id));
+  for (const statement of stale.length ? purgeStatements(sql, tables, stale) : []) await statement;
   const couplesPurged = count(await sql`WITH d AS (DELETE FROM couples WHERE legacy = false AND unpaired_at IS NOT NULL AND unpaired_at <= now() - make_interval(days => ${UNPAIR_GRACE_DAYS}::int) RETURNING id) SELECT count(*)::int AS n FROM d`);
 
   // Profile photos reserved but never completed (api/v1/profile.ts): keys queued like photos.
@@ -477,7 +609,7 @@ export async function runRetention(sql: Sql, store = getObjectStore()): Promise<
 
   const objectsDeleted = store ? await drainDeletionQueue(sql, store) : 0;
   const objectsPending = count(await sql`SELECT count(*)::int AS n FROM storage_deletions`);
-  return { ok: true, photosDeleted, couplesPurged, exportsDeleted, calendarBlocksDeleted, tokensRevoked, invitesDeleted, objectsDeleted, objectsPending };
+  return { ok: true, couplesRepaired, photosDeleted, couplesPurged, exportsDeleted, calendarBlocksDeleted, tokensRevoked, invitesDeleted, objectsDeleted, objectsPending };
 }
 
 async function drainDeletionQueue(sql: Sql, store: ObjectStore) {

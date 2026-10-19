@@ -250,8 +250,11 @@ paths:
       operationId: deleteMe
       summary: Delete the account (App Store 5.1.1(v)).
       description: |
-        Unpairs first (same rules as `DELETE /api/v1/couple`), revokes every token and device, then
-        deletes the user's photos and profile photo immediately (no 30-day grace for a deleted account).
+        One transaction: unpairs first (same rules as `DELETE /api/v1/couple`, with reason `partner_deleted`),
+        revokes every token and device, deletes the user's photos, exports and profile photo (no 30-day grace for a
+        deleted account; their storage keys are queued in the same transaction) and the user. After the commit the
+        objects are deleted from storage, the partner receives push `couple.unpaired` (`reason: partner_deleted`)
+        plus a widget reload, the RevenueCat subscriber is deleted and the Sign in with Apple grant is revoked.
       responses:
         '204': { description: Deleted. }
         '401': { $ref: '#/components/responses/Error' }
@@ -506,7 +509,8 @@ paths:
         The shared history (couple, reunion, trips, calendar blocks, nudges, the partner's photos) disappears
         immediately for both. Each partner keeps their **own** photos read-only and exportable for 30 days
         (`photosAvailableUntil`); the daily retention job then deletes them from object storage and the database.
-        The partner receives push `couple.unpaired`. Live Activities for the couple are ended.
+        The partner receives push `couple.unpaired` (`reason: unpaired`) plus a widget reload; `GET /api/v1/me`
+        returns `pendingUnpair.reason = unpaired` for both. Live Activities for the couple are ended.
       responses:
         '200':
           description: Unpaired.
@@ -1171,6 +1175,7 @@ components:
         nonce: { type: string }
         name: { type: string, maxLength: 80 }
         platform: { $ref: '#/components/schemas/AuthPlatform' }
+        authorizationCode: { type: string, maxLength: 1024, description: 'Optional `authorizationCode` of the Apple credential (single use, 5 minutes). The server exchanges it for an Apple refresh token so the account deletion can revoke the Sign in with Apple grant; sign-in still succeeds when it is missing or the exchange fails.' }
     EmailStartRequest:
       type: object
       required: [email, platform]
@@ -1307,12 +1312,17 @@ components:
         expiresAt: { type: [string, 'null'], format: date-time }
         photoCount: { type: integer }
         photosAvailableUntil: { type: [string, 'null'], format: date-time, description: 'Set after unpairing.' }
+    UnpairReason:
+      type: string
+      enum: [unpaired, partner_deleted]
+      description: '`unpaired` = one of us unpaired (DELETE /api/v1/couple); `partner_deleted` = my partner deleted their account.'
     UnpairState:
       type: object
-      required: [unpairedAt, photosAvailableUntil]
+      required: [unpairedAt, photosAvailableUntil, reason]
       properties:
         unpairedAt: { type: string, format: date-time }
         photosAvailableUntil: { type: string, format: date-time }
+        reason: { $ref: '#/components/schemas/UnpairReason' }
     Me:
       type: object
       required: [user, couple, entitlement, pendingUnpair, hasPendingInvite]
@@ -1813,9 +1823,10 @@ components:
     CronRetentionResult:
       type: object
       x-dart: false
-      required: [ok, photosDeleted, couplesPurged, exportsDeleted, calendarBlocksDeleted, tokensRevoked, invitesDeleted, objectsDeleted, objectsPending]
+      required: [ok, couplesRepaired, photosDeleted, couplesPurged, exportsDeleted, calendarBlocksDeleted, tokensRevoked, invitesDeleted, objectsDeleted, objectsPending]
       properties:
         ok: { type: boolean }
+        couplesRepaired: { type: integer, description: 'Couples not unpaired that had fewer than 2 active members (e.g. a member deleted outside the account deletion), unpaired in this run.' }
         photosDeleted: { type: integer }
         couplesPurged: { type: integer }
         exportsDeleted: { type: integer }
@@ -1845,6 +1856,7 @@ components:
         nudgeId: { type: string }
         tripId: { type: string }
         fromName: { type: string }
+        reason: { $ref: '#/components/schemas/UnpairReason', description: 'couple.unpaired only.' }
     TripActivityPhase:
       type: string
       enum: [before, inTransit, landed]

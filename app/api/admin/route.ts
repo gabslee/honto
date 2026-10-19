@@ -1,3 +1,4 @@
+import { deleteAccount } from "../../../api/v1/lifecycle";
 import { ensureEntitlementsSchema, PREMIUM_ENTITLEMENT } from "../../entitlements";
 import { adminCookie, clearAdminCookie, createAdminSession, database, ensureIdentitySchema, getAdminUser, getCurrentUser, hasAdminBootstrapToken } from "../../server-auth";
 
@@ -7,7 +8,7 @@ export const revalidate = 0;
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) => Response.json(body, { status, headers: { "Cache-Control": "no-store", ...headers } });
 
 export async function POST(request: Request) {
-  let body: { action?: string; token?: string; userId?: string; role?: string; plan?: string; subscriptionStatus?: string; subscriptionExpiresAt?: string | null; expiresAt?: string | null; revoke?: boolean } = {};
+  let body: { action?: string; token?: string; userId?: string; confirmEmail?: string; role?: string; plan?: string; subscriptionStatus?: string; subscriptionExpiresAt?: string | null; expiresAt?: string | null; revoke?: boolean } = {};
   try { body = await request.json(); } catch { /* invalid body */ }
   if (body.action === "logout") return json({ ok: true }, 200, { "Set-Cookie": clearAdminCookie() });
   if (body.action === "updateUser") {
@@ -39,6 +40,24 @@ export async function POST(request: Request) {
       ON CONFLICT (user_id, source, entitlement) DO UPDATE SET expires_at = EXCLUDED.expires_at, period_type = 'normal', will_renew = false, updated_at = now() RETURNING user_id`;
     if (!rows[0]) return json({ error: "User not found." }, 404);
     return json({ ok: true, userId: body.userId, expiresAt });
+  }
+  if (body.action === "deleteUser") {
+    // Same deletion as DELETE /api/v1/me (one transaction, partner unpaired with reason partner_deleted, storage,
+    // RevenueCat and Apple cleanup after the commit). `confirmEmail` must equal the account's email; an admin
+    // cannot delete their own account here.
+    const admin = await getAdminUser(request) ?? await getCurrentUser(request);
+    if (!admin || admin.role !== "admin") return json({ error: "Admin authentication required." }, 401);
+    if (typeof body.userId !== "string" || !body.userId || typeof body.confirmEmail !== "string" || !body.confirmEmail.trim()) return json({ error: "Send userId and confirmEmail." }, 400);
+    if (body.userId === admin.id) return json({ error: "You cannot delete your own account from the admin." }, 403);
+    const sql = database(); if (!sql) return json({ error: "DATABASE_URL is not configured." }, 503);
+    await ensureIdentitySchema();
+    const target = (await sql`SELECT email FROM users WHERE id = ${body.userId}`)[0];
+    if (!target) return json({ error: "User not found." }, 404);
+    if (String(target.email).trim().toLowerCase() !== body.confirmEmail.trim().toLowerCase()) return json({ error: "The confirmation email does not match this account." }, 400);
+    const deleted = await deleteAccount(sql, body.userId);
+    if (!deleted) return json({ error: "User not found." }, 404);
+    console.info(`[admin] account ${body.userId} deleted by admin ${admin.id}`);
+    return json({ ok: true, deleted: true, userId: body.userId });
   }
   if (body.action !== "login" || !hasAdminBootstrapToken(String(body.token ?? ""))) return json({ error: "Invalid admin credentials." }, 401);
   try {

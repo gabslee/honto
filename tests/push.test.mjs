@@ -261,3 +261,38 @@ test('notifyPartner: fans out to the partner devices only, prunes dead tokens, n
   assert.ok(logs.length > 0);
   for (const line of logs) assert.doesNotMatch(line, /tok-|ya29|BEGIN PRIVATE KEY/, `log leaks a secret: ${line}`);
 });
+
+test('couple.unpaired: alert + widget reload + FCM data to the partner who already left (toUserId), contract payload', async () => {
+  const now = new Date('2026-10-19T12:00:00Z');
+  const fixture = JSON.parse(readFileSync(new URL('../contracts/fixtures/schema.PushData.couple_unpaired.json', import.meta.url), 'utf8'));
+  const data = push.pushData('cpl_01', { type: 'couple.unpaired', reason: 'partner_deleted' }, now);
+  assert.deepEqual(data, fixture);
+  assertContract('PushData', data);
+  assert.equal(push.apnsAlertPayload(data).aps.alert.body, 'Your partner deleted their account. Your photos stay available for 30 days.');
+  const voluntary = push.pushData('cpl_01', { type: 'couple.unpaired', reason: 'unpaired', fromName: 'Ana' }, now);
+  assertContract('PushData', voluntary);
+  assert.equal(push.apnsAlertPayload(voluntary).aps.alert.body, 'You are no longer paired. Your photos stay available for 30 days.');
+
+  // Both members left (the unpair committed before the push): only toUserId reaches the partner.
+  await db.query("UPDATE couple_members SET left_at = now() WHERE couple_id = 'cpl_01'");
+  await db.query("UPDATE push_devices SET revoked_at = NULL WHERE user_id = 'usr_kenji' AND id <> 'd_old'");
+  const quiet = { info: console.info, error: console.error };
+  console.info = () => {}; console.error = () => {};
+  try {
+    setEnv({ ...apnsEnv, ...fcmEnv });
+    apnsRequests.length = 0; fcmRequests.length = 0;
+    apnsRespond = () => ({ status: 200, body: '' });
+    fcmRespond = () => ({ status: 200, body: { name: 'm/3' } });
+    assert.equal((await push.notifyPartner('cpl_01', 'usr_ana', { type: 'couple.unpaired', reason: 'partner_deleted' })).devices, 0, 'members who left are not reached without toUserId');
+    const summary = await push.notifyPartner('cpl_01', 'usr_ana', { type: 'couple.unpaired', reason: 'partner_deleted' }, { now, toUserId: 'usr_kenji' });
+    assert.deepEqual(summary, { devices: 3, sent: 3, failed: 0, pruned: 0, skipped: 0 });
+    assert.deepEqual(apnsRequests.map((r) => [r.headers[':path'], r.headers['apns-push-type']]), [['/3/device/tok-kenji-alert-sandbox', 'alert'], ['/3/device/tok-kenji-widget', 'widgets']]);
+    assert.deepEqual(apnsRequests[0].body.honto, fixture);
+    assert.deepEqual(apnsRequests[1].body, { aps: { 'content-changed': true } }, 'widget reload');
+    assert.deepEqual(fcmRequests.at(-1).body.message.data, { type: 'couple.unpaired', coupleId: 'cpl_01', sentAt: '2026-10-19T12:00:00Z', reason: 'partner_deleted' });
+    assert.equal((await push.notifyPartner('cpl_01', 'usr_ana', { type: 'couple.unpaired', reason: 'unpaired' }, { toUserId: 'usr_ana' })).devices, 0, 'never to the actor');
+  } finally {
+    Object.assign(console, quiet);
+    clearPushEnv();
+  }
+});

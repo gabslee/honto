@@ -2,7 +2,7 @@
 // Payloads follow the contract (`PushData` in contracts/openapi.yaml). Sending never throws and never logs
 // device tokens; with the APNs / FCM settings unset it is a logged no-op so the endpoints keep working.
 import type { NeonQueryFunction } from "@neondatabase/serverless";
-import type { PushData } from "../../contracts/honto-api";
+import type { PushData, UnpairReason } from "../../contracts/honto-api";
 import { ensurePhotosSchema } from "../../api/v1/photos-schema";
 import { database } from "../server-auth";
 import { apnsConfig, sendApns, type ApnsEnv, type ApnsMessage, type ApnsResult } from "./apns";
@@ -15,7 +15,8 @@ export type PushEvent =
   | { type: "photo.new"; photoId: string; thumbUrl?: string | null; fromName?: string | null }
   | { type: "nudge.new"; nudgeId: string; fromName?: string | null }
   | { type: "couple.joined"; fromName?: string | null }
-  | { type: "reunion.changed" };
+  | { type: "reunion.changed" }
+  | { type: "couple.unpaired"; reason: UnpairReason; fromName?: string | null };
 
 export type NotifySummary = { devices: number; sent: number; failed: number; pruned: number; skipped: number };
 
@@ -33,6 +34,7 @@ export function pushData(coupleId: string, event: PushEvent, now = new Date()): 
   }
   if (event.type === "nudge.new") data.nudgeId = event.nudgeId;
   if (event.type !== "reunion.changed" && event.fromName) data.fromName = event.fromName;
+  if (event.type === "couple.unpaired") data.reason = event.reason;
   return data;
 }
 
@@ -43,6 +45,7 @@ export function apnsAlertPayload(data: PushData) {
   // "Thinking of you": short and silent (no sound); the NSE refreshes the widget snapshot.
   if (data.type === "nudge.new") return { aps: { alert: { title: from, body: "Thinking of you" }, "mutable-content": 1, "thread-id": data.coupleId }, honto: data };
   if (data.type === "couple.joined") return { aps: { alert: { title: "Honto", body: `You are now paired with ${from}` }, sound: "default", "thread-id": data.coupleId }, honto: data };
+  if (data.type === "couple.unpaired") return { aps: { alert: { title: "Honto", body: data.reason === "partner_deleted" ? "Your partner deleted their account. Your photos stay available for 30 days." : "You are no longer paired. Your photos stay available for 30 days." }, sound: "default", "thread-id": data.coupleId }, honto: data };
   return null;
 }
 
@@ -62,13 +65,16 @@ async function prune(sql: Sql, ids: string[]) {
  * couple.joined), an APNs widget push and an FCM data message. Dead tokens (APNs 410 / BadDeviceToken,
  * FCM 404 / UNREGISTERED) are revoked. Resolves with counts only; errors are logged, never thrown.
  */
-export async function notifyPartner(coupleId: string, fromUserId: string, event: PushEvent, options: { now?: Date } = {}): Promise<NotifySummary> {
+export async function notifyPartner(coupleId: string, fromUserId: string, event: PushEvent, options: { now?: Date; toUserId?: string } = {}): Promise<NotifySummary> {
   const summary: NotifySummary = { devices: 0, sent: 0, failed: 0, pruned: 0, skipped: 0 };
   const sql = database() as Sql | null;
   if (!sql) return summary;
   try {
     await ensurePhotosSchema(sql);
-    const devices = await sql`SELECT d.id, d.kind, d.token, d.env FROM couple_members m JOIN push_devices d ON d.user_id = m.user_id AND d.revoked_at IS NULL WHERE m.couple_id = ${coupleId} AND m.left_at IS NULL AND m.user_id <> ${fromUserId} ORDER BY d.created_at` as DeviceRow[];
+    // `toUserId`: a member who already left (couple.unpaired goes out after both left_at are set).
+    const devices = (options.toUserId
+      ? await sql`SELECT d.id, d.kind, d.token, d.env FROM couple_members m JOIN push_devices d ON d.user_id = m.user_id AND d.revoked_at IS NULL WHERE m.couple_id = ${coupleId} AND m.user_id = ${options.toUserId} AND m.user_id <> ${fromUserId} ORDER BY d.created_at`
+      : await sql`SELECT d.id, d.kind, d.token, d.env FROM couple_members m JOIN push_devices d ON d.user_id = m.user_id AND d.revoked_at IS NULL WHERE m.couple_id = ${coupleId} AND m.left_at IS NULL AND m.user_id <> ${fromUserId} ORDER BY d.created_at`) as DeviceRow[];
     summary.devices = devices.length;
     if (!devices.length) return summary;
     const data = pushData(coupleId, event, options.now);

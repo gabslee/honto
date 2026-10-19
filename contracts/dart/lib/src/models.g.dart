@@ -284,18 +284,21 @@ class GoogleSignInRequest {
 }
 
 class AppleSignInRequest {
-  const AppleSignInRequest({required this.idToken, this.nonce, this.name, required this.platform});
+  const AppleSignInRequest({required this.idToken, this.nonce, this.name, required this.platform, this.authorizationCode});
 
   final String idToken;
   final String? nonce;
   final String? name;
   final AuthPlatform platform;
+  /// Optional `authorizationCode` of the Apple credential (single use, 5 minutes). The server exchanges it for an Apple refresh token so the account deletion can revoke the Sign in with Apple grant; sign-in still succeeds when it is missing or the exchange fails.
+  final String? authorizationCode;
 
   factory AppleSignInRequest.fromJson(Map<String, dynamic> json) => AppleSignInRequest(
         idToken: json['idToken'] as String,
         nonce: json['nonce'] == null ? null : json['nonce'] as String,
         name: json['name'] == null ? null : json['name'] as String,
         platform: AuthPlatform.fromJson(json['platform'] as String),
+        authorizationCode: json['authorizationCode'] == null ? null : json['authorizationCode'] as String,
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -303,6 +306,7 @@ class AppleSignInRequest {
         if (nonce != null) 'nonce': nonce!,
         if (name != null) 'name': name!,
         'platform': platform.toJson(),
+        if (authorizationCode != null) 'authorizationCode': authorizationCode!,
       };
 
   @override
@@ -775,20 +779,37 @@ class ExportStatus {
   String toString() => 'ExportStatus(${toJson()})';
 }
 
+/// `unpaired` = one of us unpaired (DELETE /api/v1/couple); `partner_deleted` = my partner deleted their account.
+enum UnpairReason {
+  unpaired('unpaired'),
+  partnerDeleted('partner_deleted'),
+  /// A value added to the API after this client was built.
+  unrecognized('');
+
+  const UnpairReason(this.wire);
+  final String wire;
+
+  static UnpairReason fromJson(String value) => values.firstWhere((e) => e.wire == value && e != unrecognized, orElse: () => unrecognized);
+  String toJson() => wire;
+}
+
 class UnpairState {
-  const UnpairState({required this.unpairedAt, required this.photosAvailableUntil});
+  const UnpairState({required this.unpairedAt, required this.photosAvailableUntil, required this.reason});
 
   final DateTime unpairedAt;
   final DateTime photosAvailableUntil;
+  final UnpairReason reason;
 
   factory UnpairState.fromJson(Map<String, dynamic> json) => UnpairState(
         unpairedAt: DateTime.parse(json['unpairedAt'] as String),
         photosAvailableUntil: DateTime.parse(json['photosAvailableUntil'] as String),
+        reason: UnpairReason.fromJson(json['reason'] as String),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'unpairedAt': unpairedAt.toUtc().toIso8601String(),
         'photosAvailableUntil': photosAvailableUntil.toUtc().toIso8601String(),
+        'reason': reason.toJson(),
       };
 
   @override
@@ -2345,7 +2366,7 @@ enum PushEventType {
 /// APNs alert: top-level key `honto` next to `aps` (with `mutable-content: 1` for photo.new / nudge.new
 /// so the NSE refreshes the App Group snapshot). APNs widget push (iOS 26): `{"aps":{"content-changed":true}}` only.
 class PushData {
-  const PushData({required this.type, required this.coupleId, required this.sentAt, this.photoId, this.thumbUrl, this.nudgeId, this.tripId, this.fromName});
+  const PushData({required this.type, required this.coupleId, required this.sentAt, this.photoId, this.thumbUrl, this.nudgeId, this.tripId, this.fromName, this.reason});
 
   final PushEventType type;
   final String coupleId;
@@ -2356,6 +2377,8 @@ class PushData {
   final String? nudgeId;
   final String? tripId;
   final String? fromName;
+  /// couple.unpaired only.
+  final UnpairReason? reason;
 
   factory PushData.fromJson(Map<String, dynamic> json) => PushData(
         type: PushEventType.fromJson(json['type'] as String),
@@ -2366,6 +2389,7 @@ class PushData {
         nudgeId: json['nudgeId'] == null ? null : json['nudgeId'] as String,
         tripId: json['tripId'] == null ? null : json['tripId'] as String,
         fromName: json['fromName'] == null ? null : json['fromName'] as String,
+        reason: json['reason'] == null ? null : UnpairReason.fromJson(json['reason'] as String),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -2377,6 +2401,7 @@ class PushData {
         if (nudgeId != null) 'nudgeId': nudgeId!,
         if (tripId != null) 'tripId': tripId!,
         if (fromName != null) 'fromName': fromName!,
+        if (reason != null) 'reason': reason!.toJson(),
       };
 
   @override

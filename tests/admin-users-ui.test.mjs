@@ -10,3 +10,10 @@ test("admin user editor keeps edits in draft state so the editor updates live", 
   assert.match(source, /updateDraft\("plan"/);
   assert.match(source, />Cancel</, "editor should offer Cancel to discard the draft");
 });
+
+test("admin users page deletes an account only after the admin types its email in a confirm dialog", () => {
+  assert.match(source, /role="dialog"/, "deletion asks in a dialog");
+  assert.match(source, />Delete</, "each user row has a Delete button");
+  assert.match(source, /action: "deleteUser", userId: row\.id, confirmEmail/, "posts deleteUser with the typed email");
+  assert.match(source, /disabled=\{!matches \|\| busy\}/, "the confirm button stays disabled until the email matches");
+});

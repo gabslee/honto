@@ -2,7 +2,7 @@ import type { NeonQueryFunction } from "@neondatabase/serverless";
 import type { Avatar, Couple, Entitlement, EntitlementSource, Features, Invite, Me, NudgeState, PartnerInfo, PartnerStatus, PeriodType, Photo, Reunion, Today, Trip } from "../../contracts/honto-api";
 import { database } from "../../app/server-auth";
 import { apiError, isCouplePremium, noStore, normalizeTimeZone, requireCouple, requireUser, toApiUser, type V1Couple, type V1Partner, type V1User } from "./context";
-import { ensureLifecycleSchema, getObjectStore, hitRateLimit, latestUnpair, optionalTables, randomId, type ObjectStore, type OptionalTables } from "./lifecycle";
+import { ensureLifecycleSchema, getObjectStore, hitRateLimit, latestUnpair, optionalTables, randomId, repairHalfCouples, type ObjectStore, type OptionalTables } from "./lifecycle";
 import { todayMilestones } from "./milestones";
 import { avatarsFor } from "./profile";
 import { weatherFor } from "./weather";
@@ -206,8 +206,14 @@ export function normalizeInviteCode(value: unknown) {
 
 const inviteBody = (row: Row): Invite => ({ code: String(row.code), url: INVITE_BASE_URL + String(row.code), expiresAt: String(row.expiresAt) });
 
+/**
+ * Paired by the same rule as requireCouple (active membership, couple not unpaired, an active partner). A
+ * half-ended couple of this user (partner deleted outside deleteAccount) is unpaired first, so the user is
+ * neither stuck on 409 already_paired nor blocked by the one-active-couple index when pairing again.
+ */
 async function activeMembership(sql: Sql, userId: string) {
-  const rows = await sql`SELECT 1 FROM couple_members m JOIN couples c ON c.id = m.couple_id AND c.unpaired_at IS NULL WHERE m.user_id = ${userId} AND m.left_at IS NULL LIMIT 1`;
+  await repairHalfCouples(sql, userId);
+  const rows = await sql`SELECT 1 FROM couple_members m JOIN couples c ON c.id = m.couple_id AND c.unpaired_at IS NULL JOIN couple_members pm ON pm.couple_id = m.couple_id AND pm.user_id <> m.user_id AND pm.left_at IS NULL WHERE m.user_id = ${userId} AND m.left_at IS NULL LIMIT 1`;
   return rows.length > 0;
 }
 
@@ -323,6 +329,8 @@ export async function meResponse(request: Request, now = new Date()) {
   const sql = database()!;
   await ensureLifecycleSchema(sql);
   const partnerId = paired instanceof Response ? null : paired.partner.id;
+  // Not paired: a half-ended couple (partner deleted outside deleteAccount) is closed now, so pendingUnpair shows it.
+  if (paired instanceof Response) await repairHalfCouples(sql, auth.user.id);
   const entitlement = await resolveEntitlement(sql, auth.user.id, partnerId);
   const avatars = await avatarsFor(sql, partnerId ? [auth.user.id, partnerId] : [auth.user.id], now);
   const body: Me = {

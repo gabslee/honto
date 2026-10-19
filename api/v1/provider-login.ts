@@ -1,6 +1,7 @@
 import type { JWTVerifyGetKey } from "jose";
 import type { AuthPlatform, AuthSession, LinkProvider, LogoutResponse, ProviderLinkResult, User } from "../../contracts/honto-api";
-import { findLinkedUser, findOrCreateProviderUser, isPrivateRelayEmail, linkProviderIdentity, verifyAppleNativeToken, verifyGoogleIdToken, type ProviderIdentity } from "../../app/mobile-auth";
+import { appleAudiences, findLinkedUser, findOrCreateProviderUser, isPrivateRelayEmail, linkProviderIdentity, verifyAppleNativeToken, verifyGoogleIdToken, type ProviderIdentity } from "../../app/mobile-auth";
+import { exchangeAppleCode, storeAppleRefreshToken } from "./account-cleanup";
 import { bearerToken, clearUserCookie, createMobileToken, database, revokeMobileToken } from "../../app/server-auth";
 import { apiError, noStore, requireUser } from "./context";
 import { ensureLifecycleSchema, sessionTokenHash } from "./lifecycle";
@@ -55,6 +56,12 @@ export async function providerSignIn(request: Request, provider: Provider) {
   } catch (cause) {
     if (cause instanceof Error && cause.message === "email_not_verified") return apiError(400, "email_required", "Share a verified email the first time you sign in.");
     throw cause;
+  }
+  // Optional native `authorizationCode`: exchanged for Apple's refresh token, revoked when the account is deleted.
+  if (provider === "apple" && typeof body?.authorizationCode === "string" && body.authorizationCode.trim() && body.authorizationCode.length <= 1024) {
+    const clientId = appleAudiences()[0];
+    const refresh = await exchangeAppleCode(body.authorizationCode.trim(), clientId);
+    if (refresh) await storeAppleRefreshToken(sql, account.userId, clientId, refresh).catch((cause) => console.error("[v1/auth/apple] storing the Apple refresh token failed", cause instanceof Error ? cause.message : cause));
   }
   const token = await createMobileToken({ kind: "user", userId: account.userId, platform });
   const refreshToken = await issueRefreshToken(sql, account.userId, platform, undefined, token);
