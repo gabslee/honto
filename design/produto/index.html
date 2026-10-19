@@ -1,0 +1,675 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Honto · MVP design direction</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{
+  --paper:#F7F2E9; --paper-2:#EFE8DB; --card:#FFFCF7; --ink:#17243D; --ink-2:#55607A; --ink-3:#8F95A3;
+  --line:rgba(23,36,61,.10); --line-2:rgba(23,36,61,.16);
+  --shu:#D2483A; --shu-ink:#B83A2E; --shu-soft:#F6DED7;
+  --sakura:#F0C7CE; --sakura-ink:#9C4A5A; --ai:#C8D4EA; --ai-ink:#34507F;
+  --matcha:#7D9B69; --matcha-soft:#DFE8D5; --kohaku:#C98A2E;
+  --glass-ui:rgba(255,252,246,.58); --glass-ui-border:rgba(255,255,255,.75);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",Inter,system-ui,sans-serif;
+  --jp:"Noto Sans JP","Noto Sans CJK JP","Hiragino Sans",sans-serif;
+}
+.dark{
+  --paper:#0F141E; --paper-2:#161C28; --card:#1A2130; --ink:#F1ECE3; --ink-2:#B5BAC5; --ink-3:#7C8390;
+  --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14);
+  --shu:#E5604E; --shu-soft:#3A2224; --sakura:#5A3A44; --sakura-ink:#F2C4CD; --ai:#2F3D5A; --ai-ink:#C9D6F0;
+  --matcha:#93B27F; --matcha-soft:#26332A;
+  --glass-ui:rgba(40,48,64,.55); --glass-ui-border:rgba(255,255,255,.14);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);color:var(--ink);-webkit-font-smoothing:antialiased;font-feature-settings:"cv11","ss01"}
+.ic{display:block;flex:none}
+.muted{color:var(--ink-3)} .light{color:#fff} .light-2{color:rgba(255,255,255,.78)} .center{text-align:center}
+
+/* ---------- type scale ---------- */
+.t-large{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-.025em}
+.t-title1{font-size:30px;line-height:36px;font-weight:650;letter-spacing:-.025em}
+.t-title2{font-size:24px;line-height:30px;font-weight:650;letter-spacing:-.02em}
+.t-title3{font-size:20px;line-height:25px;font-weight:600;letter-spacing:-.015em}
+.t-head{font-size:17px;font-weight:600;letter-spacing:-.01em}
+.t-body{font-size:16px;line-height:23px;letter-spacing:-.01em}
+.t-callout{font-size:15px;line-height:20px;letter-spacing:-.005em}
+.t-foot{font-size:13px;line-height:18px}
+.t-cap2{font-size:11.5px;line-height:15px}
+.cap{font-size:11px;line-height:14px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.jp{font-family:var(--jp);font-weight:500;font-size:13px;color:var(--ink-3);margin-left:10px;letter-spacing:.1em}
+.jp.big{font-size:16px}
+
+/* ---------- brand ---------- */
+.hanko{display:inline-grid;place-items:center;flex:none;background:var(--shu);color:#FFF6EC;border-radius:24%;font-family:var(--jp);font-weight:700;line-height:1;box-shadow:inset 0 0 0 1.5px rgba(255,246,236,.42);}
+.brand{display:inline-flex;align-items:center;gap:9px;font-weight:650;letter-spacing:-.02em;color:var(--ink)}
+.brand.light{color:#fff}
+.av{display:inline-grid;place-items:center;border-radius:50%;font-weight:650;flex:none;box-shadow:0 0 0 2px rgba(255,255,255,.85)}
+.av-mia{background:var(--sakura);color:var(--sakura-ink)} .av-leo{background:var(--ai);color:var(--ai-ink)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.dot.busy{background:#E8A23A} .dot.free-d{background:var(--matcha);width:10px;height:10px;margin:5px 0 0}
+
+/* ---------- glass materials ---------- */
+.glass-ui{background:var(--glass-ui);backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);
+  border:1px solid var(--glass-ui-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 8px 28px rgba(23,36,61,.10)}
+.dark .glass-ui{box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 8px 28px rgba(0,0,0,.35)}
+.glass-photo{background:rgba(255,255,255,.16);backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);
+  border:1px solid rgba(255,255,255,.34);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(255,255,255,.08),0 12px 36px rgba(8,12,24,.22);color:#fff}
+.glass-dark{background:rgba(30,30,34,.42);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.18);color:#fff}
+.glass-sheet{background:rgba(250,246,238,.9);backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);border:1px solid rgba(255,255,255,.8);box-shadow:inset 0 1px 0 #fff,0 -10px 50px rgba(23,36,61,.18)}
+.washi{position:absolute;inset:0;pointer-events:none;opacity:.9;background-image:
+ url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .42  0 0 0 0 .36  0 0 0 0 .26  0 0 0 .055 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+ url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='.012 .09' numOctaves='3' seed='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .44  0 0 0 0 .33  0 0 0 .05 0'/></filter><rect width='100%' height='100%' filter='url(%23f)'/></svg>")}
+.dark .washi{opacity:.35}
+.washi.strong{opacity:1;mix-blend-mode:multiply}
+
+/* ---------- gallery ---------- */
+.gallery{background:#E7E1D6;padding:56px 64px 80px}
+.g-head{display:flex;align-items:flex-start;gap:28px;margin-bottom:24px;flex-wrap:wrap}
+.g-head h1{font-size:22px;font-weight:650;letter-spacing:-.02em}
+.g-head p{font-size:14px;color:var(--ink-2);max-width:720px;margin-top:4px;line-height:20px}
+.sample{margin-left:auto;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--shu-ink);border:1px solid rgba(184,58,46,.35);border-radius:999px;padding:7px 14px;background:#F6E6DF}
+.sec{margin-top:48px} .sec h2{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin-bottom:22px}
+.items{display:flex;flex-wrap:wrap;gap:48px 44px;align-items:flex-start}
+.item figcaption{margin-top:14px;max-width:393px;font-size:13px;line-height:18px;color:var(--ink-2)}
+.item figcaption b{display:block;color:var(--ink);font-weight:600;font-size:14px;margin-bottom:2px}
+.g-foot{margin-top:64px;font-size:12px;color:var(--ink-3)}
+
+/* ---------- device ---------- */
+.phone{position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--paper);color:var(--ink);box-shadow:0 30px 70px rgba(23,36,61,.16),0 0 0 1px rgba(23,36,61,.06)}
+.sb{position:absolute;left:0;right:0;top:0;height:54px;display:flex;align-items:center;justify-content:space-between;padding:4px 30px 0 52px;z-index:50;color:var(--ink)}
+.sb.light{color:#fff} .sb-time{font-size:17px;font-weight:600;letter-spacing:-.01em} .sb-ic{display:flex;gap:6px;align-items:center} .sb svg{fill:currentColor}
+.di{position:absolute;top:11px;left:133.5px;width:126px;height:37px;border-radius:20px;background:#000;z-index:60}
+.hb{position:absolute;bottom:8px;left:50%;width:139px;height:5px;margin-left:-69.5px;border-radius:3px;background:var(--ink);opacity:.85;z-index:60}
+.hb.light{background:#fff}
+.nav{position:absolute;top:58px;left:16px;right:16px;height:44px;display:flex;align-items:center;justify-content:space-between;z-index:20}
+.circ{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--ink)}
+.circ.glass-photo,.circ.glass-dark{color:#fff}
+.circ.sm{width:34px;height:34px} .circ.big{width:54px;height:54px}
+.pad{position:absolute;left:24px;right:24px}
+.card{background:var(--card);border-radius:24px;box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 0 0 1px var(--line),0 10px 30px rgba(23,36,61,.05)}
+.row2{display:flex;gap:10px} .row2>*{flex:1}
+.btn{height:52px;border-radius:26px;display:flex;align-items:center;justify-content:center;gap:9px;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.btn.sm{height:44px;font-size:15px;border-radius:22px}
+.btn-ink{background:var(--ink);color:var(--paper)} .btn-shu{background:var(--shu);color:#fff;box-shadow:0 8px 20px rgba(210,72,58,.28)}
+.btn-line{background:var(--card);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line-2)}
+.btn-glass-dark{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(20px)}
+
+/* tab bar (iOS 26 native, drawn here for reference) */
+.tabwrap{position:absolute;left:20px;right:20px;bottom:24px;height:64px;display:flex;gap:10px;z-index:30}
+.tabbar{flex:1;border-radius:32px;display:flex;align-items:center;justify-content:space-around;padding:0 6px}
+.tab{width:84px;height:54px;border-radius:27px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--ink);font-size:10.5px;font-weight:600}
+.tab.on{color:var(--shu);background:rgba(23,36,61,.07)}
+.dark .tab.on{background:rgba(255,255,255,.10)}
+.tabcam{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;color:var(--ink)}
+.hero ~ .tabwrap .tabbar,.hero ~ .tabwrap .tabcam{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.36);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 10px 30px rgba(0,0,0,.2);color:#fff}
+.hero ~ .tabwrap .tab{color:#fff} .hero ~ .tabwrap .tab.on{color:#fff;background:rgba(255,255,255,.22)}
+
+/* ---------- onboarding ---------- */
+.ob-photo{position:absolute;left:0;right:0;top:0;height:430px;background-size:cover;background-position:center 62%}
+.ob-photo:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.25) 0,rgba(0,0,0,0) 22%,rgba(247,242,233,0) 62%,var(--paper) 100%)}
+.ob-float{position:absolute;left:24px;top:252px;border-radius:22px;padding:12px 16px 14px;width:170px}
+.ob-float .cap{color:rgba(255,255,255,.85)}
+.ob-float-row{display:flex;align-items:center;gap:10px;margin-top:6px;font-size:13px;line-height:16px}
+.num-l{font-size:38px;line-height:40px;font-weight:300;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.ob-text{position:absolute;left:28px;right:28px;top:430px}
+.dots{display:flex;gap:6px;margin-top:20px} .dots i{width:6px;height:6px;border-radius:3px;background:var(--line-2)} .dots i.on{width:18px;background:var(--ink)}
+.ob-cta{position:absolute;left:24px;right:24px;top:654px;display:flex;flex-direction:column;gap:10px}
+.ob-cta .btn{height:50px}
+
+/* pairing */
+.code-card{position:absolute;left:20px;right:20px;padding:22px 20px 20px}
+.code{display:flex;align-items:center;justify-content:center;gap:14px;margin:16px 0 10px;font-size:40px;font-weight:600;letter-spacing:.16em;font-variant-numeric:tabular-nums}
+.code i{width:8px;height:2px;background:var(--ink-3);border-radius:1px}
+.or{position:absolute;left:40px;right:40px;display:flex;align-items:center;gap:12px;color:var(--ink-3);font-size:13px}
+.or i{flex:1;height:1px;background:var(--line-2)}
+.field{height:54px;border-radius:18px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line-2);display:flex;align-items:center;gap:10px;padding:0 8px 0 16px;font-size:16px}
+.field-btn{margin-left:auto;height:38px;padding:0 18px;border-radius:19px;display:grid;place-items:center;font-size:15px;font-weight:600;background:var(--paper-2);color:var(--ink-3)}
+.waiting{position:absolute;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:10px}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--matcha);box-shadow:0 0 0 6px rgba(125,155,105,.18)}
+
+/* paywall */
+.pw-hero{position:absolute;left:0;right:0;top:104px;height:170px}
+.pw-ph{position:absolute;top:6px;width:124px;height:156px;border-radius:20px;background-size:cover;background-position:center;box-shadow:0 0 0 4px var(--card),0 16px 34px rgba(23,36,61,.18)}
+.pw-ph.a{left:72px;transform:rotate(-6deg)} .pw-ph.b{right:72px;transform:rotate(5deg);top:12px}
+.pw-stamp{position:absolute;left:50%;margin-left:-20px;top:118px;transform:rotate(-8deg);box-shadow:0 6px 16px rgba(210,72,58,.35),inset 0 0 0 1.5px rgba(255,246,236,.42)}
+.feats{position:absolute;left:44px;right:30px;list-style:none;display:flex;flex-direction:column;gap:13px}
+.feats li{display:flex;align-items:center;gap:14px;font-size:15px;letter-spacing:-.01em} .feats .ic{color:var(--shu)}
+.free-line{position:absolute;left:36px;right:36px;font-size:12px;line-height:17px;color:var(--ink-3);text-align:center}
+.plans{position:absolute;left:20px;right:20px;display:flex;gap:10px}
+.plan{flex:1;position:relative;height:94px;border-radius:20px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line-2);padding:14px 16px}
+.plan.on{box-shadow:inset 0 0 0 2px var(--ink)}
+.plan .cap{color:var(--ink-2)} .price{font-size:22px;font-weight:650;letter-spacing:-.02em;margin:4px 0 1px;font-variant-numeric:tabular-nums} .price small{font-size:13px;font-weight:500;color:var(--ink-3)}
+.badge{position:absolute;top:-10px;right:12px;background:var(--shu);color:#fff;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:4px 9px;border-radius:999px}
+.radio{position:absolute;top:14px;right:14px;width:20px;height:20px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--line-2);display:grid;place-items:center}
+.plan.on .radio{background:var(--ink);color:var(--paper);box-shadow:none}
+
+/* ---------- today ---------- */
+.hero{position:absolute;inset:0;background-size:cover;background-position:center}
+.hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.34) 0,rgba(0,0,0,0) 20%,rgba(0,0,0,0) 42%,rgba(5,8,16,.55) 75%,rgba(5,8,16,.7) 100%)}
+.who{height:48px;border-radius:24px;display:flex;align-items:center;gap:10px;padding:0 18px 0 8px}
+.who b{display:block;font-size:15px;font-weight:600;line-height:18px} .who span{font-size:12px;opacity:.8}
+.today-cap{position:absolute;left:28px;right:28px;top:446px;text-shadow:0 1px 12px rgba(0,0,0,.25)}
+.today-card{position:absolute;left:16px;right:16px;top:550px;height:190px;border-radius:30px;display:grid;grid-template-columns:1fr 1px 1fr;padding:20px 22px 0;column-gap:20px}
+.tc-sep{background:rgba(255,255,255,.25);height:96px;margin-top:2px}
+.big-num{font-size:44px;line-height:50px;font-weight:300;letter-spacing:-.035em;margin:6px 0 4px;font-variant-numeric:tabular-nums}
+.big-num small{font-size:15px;font-weight:500;letter-spacing:0;margin-left:6px;opacity:.85}
+.tc-foot{grid-column:1/-1;align-self:end;height:48px;border-top:1px solid rgba(255,255,255,.2);display:flex;align-items:center;gap:9px;font-size:13px;font-weight:500;margin:0 -2px}
+
+/* ---------- camera ---------- */
+.cam-bg{position:absolute;inset:0;background:#0B0C0F}
+.viewfinder{position:absolute;left:0;right:0;top:112px;height:524px;background-size:cover;background-position:center}
+.vf-grid{position:absolute;inset:0;background:linear-gradient(90deg,transparent 33.2%,rgba(255,255,255,.18) 33.3%,transparent 33.5%,transparent 66.5%,rgba(255,255,255,.18) 66.6%,transparent 66.8%),linear-gradient(180deg,transparent 33.2%,rgba(255,255,255,.18) 33.3%,transparent 33.5%,transparent 66.5%,rgba(255,255,255,.18) 66.6%,transparent 66.8%)}
+.cam-hint{position:absolute;left:40px;right:40px;top:652px;text-align:center}
+.cam-controls{position:absolute;left:36px;right:36px;top:712px;display:flex;align-items:center;justify-content:space-between}
+.cam-thumb{width:54px;height:54px;border-radius:14px;background-size:cover;background-position:center;box-shadow:0 0 0 1.5px rgba(255,255,255,.6)}
+.shutter{width:80px;height:80px;border-radius:50%;box-shadow:inset 0 0 0 4px #fff;display:grid;place-items:center}
+.shutter i{width:64px;height:64px;border-radius:50%;background:#fff}
+.preview{position:absolute;left:12px;right:12px;top:112px;height:560px;border-radius:34px;background-size:cover;background-position:center;overflow:hidden}
+.caption-pill{position:absolute;left:14px;right:14px;bottom:14px;min-height:56px;border-radius:28px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:16px;font-weight:500}
+.caption-pill small{font-size:12px;opacity:.7;font-variant-numeric:tabular-nums}
+.send-row{position:absolute;left:20px;right:20px;top:696px;display:flex;gap:10px}
+.send-row .btn:first-child{flex:0 0 132px} .send-row .btn:last-child{flex:1}
+
+/* ---------- calendar ---------- */
+.weekstrip{position:absolute;left:16px;right:16px;display:flex;justify-content:space-between}
+.day{width:46px;height:62px;border-radius:23px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--ink-2)}
+.day span{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3)} .day b{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.day.on{background:var(--ink);color:var(--paper)} .day.on span{color:rgba(247,242,233,.7)}
+.dark .day.on span{color:rgba(15,20,30,.6)}
+.best-card{position:absolute;left:16px;right:16px;height:66px;display:flex;gap:12px;align-items:flex-start;padding:15px 18px}
+.best-card b{display:block;font-size:15px;font-weight:600;margin-bottom:2px}
+.tl-head{position:absolute;left:16px;right:16px;display:grid;grid-template-columns:44px 1fr 1fr;column-gap:8px}
+.tl-head>div{display:flex;align-items:center;gap:7px;font-size:13px} .tl-head b{font-weight:600} .tl-head .muted{font-size:12px}
+.tl-head .av{box-shadow:none}
+.timeline{position:absolute;left:16px;right:16px;height:420px}
+.hr{position:absolute;left:0;right:0;border-top:1px solid var(--line);height:0}
+.hr span{position:absolute;top:-7px;left:0;font-size:10.5px;color:var(--ink-3);background:var(--paper);padding-right:6px;font-variant-numeric:tabular-nums}
+.cols{position:absolute;left:52px;right:0;top:0;bottom:0;display:grid;grid-template-columns:1fr 1fr;column-gap:8px}
+.col{position:relative}
+.blk{position:absolute;left:0;right:0;border-radius:10px;padding:6px 9px;font-size:12px;font-weight:600;display:flex;align-items:flex-start}
+.blk span{display:flex;align-items:center;gap:5px}
+.blk.you{background:var(--ai);color:var(--ai-ink)} .blk.mia{background:var(--sakura);color:var(--sakura-ink)}
+.blk.sleep{background:repeating-linear-gradient(135deg,var(--paper-2) 0 6px,transparent 6px 11px);box-shadow:inset 0 0 0 1px var(--line-2);color:var(--ink-3)}
+.free{position:absolute;left:0;right:0;border-radius:10px;background:rgba(125,155,105,.16);box-shadow:inset 0 0 0 1.5px rgba(125,155,105,.55);pointer-events:none}
+.free.best span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--matcha);color:#fff;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.now{position:absolute;left:-6px;right:0;height:0;border-top:1.5px solid var(--shu)} .now i{position:absolute;left:-4px;top:-5px;width:9px;height:9px;border-radius:50%;background:var(--shu)}
+
+/* ---------- memories ---------- */
+.month-row{position:absolute;left:24px;right:16px;display:flex;align-items:center;justify-content:space-between}
+.mnav{display:flex;gap:8px;align-items:center}
+.mgrid{display:grid;grid-template-columns:repeat(7,var(--cell));gap:var(--gap);justify-content:space-between}
+.wd{font-size:11px;font-weight:600;color:var(--ink-3);text-align:center;letter-spacing:.06em;padding-bottom:4px}
+.mc{height:var(--cell);border-radius:var(--r);position:relative;display:flex;align-items:flex-end;justify-content:flex-start}
+.mc span{font-weight:600;padding:0 0 5px 7px;font-variant-numeric:tabular-nums}
+.mc.ph{background-size:cover;background-position:center;color:#fff}
+.mc.ph:after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(0,0,0,.42))}
+.mc.ph span{position:relative;z-index:1;text-shadow:0 1px 4px rgba(0,0,0,.35)}
+.mc.half{background:var(--paper-2);color:var(--ink-2)} .mc.half i{position:absolute;right:7px;top:7px;width:6px;height:6px;border-radius:50%;background:var(--sakura-ink);opacity:.6}
+.mc.future{color:var(--ink-3);box-shadow:inset 0 0 0 1px var(--line)}
+.mc.today{box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--shu)}
+.mc.opened{box-shadow:0 0 0 3px var(--paper),0 0 0 5.5px var(--ink)}
+.sum-card{position:absolute;left:16px;right:16px;height:88px;display:flex;align-items:center;justify-content:space-around;padding:0 10px}
+.sum-card>div{display:flex;align-items:center;gap:10px} .sum-card>i{width:1px;height:40px;background:var(--line)}
+.sum-num{font-size:28px;font-weight:300;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.sum-card .t-foot{font-size:12px;line-height:15px}
+.dim-under{position:absolute;inset:0}
+.scrim{position:absolute;inset:0;background:rgba(23,36,61,.22);z-index:40}
+.sheet{position:absolute;left:8px;right:8px;top:150px;bottom:8px;border-radius:40px;z-index:45;padding:10px 22px 22px}
+.grabber{width:38px;height:5px;border-radius:3px;background:rgba(23,36,61,.2);margin:0 auto 14px}
+.sheet-head{display:flex;justify-content:space-between;align-items:flex-start}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}
+.pp{aspect-ratio:3/4;border-radius:20px;background-size:cover;background-position:center;box-shadow:0 8px 22px rgba(23,36,61,.14)}
+.pp-meta{display:flex;align-items:center;gap:7px;margin:12px 0 6px;font-size:13px;flex-wrap:wrap} .pp-meta b{font-weight:600} .pp-meta .muted{font-size:12px;width:100%;margin-top:-2px;padding-left:27px}
+.pp-meta .av{box-shadow:none}
+.pair p,.w-pair p{color:var(--ink-2)}
+.more-row{display:flex;align-items:center;gap:8px;margin-top:20px;padding:10px 12px;border-radius:18px;background:rgba(23,36,61,.04)}
+.more-row .t-callout{flex:1;margin-left:6px;font-weight:500}
+.mini{width:34px;height:34px;border-radius:10px;background-size:cover;background-position:center}
+
+/* ---------- settings ---------- */
+.couple{position:absolute;left:16px;right:16px;height:96px;display:flex;align-items:center;gap:18px;padding:0 20px}
+.avs{position:relative;display:flex;width:90px} .avs .av+.av{margin-left:-14px}
+.avs-stamp{position:absolute;left:34px;bottom:-6px;transform:rotate(-8deg)}
+.group{position:absolute;left:16px;right:16px;background:var(--card);border-radius:22px;box-shadow:0 0 0 1px var(--line);overflow:hidden}
+.g-row{height:52px;display:flex;align-items:center;gap:14px;padding:0 16px;font-size:16px;letter-spacing:-.01em}
+.g-row+.g-row{border-top:1px solid var(--line);margin-left:0}
+.g-row>.l{flex:1} .g-row .muted{font-size:15px}
+.g-row .ic{color:var(--ink-2)} .g-row .ic.muted{color:var(--ink-3)}
+.g-row.danger,.g-row.danger .ic{color:var(--shu)}
+.g-label{position:absolute;left:32px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.g-note{position:absolute;left:32px;right:32px;font-size:12.5px;line-height:17px;color:var(--ink-3)}
+.tg{width:51px;height:31px;border-radius:16px;background:rgba(120,120,128,.18);position:relative;flex:none}
+.tg i{position:absolute;left:2px;top:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15)}
+.tg.on{background:var(--matcha)} .tg.on i{left:22px}
+
+/* ---------- widgets ---------- */
+.wall{position:absolute;inset:0;width:100%;height:100%}
+.hs{position:absolute;left:27.5px;right:27.5px;top:70px}
+.wg-m{width:338px;height:158px;border-radius:24px;position:relative;overflow:hidden}
+.wg-s{width:158px;height:158px;border-radius:24px;position:relative;overflow:hidden}
+.wl{font-size:11.5px;font-weight:500;color:var(--ink);text-align:center;margin:6px 0 14px;opacity:.8}
+.row-s{display:flex;justify-content:space-between}
+.wg-photo{background-size:cover;background-position:center;color:#fff}
+.wg-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.28),rgba(0,0,0,0) 35%,rgba(0,0,0,0) 50%,rgba(0,0,0,.5))}
+.wg-tl{position:absolute;left:12px;top:12px;display:flex;align-items:center;gap:7px;font-size:13px} .wg-tl b{font-weight:600} .wg-tl span{opacity:.8;font-size:12px}
+.wg-tl .av{box-shadow:0 0 0 1.5px #fff}
+.wg-bl{position:absolute;left:14px;right:14px;bottom:12px;font-size:13px;line-height:17px} .wg-bl b{display:block;font-weight:600;font-size:14px} .wg-bl span{opacity:.85}
+.wg-paper{background:rgba(255,252,246,.86);backdrop-filter:blur(20px);color:var(--ink)}
+.toy{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;padding:16px;gap:2px;font-size:12.5px}
+.toy b{font-size:15px;font-weight:600;margin-top:10px}
+.toy-btn{width:58px;height:58px;border-radius:50%;background:var(--shu);color:#fff;display:grid;place-items:center;box-shadow:0 8px 18px rgba(210,72,58,.3)}
+.cd{display:grid;grid-template-columns:1fr 1px 1fr;column-gap:18px;padding:16px 18px 0}
+.cd .vsep{background:var(--line-2);height:78px;margin-top:4px}
+.cd-num{font-size:34px;line-height:40px;font-weight:300;letter-spacing:-.03em;margin:4px 0 2px;font-variant-numeric:tabular-nums} .cd-num small{font-size:13px;font-weight:500;color:var(--ink-2);letter-spacing:0}
+.cd-foot{grid-column:1/-1;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-2);margin-top:12px}
+.hs-search{position:absolute;left:50%;transform:translateX(-50%);top:716px;height:30px;border-radius:15px;padding:0 14px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--ink)}
+.dock{position:absolute;left:12px;right:12px;bottom:12px;height:94px;border-radius:38px;display:flex;align-items:center;justify-content:space-around;padding:0 10px}
+.app{width:62px;height:62px;border-radius:16px;background:rgba(255,255,255,.55);display:grid;place-items:center;color:var(--ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.7)}
+
+/* ---------- lock + live activity ---------- */
+.lock-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,12,24,.15),rgba(8,12,24,.05) 40%,rgba(8,12,24,.55))}
+.lock-date{position:absolute;left:0;right:0;top:78px;text-align:center;color:rgba(255,255,255,.9);font-size:19px;font-weight:600}
+.lock-time{position:absolute;left:0;right:0;top:92px;text-align:center;color:rgba(255,255,255,.95);font-size:104px;line-height:112px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.la{position:absolute;left:12px;right:12px;top:560px;border-radius:26px;padding:15px 18px 14px;color:#fff;background:rgba(20,22,30,.48);backdrop-filter:blur(30px) saturate(160%);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.14)}
+.la-top{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600} .la-r{margin-left:auto;font-weight:500;opacity:.75;font-size:12.5px}
+.la-main{display:flex;justify-content:space-between;align-items:flex-end;margin-top:10px}
+.la-sub{font-size:13px;opacity:.75} .la-num{font-size:36px;line-height:40px;font-weight:600;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.la-route{display:flex;align-items:center;gap:6px;font-size:14px;opacity:.9;padding-bottom:6px} .la-route b{font-weight:600;letter-spacing:.04em}
+.prog{position:relative;height:4px;border-radius:2px;background:rgba(255,255,255,.22);margin:16px 6px 0}
+.prog i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:#fff}
+.prog .plane{position:absolute;top:-8px;margin-left:-10px;width:20px;height:20px;border-radius:50%;background:var(--shu);color:#fff;display:grid;place-items:center}
+.prog .plane .ic{width:13px;height:13px}
+.la-foot{display:flex;justify-content:space-between;font-size:12px;opacity:.7;margin-top:12px}
+.lock-btns{position:absolute;left:46px;right:46px;bottom:44px;display:flex;justify-content:space-between}
+
+/* dynamic island board */
+.board{background:#0C0E13}
+.di-board{position:absolute;inset:0;padding-top:28px;overflow:hidden}
+.board .di{display:none}
+.di-lab{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);margin:16px 24px 10px}
+.di-panel{position:relative;margin:0 12px;border-radius:28px;overflow:hidden}
+.di-c{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:210px;height:37px;border-radius:20px;background:#000;display:flex;align-items:center;justify-content:space-between;padding:0 14px 0 10px;color:#fff}
+.di-l{width:24px;height:24px;border-radius:50%;background:var(--shu);display:grid;place-items:center}
+.di-r{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:#F6C9BF}
+.di-min-wrap{position:absolute;top:11px;left:50%;transform:translateX(-50%);display:flex;gap:8px}
+.di-base{width:126px;height:37px;border-radius:20px;background:#000}
+.di-min{width:37px;height:37px;border-radius:50%;background:#000;display:grid;place-items:center}
+.di-x{position:absolute;top:10px;left:10px;right:10px;height:160px;border-radius:44px;background:#000;color:#fff;padding:26px 26px 0}
+.di-x-row{display:flex;justify-content:space-between;align-items:center}
+.di-x-l{display:flex;gap:12px;align-items:center} .di-x-l b{display:block;font-size:15px;font-weight:600} .di-x-l span{font-size:12.5px;opacity:.65}
+.di-x-num{font-size:32px;font-weight:600;letter-spacing:-.025em;color:#F6C9BF;font-variant-numeric:tabular-nums}
+.prog.dark{margin-top:26px}
+.di-x-foot{display:flex;justify-content:space-between;font-size:12px;opacity:.65;margin-top:16px}
+
+/* ---------- android ---------- */
+.android{position:relative;width:412px;height:915px;border-radius:44px;overflow:hidden;background:#151B2B;color:#E9E6F0;font-family:Inter,Roboto,var(--font);box-shadow:0 30px 70px rgba(23,36,61,.16)}
+.a-shade{position:absolute;left:0;right:0;top:0;height:372px;background:rgba(22,26,38,.92);border-radius:0 0 32px 32px;backdrop-filter:blur(20px);padding:0 14px}
+.a-sb{height:40px;display:flex;align-items:center;justify-content:space-between;padding:6px 14px 0;font-size:14px;font-weight:500;position:relative}
+.a-punch{position:absolute;left:50%;top:13px;width:22px;height:22px;margin-left:-11px;border-radius:50%;background:#000}
+.a-sbr{font-size:12.5px;opacity:.85}
+.a-qs{padding:14px 14px 16px;font-size:22px} .a-qs b{font-weight:500;letter-spacing:-.01em}
+.a-notif{background:#262C3D;border-radius:28px;padding:16px 18px 6px}
+.a-n-top{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#B9BCCB} .a-n-top .ic{margin-left:auto}
+.a-mut{color:#9EA3B5}
+.a-n-title{font-size:18px;font-weight:600;margin-top:10px}
+.a-n-text{font-size:14px;color:#C7CAD6;margin-top:3px;line-height:19px}
+.a-prog{position:relative;height:6px;border-radius:3px;background:#3A4157;margin:16px 4px 4px}
+.a-prog i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#F2B4A6}
+.a-prog span{position:absolute;top:-9px;margin-left:-12px;width:24px;height:24px;border-radius:50%;background:#F2B4A6;color:#3B1B16;display:grid;place-items:center}
+.a-prog .ic{width:14px;height:14px}
+.a-n-act{display:flex;gap:8px;margin-top:14px;padding-bottom:10px}
+.a-n-act span{height:36px;padding:0 16px;border-radius:18px;background:#3A4157;display:grid;place-items:center;font-size:13.5px;font-weight:600;color:#F2D7D0}
+.a-handle{width:36px;height:4px;border-radius:2px;background:#5A6076;margin:16px auto 0}
+.a-wg{position:absolute;left:18px;right:18px;top:400px;height:176px;border-radius:28px;background:#F4EEE6;color:#17243D;display:flex;overflow:hidden}
+.a-w-photo{width:176px;background-size:cover;background-position:center;position:relative;border-radius:28px}
+.a-chip{position:absolute;left:10px;bottom:10px;background:rgba(255,255,255,.9);color:#17243D;font-size:12px;font-weight:600;padding:5px 10px;border-radius:12px}
+.a-w-info{flex:1;padding:18px 18px}
+.a-w-info .a-mut{color:#7C8394}
+.a-w-num{font-size:40px;font-weight:300;letter-spacing:-.03em;line-height:46px;margin-top:4px} .a-w-num small{font-size:14px;font-weight:500;letter-spacing:0;color:#55607A}
+.a-w-sub{font-size:13px;color:#55607A} .a-w-sep{height:1px;background:rgba(23,36,61,.12);margin:12px 0}
+.a-toy{position:absolute;left:18px;top:596px;width:200px;height:72px;border-radius:36px;background:#D2483A;color:#fff;display:flex;align-items:center;gap:12px;padding:0 22px;font-size:15px;font-weight:600}
+.a-dock{position:absolute;left:24px;right:24px;top:752px;display:flex;justify-content:space-between}
+.a-app{width:58px;height:58px;border-radius:50%;background:#2A3249;display:grid;place-items:center;color:#DCE1EE}
+.a-search{position:absolute;left:24px;right:24px;top:832px;height:52px;border-radius:26px;background:#2A3249;display:flex;align-items:center;gap:12px;padding:0 20px;color:#B9BFD0;font-size:15px}
+.a-gest{position:absolute;left:50%;bottom:8px;width:110px;height:4px;margin-left:-55px;border-radius:2px;background:#C8CCD8}
+
+/* ---------- web ---------- */
+.web{position:relative;width:1440px;height:1000px;background:var(--paper);overflow:hidden;border-radius:18px;box-shadow:0 30px 70px rgba(23,36,61,.14)}
+.w-top{position:absolute;left:64px;right:64px;top:0;height:84px;display:flex;align-items:center}
+.w-top nav{display:flex;gap:6px;margin-left:48px} .w-top nav span{font-size:15px;font-weight:500;color:var(--ink-2);padding:9px 16px;border-radius:20px} .w-top nav .on{color:var(--ink);background:rgba(23,36,61,.06);font-weight:600}
+.w-acc{margin-left:auto;display:flex;align-items:center;gap:16px}
+.w-prem{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink-2);padding:7px 14px 7px 8px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--line-2)}
+.w-strip{position:absolute;left:64px;right:64px;top:92px;height:128px;border-radius:28px;background-size:cover;background-position:center 58%;overflow:hidden;display:flex;align-items:center;gap:14px;padding:0 24px}
+.w-strip-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,12,24,.5),rgba(8,12,24,.18))}
+.w-chip{position:relative;height:80px;border-radius:24px;display:flex;align-items:center;gap:14px;padding:0 24px 0 18px;flex:1}
+.w-chip b{display:block;font-size:17px;font-weight:600;letter-spacing:-.01em} .w-chip span{font-size:13.5px;opacity:.85}
+.w-cal{position:absolute;left:64px;top:248px;width:858px;height:712px;padding:28px 26px}
+.w-cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding:0 4px}
+.w-today{font-size:14px;font-weight:600;padding:0 12px;color:var(--ink-2)}
+.w-cal .wd{font-size:12px;padding-bottom:8px}
+.w-day{position:absolute;left:950px;right:64px;top:248px;height:712px;padding:28px 26px}
+.w-pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}
+.w-pair .pp{border-radius:22px}
+
+.sub{color:var(--ink-2)}
+.dark .card{box-shadow:0 0 0 1px var(--line),0 10px 30px rgba(0,0,0,.25)}
+.sb-time:empty{display:none}
+.lock-shade+.sb{justify-content:flex-end}
+</style></head><body class="gallery">
+<header class="g-head"><span class="brand"><span class="hanko " style="width:29px;height:29px;font-size:16px">本</span><span style="font-size:20px">Honto</span></span><div><h1>MVP redesign · design direction</h1><p>Reference for implementation, not production code. iPhone frames 393 x 852 pt (iOS 26 look, app targets iOS 17+, portrait only). Web frame 1440 wide. Tokens in README.md.</p></div><span class="sample">Sample data · Mia in Lisbon, Leo in São Paulo · Mon, Oct 19, 2026</span></header>
+<section class="sec"><h2>Onboarding</h2><div class="items"><figure class="item"><div class="phone  " id="onboarding-value" data-shot><div class="ob-photo" style="background-image:url(assets/beach.jpg)"></div>
+<div class="sb light"><span class="sb-time">9:41</span><span class="sb-ic">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.4l1.2 1.3A8.9 8.9 0 0 1 8 2.2zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4a7.2 7.2 0 0 0-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.4l2.2-2.3a3.4 3.4 0 0 0-4.4 0z"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><path d="M24.5 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" opacity=".45"/></svg></span></div>
+<div class="di"></div>
+<div class="ob-float glass-photo"><div class="cap">Mia · Lisbon</div><div class="ob-float-row"><span class="num-l">23</span><span>days until<br>you meet</span></div></div>
+<div class="ob-text">
+  <span class="brand"><span class="hanko " style="width:25px;height:25px;font-size:14px">本</span><span style="font-size:17px">Honto</span></span>
+  <h1 class="t-title1" style="margin-top:18px">Together,<br>even when apart.</h1>
+  <p class="t-body sub" style="margin-top:10px">One photo a day, a countdown to the next hug, and their local time at a glance.</p>
+  <div class="dots"><i class="on"></i><i></i><i></i></div>
+</div>
+<div class="ob-cta">
+  <div class="btn btn-ink"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.6 12.7c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.8 1.2 1.8 2.6 3.1 2.6 1.3-.1 1.7-.8 3.3-.8 1.5 0 1.9.8 3.3.8 1.4 0 2.2-1.3 3-2.5 1-1.4 1.4-2.8 1.4-2.8s-2.5-1-2.4-4.2zM14 5.1c.7-.9 1.2-2 1-3.2-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.1 1.2.1 2.3-.6 3.1-1.5z"/></svg><span>Continue with Apple</span></div>
+  <div class="btn btn-line"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.35 12.27c0-.72-.06-1.42-.18-2.09H12v3.96h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.7 2.91-4.2 2.91-7.26z"/><path fill="#34A853" d="M12 21.75c2.63 0 4.84-.87 6.44-2.36l-3.14-2.45c-.87.59-1.99.93-3.3.93-2.54 0-4.69-1.71-5.46-4.02H3.29v2.52A9.74 9.74 0 0 0 12 21.75z"/><path fill="#FBBC05" d="M6.54 13.85a5.85 5.85 0 0 1 0-3.7V7.63H3.29a9.75 9.75 0 0 0 0 8.74z"/><path fill="#EA4335" d="M12 6.13c1.43 0 2.71.49 3.72 1.45l2.79-2.79A9.36 9.36 0 0 0 12 2.25a9.74 9.74 0 0 0-8.71 5.38l3.25 2.52C7.31 7.84 9.46 6.13 12 6.13z"/></svg><span>Continue with Google</span></div>
+  <div class="btn btn-line"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="3"/><path d="M4.5 7.5l7.5 5.5 7.5-5.5"/></svg><span>Email me a magic link</span></div>
+</div><div class="hb"></div></div>
+<figcaption><b>Onboarding · value + sign-in</b><span>1 of 3 value screens. Apple, Google, email magic link.</span></figcaption></figure><figure class="item"><div class="phone  " id="onboarding-pairing" data-shot><div class="sb"><span class="sb-time">9:41</span><span class="sb-ic">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.4l1.2 1.3A8.9 8.9 0 0 1 8 2.2zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4a7.2 7.2 0 0 0-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.4l2.2-2.3a3.4 3.4 0 0 0-4.4 0z"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><path d="M24.5 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" opacity=".45"/></svg></span></div>
+<div class="di"></div><div class="washi"></div>
+<div class="nav"><div class="circ glass-ui"><svg class="ic " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg></div><span class="cap muted">Step 2 of 3</span><div style="width:44px"></div></div>
+<div class="pad" style="top:126px">
+  <h1 class="t-title1">Pair with<br>your person</h1>
+  <p class="t-body sub" style="margin-top:10px">Honto is for exactly two. Send your code or link, and you are in.</p>
+</div>
+<div class="card code-card" style="top:290px">
+  <div class="cap muted">Your code</div>
+  <div class="code"><span>K7M</span><i></i><span>4Q2</span></div>
+  <div class="t-foot muted" style="text-align:center">hontogame.com/p/k7m4q2 · expires in 24 h</div>
+  <div class="row2" style="margin-top:18px"><div class="btn btn-line sm"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.8"/><path d="M15.5 8.5V6.8A2.8 2.8 0 0 0 12.7 4H6.8A2.8 2.8 0 0 0 4 6.8v5.9a2.8 2.8 0 0 0 2.8 2.8h1.7"/></svg><span>Copy</span></div><div class="btn btn-shu sm"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M12 3.5v11M7.8 7.7L12 3.5l4.2 4.2M6 11.5v6.7A2.3 2.3 0 0 0 8.3 20.5h7.4a2.3 2.3 0 0 0 2.3-2.3v-6.7"/></svg><span>Share link</span></div></div>
+</div>
+<div class="or" style="top:556px"><i></i><span>or</span><i></i></div>
+<div class="pad" style="top:596px">
+  <div class="field"><svg class="ic muted" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.2 1.2M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/></svg><span class="muted">Enter their code</span><span class="field-btn">Join</span></div>
+</div>
+<div class="waiting" style="top:700px"><span class="pulse"></span><span class="t-foot muted">Waiting for your partner to join</span></div>
+<div class="hb"></div></div>
+<figcaption><b>Onboarding · pairing</b><span>Code or link. A couple is exactly two.</span></figcaption></figure><figure class="item"><div class="phone  " id="paywall" data-shot><div class="sb"><span class="sb-time">9:41</span><span class="sb-ic">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.4l1.2 1.3A8.9 8.9 0 0 1 8 2.2zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4a7.2 7.2 0 0 0-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.4l2.2-2.3a3.4 3.4 0 0 0-4.4 0z"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><path d="M24.5 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" opacity=".45"/></svg></span></div>
+<div class="di"></div><div class="washi"></div>
+<div class="nav"><span class="t-foot muted" style="padding-left:6px">Restore</span><span></span><div class="circ glass-ui" title="Dismiss"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></div></div>
+<div class="pw-hero">
+  <div class="pw-ph a" style="background-image:url(assets/alfama2.jpg)"></div>
+  <div class="pw-ph b" style="background-image:url(assets/spdusk.jpg)"></div>
+  <span class="hanko pw-stamp" style="width:40px;height:40px;font-size:22px">本</span>
+</div>
+<div class="pad center" style="top:286px">
+  <h1 class="t-title2">Keep every day, together.</h1>
+  <p class="t-callout muted" style="margin-top:6px">One plan for both of you. Mia is included.</p>
+</div>
+<ul class="feats" style="top:368px"><li><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.6L4 8.7"/><path d="M4 4v4.7h4.7M12 8v4l2.8 1.8"/></svg><span>Full history, in the app and on the web</span></li><li><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Couple calendar, busy and free</span></li><li><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2.2"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="2.2"/><rect x="3.5" y="13" width="17" height="7.5" rx="2.2"/></svg><span>Countdown and extra widgets</span></li><li><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="3" y="8" width="18" height="8" rx="4"/><circle cx="16.5" cy="12" r="1.2"/></svg><span>Trip-day Live Activity</span></li><li><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="3.5" y="6" width="10" height="14" rx="2.5" transform="rotate(-8 8.5 13)"/><rect x="10.5" y="4" width="10" height="14" rx="2.5"/></svg><span>Premium game decks</span></li></ul>
+<p class="free-line" style="top:540px">Always free: pairing, the daily photo, the photo widget, countdown and partner time, Thinking of you, and the last 7 days.</p>
+<div class="plans" style="top:606px">
+  <div class="plan on"><span class="badge">Save 50%</span><div class="cap">Yearly</div><div class="price">$29.99<small>/yr</small></div><div class="t-foot muted">$2.50 a month</div><span class="radio"><svg class="ic " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>
+  <div class="plan"><div class="cap">Monthly</div><div class="price">$4.99<small>/mo</small></div><div class="t-foot muted">Billed monthly</div><span class="radio"></span></div>
+</div>
+<div class="pad" style="top:718px"><div class="btn btn-ink">Start 7-day free trial</div>
+<p class="t-cap2 muted center" style="margin-top:10px">7 days free, then $29.99 a year per couple. Cancel anytime.</p></div>
+<div class="hb"></div></div>
+<figcaption><b>Paywall</b><span>After pairing. 7-day trial, dismissable.</span></figcaption></figure></div></section><section class="sec"><h2>Today and camera</h2><div class="items"><figure class="item"><div class="phone  " id="today" data-shot><div class="hero" style="background-image:url(assets/tram.jpg)"></div><div class="hero-shade"></div>
+<div class="sb light"><span class="sb-time">9:41</span><span class="sb-ic">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.4l1.2 1.3A8.9 8.9 0 0 1 8 2.2zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4a7.2 7.2 0 0 0-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.4l2.2-2.3a3.4 3.4 0 0 0-4.4 0z"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><path d="M24.5 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" opacity=".45"/></svg></span></div>
+<div class="di"></div>
+<div class="nav"><div class="who glass-photo"><span class="av av-mia" style="width:32px;height:32px;font-size:13px">M</span><div><b>Mia</b><span>Lisbon</span></div></div><div class="circ glass-photo"><svg class="ic " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></div></div>
+<div class="today-cap">
+  <div class="cap light-2">Mia's photo of the day · 8:05 AM her time</div>
+  <div class="t-title3 light" style="margin-top:8px">The 28 was on time.<br>First time ever.</div>
+</div>
+<div class="today-card glass-photo">
+  <div class="tc-col">
+    <div class="cap light-2">Next meeting</div>
+    <div class="big-num">23<small>days</small></div>
+    <div class="t-foot light-2">Wed, Nov 11 · Lisbon</div>
+  </div>
+  <div class="tc-sep"></div>
+  <div class="tc-col">
+    <div class="cap light-2">Mia's time</div>
+    <div class="big-num">1:41<small>PM</small></div>
+    <div class="t-foot light-2"><span class="dot busy"></span>Busy until 3 PM</div>
+  </div>
+  <div class="tc-foot"><span class="hanko " style="width:16px;height:16px;font-size:9px">本</span><span>412 days together</span></div>
+</div>
+<div class="tabwrap"><div class="tabbar glass-ui"><div class="tab on"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.8v2M12 19.2v2M2.8 12h2M19.2 12h2M5.5 5.5l1.4 1.4M17.1 17.1l1.4 1.4M5.5 18.5l1.4-1.4M17.1 6.9l1.4-1.4"/></svg><span>Today</span></div><div class="tab"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Calendar</span></div><div class="tab"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="7" y="3.5" width="13.5" height="13.5" rx="3"/><path d="M3.5 7.5v9.5a3.5 3.5 0 0 0 3.5 3.5h9.5"/><path d="M7.5 14.5l3.5-3.5 3 3 2-2 3.5 3.5"/></svg><span>Memories</span></div></div>
+<div class="tabcam glass-ui" title="Take photo"><svg class="ic " width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 8.8A2.6 2.6 0 0 1 6.6 6.2h1.6l1.5-2.2h4.6l1.5 2.2h1.6A2.6 2.6 0 0 1 20 8.8v8.6a2.6 2.6 0 0 1-2.6 2.6H6.6A2.6 2.6 0 0 1 4 17.4z"/><circle cx="12" cy="12.8" r="3.6"/></svg></div></div><div class="hb light"></div></div>
+<figcaption><b>Today</b><span>Partner photo is the hero. Native glass tab bar + camera button.</span></figcaption></figure><figure class="item"><div class="phone  " id="camera" data-shot><div class="cam-bg"></div><div class="sb light"><span class="sb-time">9:41</span><span class="sb-ic">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.4l1.2 1.3A8.9 8.9 0 0 1 8 2.2zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4a7.2 7.2 0 0 0-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.4l2.2-2.3a3.4 3.4 0 0 0-4.4 0z"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><path d="M24.5 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" opacity=".45"/></svg></span></div>
+<div class="di"></div>
+<div class="nav"><div class="circ glass-dark"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></div><span class="cap light-2">Photo of the day</span><div class="circ glass-dark"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M13 3L5.5 13.2h5.8L10.5 21 18 10.8h-5.8z"/></svg></div></div>
+<div class="viewfinder" style="background-image:url(assets/piccolo.jpg)"><div class="vf-grid"></div></div>
+<div class="cam-hint t-foot light-2">Mia gets it right away. It also lands on today in Memories.</div>
+<div class="cam-controls">
+  <div class="cam-thumb" style="background-image:url(assets/ibira.jpg)"></div>
+  <div class="shutter"><i></i></div>
+  <div class="circ glass-dark big"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4.5 11a7.5 7.5 0 0 1 13.2-4.4L19.5 8.5M19.5 4v4.5H15M19.5 13a7.5 7.5 0 0 1-13.2 4.4L4.5 15.5M4.5 20v-4.5H9"/></svg></div>
+</div><div class="hb light"></div></div>
+<figcaption><b>Camera</b><span>One photo of the day per person.</span></figcaption></figure><figure class="item"><div class="phone  " id="camera-send" data-shot><div class="cam-bg"></div><div class="sb light"><span class="sb-time">9:41</span><span class="sb-ic">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.4l1.2 1.3A8.9 8.9 0 0 1 8 2.2zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4a7.2 7.2 0 0 0-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.4l2.2-2.3a3.4 3.4 0 0 0-4.4 0z"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><path d="M24.5 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" opacity=".45"/></svg></span></div>
+<div class="di"></div>
+<div class="nav"><div class="circ glass-dark"><svg class="ic " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg></div><span class="cap light-2">Today · Mon, Oct 19</span><div style="width:44px"></div></div>
+<div class="preview" style="background-image:url(assets/piccolo.jpg)">
+  <div class="caption-pill glass-photo"><span>Coffee before work. Miss you.</span><small>29/80</small></div>
+</div>
+<div class="send-row">
+  <div class="btn btn-glass-dark"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 8.8A2.6 2.6 0 0 1 6.6 6.2h1.6l1.5-2.2h4.6l1.5 2.2h1.6A2.6 2.6 0 0 1 20 8.8v8.6a2.6 2.6 0 0 1-2.6 2.6H6.6A2.6 2.6 0 0 1 4 17.4z"/><circle cx="12" cy="12.8" r="3.6"/></svg><span>Retake</span></div>
+  <div class="btn btn-shu"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M12 19V5.5M6.5 11L12 5.5 17.5 11"/></svg><span>Send to Mia</span></div>
+</div>
+<div class="t-cap2 light-2 center" style="position:absolute;left:0;right:0;top:770px">This is your photo of the day. Extra shots go to the day's gallery.</div>
+<div class="hb light"></div></div>
+<figcaption><b>Send</b><span>Optional short caption, 80 chars.</span></figcaption></figure></div></section><section class="sec"><h2>Calendar, Memories, Couple</h2><div class="items"><figure class="item"><div class="phone  " id="calendar" data-shot><div class="sb"><span class="sb-time">9:41</span><span class="sb-ic">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.4l1.2 1.3A8.9 8.9 0 0 1 8 2.2zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4a7.2 7.2 0 0 0-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.4l2.2-2.3a3.4 3.4 0 0 0-4.4 0z"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><path d="M24.5 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" opacity=".45"/></svg></span></div>
+<div class="di"></div><div class="washi"></div>
+<div class="nav"><div></div><div></div><div class="circ glass-ui"><svg class="ic " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></div></div>
+<div class="pad" style="top:100px"><h1 class="t-large">Calendar</h1></div>
+<div class="weekstrip" style="top:158px"><div class="day on"><span>Mon</span><b>19</b></div><div class="day"><span>Tue</span><b>20</b></div><div class="day"><span>Wed</span><b>21</b></div><div class="day"><span>Thu</span><b>22</b></div><div class="day"><span>Fri</span><b>23</b></div><div class="day"><span>Sat</span><b>24</b></div><div class="day"><span>Sun</span><b>25</b></div></div>
+<div class="best-card card" style="top:236px"><span class="dot free-d"></span><div><b>Best time to call: 5 – 7 PM</b><span class="t-foot muted">That is 9 – 11 PM for Mia. You are both free.</span></div></div>
+<div class="tl-head" style="top:318px"><span></span><div><span class="av av-leo" style="width:22px;height:22px;font-size:9px">L</span><b>You</b><span class="muted">São Paulo</span></div><div><span class="av av-mia" style="width:22px;height:22px;font-size:9px">M</span><b>Mia</b><span class="muted">Lisbon +4h</span></div></div>
+<div class="timeline" style="top:352px"><div class="hr" style="top:0px"><span>8 AM</span></div><div class="hr" style="top:31px"><span>9 AM</span></div><div class="hr" style="top:62px"><span>10 AM</span></div><div class="hr" style="top:93px"><span>11 AM</span></div><div class="hr" style="top:124px"><span>12 PM</span></div><div class="hr" style="top:155px"><span>1 PM</span></div><div class="hr" style="top:186px"><span>2 PM</span></div><div class="hr" style="top:217px"><span>3 PM</span></div><div class="hr" style="top:248px"><span>4 PM</span></div><div class="hr" style="top:279px"><span>5 PM</span></div><div class="hr" style="top:310px"><span>6 PM</span></div><div class="hr" style="top:341px"><span>7 PM</span></div><div class="hr" style="top:372px"><span>8 PM</span></div><div class="hr" style="top:403px"><span>9 PM</span></div><div class="cols"><div class="col"><div class="blk you " style="top:31px;height:90px"><span>Work</span></div><div class="blk you " style="top:155px;height:121px"><span>Work</span></div><div class="blk you " style="top:372px;height:28px"><span>Gym</span></div></div><div class="col"><div class="blk mia " style="top:0px;height:90px"><span><svg class="ic " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M3.5 3.5l17 17M10.6 6.1A8.6 8.6 0 0 1 12 6c5 0 8.5 6 8.5 6a14.8 14.8 0 0 1-2.6 3.2M6.3 7.6A14.5 14.5 0 0 0 3.5 12s3.5 6 8.5 6a8 8 0 0 0 3.6-.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>Busy</span></div><div class="blk mia " style="top:186px;height:43px"><span><svg class="ic " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M3.5 3.5l17 17M10.6 6.1A8.6 8.6 0 0 1 12 6c5 0 8.5 6 8.5 6a14.8 14.8 0 0 1-2.6 3.2M6.3 7.6A14.5 14.5 0 0 0 3.5 12s3.5 6 8.5 6a8 8 0 0 0 3.6-.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>Busy</span></div><div class="blk mia sleep" style="top:341px;height:90px"><span><svg class="ic " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M19.5 14.6A7.8 7.8 0 0 1 9.4 4.5a7.8 7.8 0 1 0 10.1 10.1z"/></svg>Asleep</span></div></div><div class="free" style="top:124px;height:28px"></div><div class="free best" style="top:279px;height:59px"><span>Both free</span></div><div class="now" style="top:52px"><i></i></div></div></div>
+<div class="tabwrap"><div class="tabbar glass-ui"><div class="tab"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.8v2M12 19.2v2M2.8 12h2M19.2 12h2M5.5 5.5l1.4 1.4M17.1 17.1l1.4 1.4M5.5 18.5l1.4-1.4M17.1 6.9l1.4-1.4"/></svg><span>Today</span></div><div class="tab on"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Calendar</span></div><div class="tab"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="7" y="3.5" width="13.5" height="13.5" rx="3"/><path d="M3.5 7.5v9.5a3.5 3.5 0 0 0 3.5 3.5h9.5"/><path d="M7.5 14.5l3.5-3.5 3 3 2-2 3.5 3.5"/></svg><span>Memories</span></div></div>
+<div class="tabcam glass-ui" title="Take photo"><svg class="ic " width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 8.8A2.6 2.6 0 0 1 6.6 6.2h1.6l1.5-2.2h4.6l1.5 2.2h1.6A2.6 2.6 0 0 1 20 8.8v8.6a2.6 2.6 0 0 1-2.6 2.6H6.6A2.6 2.6 0 0 1 4 17.4z"/><circle cx="12" cy="12.8" r="3.6"/></svg></div></div><div class="hb"></div></div>
+<figcaption><b>Calendar</b><span>Busy / free side by side, titles hidden by default.</span></figcaption></figure><figure class="item"><div class="phone  " id="memories" data-shot><div class="sb"><span class="sb-time">9:41</span><span class="sb-ic">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.4l1.2 1.3A8.9 8.9 0 0 1 8 2.2zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4a7.2 7.2 0 0 0-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.4l2.2-2.3a3.4 3.4 0 0 0-4.4 0z"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><path d="M24.5 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" opacity=".45"/></svg></span></div>
+<div class="di"></div><div class="washi"></div>
+<div class="nav"><div></div><div></div><div class="circ glass-ui"><svg class="ic " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></div></div>
+<div class="pad" style="top:100px"><h1 class="t-large">Memories</h1></div>
+<div class="month-row" style="top:166px"><div><span class="t-title3">October 2026</span><span class="jp">十月</span></div><div class="mnav"><span class="circ sm glass-ui"><svg class="ic " width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg></span><span class="circ sm glass-ui"><svg class="ic " width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M9.5 5.5L16 12l-6.5 6.5"/></svg></span></div></div>
+<div class="pad" style="top:220px"><div class="mgrid" style="--cell:45px;--gap:6px;--r:12px"><div class="wd">M</div><div class="wd">T</div><div class="wd">W</div><div class="wd">T</div><div class="wd">F</div><div class="wd">S</div><div class="wd">S</div><div class="mc empty"></div><div class="mc empty"></div><div class="mc empty"></div><div class="mc ph" style="background-image:url(assets/alfama.jpg)"><span style="font-size:11px">1</span></div><div class="mc ph" style="background-image:url(assets/nata.jpg)"><span style="font-size:11px">2</span></div><div class="mc ph" style="background-image:url(assets/tram2.jpg)"><span style="font-size:11px">3</span></div><div class="mc ph" style="background-image:url(assets/beach2.jpg)"><span style="font-size:11px">4</span></div><div class="mc ph" style="background-image:url(assets/miradouro.jpg)"><span style="font-size:11px">5</span></div><div class="mc ph" style="background-image:url(assets/azulejo.jpg)"><span style="font-size:11px">6</span></div><div class="mc half"><span style="font-size:11px">7</span><i></i></div><div class="mc ph" style="background-image:url(assets/belem.jpg)"><span style="font-size:11px">8</span></div><div class="mc ph" style="background-image:url(assets/leaf.jpg)"><span style="font-size:11px">9</span></div><div class="mc ph" style="background-image:url(assets/alcantara.jpg)"><span style="font-size:11px">10</span></div><div class="mc ph" style="background-image:url(assets/piccolo.jpg)"><span style="font-size:11px">11</span></div><div class="mc ph" style="background-image:url(assets/beach.jpg)"><span style="font-size:11px">12</span></div><div class="mc ph" style="background-image:url(assets/tram.jpg)"><span style="font-size:11px">13</span></div><div class="mc half"><span style="font-size:11px">14</span><i></i></div><div class="mc ph" style="background-image:url(assets/alcantara.jpg)"><span style="font-size:11px">15</span></div><div class="mc ph" style="background-image:url(assets/nata.jpg)"><span style="font-size:11px">16</span></div><div class="mc ph" style="background-image:url(assets/alfama.jpg)"><span style="font-size:11px">17</span></div><div class="mc ph" style="background-image:url(assets/alfama2.jpg)"><span style="font-size:11px">18</span></div><div class="mc today ph" style="background-image:url(assets/tram.jpg)"><span style="font-size:11px">19</span></div><div class="mc future"><span style="font-size:11px">20</span></div><div class="mc future"><span style="font-size:11px">21</span></div><div class="mc future"><span style="font-size:11px">22</span></div><div class="mc future"><span style="font-size:11px">23</span></div><div class="mc future"><span style="font-size:11px">24</span></div><div class="mc future"><span style="font-size:11px">25</span></div><div class="mc future"><span style="font-size:11px">26</span></div><div class="mc future"><span style="font-size:11px">27</span></div><div class="mc future"><span style="font-size:11px">28</span></div><div class="mc future"><span style="font-size:11px">29</span></div><div class="mc future"><span style="font-size:11px">30</span></div><div class="mc future"><span style="font-size:11px">31</span></div><div class="mc empty"></div></div></div>
+<div class="card sum-card" style="top:540px">
+  <div><span class="sum-num">17</span><span class="t-foot muted">days with<br>both photos</span></div><i></i>
+  <div><span class="sum-num">36</span><span class="t-foot muted">photos<br>this month</span></div><i></i>
+  <div><span class="sum-num">19</span><span class="t-foot muted">day<br>streak</span></div>
+</div>
+<div class="t-foot muted center" style="position:absolute;left:0;right:0;top:648px">Also on hontogame.com/app</div>
+<div class="tabwrap"><div class="tabbar glass-ui"><div class="tab"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.8v2M12 19.2v2M2.8 12h2M19.2 12h2M5.5 5.5l1.4 1.4M17.1 17.1l1.4 1.4M5.5 18.5l1.4-1.4M17.1 6.9l1.4-1.4"/></svg><span>Today</span></div><div class="tab"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Calendar</span></div><div class="tab on"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="7" y="3.5" width="13.5" height="13.5" rx="3"/><path d="M3.5 7.5v9.5a3.5 3.5 0 0 0 3.5 3.5h9.5"/><path d="M7.5 14.5l3.5-3.5 3 3 2-2 3.5 3.5"/></svg><span>Memories</span></div></div>
+<div class="tabcam glass-ui" title="Take photo"><svg class="ic " width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 8.8A2.6 2.6 0 0 1 6.6 6.2h1.6l1.5-2.2h4.6l1.5 2.2h1.6A2.6 2.6 0 0 1 20 8.8v8.6a2.6 2.6 0 0 1-2.6 2.6H6.6A2.6 2.6 0 0 1 4 17.4z"/><circle cx="12" cy="12.8" r="3.6"/></svg></div></div><div class="hb"></div></div>
+<figcaption><b>Memories · month</b><span>Partner photo per day as thumbnail.</span></figcaption></figure><figure class="item"><div class="phone  " id="memories-day" data-shot><div class="dim-under"><div class="sb"><span class="sb-time">9:41</span><span class="sb-ic">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.4l1.2 1.3A8.9 8.9 0 0 1 8 2.2zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4a7.2 7.2 0 0 0-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.4l2.2-2.3a3.4 3.4 0 0 0-4.4 0z"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><path d="M24.5 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" opacity=".45"/></svg></span></div>
+<div class="di"></div><div class="washi"></div>
+<div class="nav"><div></div><div></div><div class="circ glass-ui"><svg class="ic " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></div></div>
+<div class="pad" style="top:100px"><h1 class="t-large">Memories</h1></div>
+<div class="month-row" style="top:166px"><div><span class="t-title3">October 2026</span><span class="jp">十月</span></div><div class="mnav"><span class="circ sm glass-ui"><svg class="ic " width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg></span><span class="circ sm glass-ui"><svg class="ic " width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M9.5 5.5L16 12l-6.5 6.5"/></svg></span></div></div>
+<div class="pad" style="top:220px"><div class="mgrid" style="--cell:45px;--gap:6px;--r:12px"><div class="wd">M</div><div class="wd">T</div><div class="wd">W</div><div class="wd">T</div><div class="wd">F</div><div class="wd">S</div><div class="wd">S</div><div class="mc empty"></div><div class="mc empty"></div><div class="mc empty"></div><div class="mc ph" style="background-image:url(assets/alfama.jpg)"><span style="font-size:11px">1</span></div><div class="mc ph" style="background-image:url(assets/nata.jpg)"><span style="font-size:11px">2</span></div><div class="mc ph" style="background-image:url(assets/tram2.jpg)"><span style="font-size:11px">3</span></div><div class="mc ph" style="background-image:url(assets/beach2.jpg)"><span style="font-size:11px">4</span></div><div class="mc ph" style="background-image:url(assets/miradouro.jpg)"><span style="font-size:11px">5</span></div><div class="mc ph" style="background-image:url(assets/azulejo.jpg)"><span style="font-size:11px">6</span></div><div class="mc half"><span style="font-size:11px">7</span><i></i></div><div class="mc ph" style="background-image:url(assets/belem.jpg)"><span style="font-size:11px">8</span></div><div class="mc ph" style="background-image:url(assets/leaf.jpg)"><span style="font-size:11px">9</span></div><div class="mc ph" style="background-image:url(assets/alcantara.jpg)"><span style="font-size:11px">10</span></div><div class="mc ph" style="background-image:url(assets/piccolo.jpg)"><span style="font-size:11px">11</span></div><div class="mc ph" style="background-image:url(assets/beach.jpg)"><span style="font-size:11px">12</span></div><div class="mc ph" style="background-image:url(assets/tram.jpg)"><span style="font-size:11px">13</span></div><div class="mc half"><span style="font-size:11px">14</span><i></i></div><div class="mc ph" style="background-image:url(assets/alcantara.jpg)"><span style="font-size:11px">15</span></div><div class="mc ph" style="background-image:url(assets/nata.jpg)"><span style="font-size:11px">16</span></div><div class="mc ph" style="background-image:url(assets/alfama.jpg)"><span style="font-size:11px">17</span></div><div class="mc ph" style="background-image:url(assets/alfama2.jpg)"><span style="font-size:11px">18</span></div><div class="mc today ph" style="background-image:url(assets/tram.jpg)"><span style="font-size:11px">19</span></div><div class="mc future"><span style="font-size:11px">20</span></div><div class="mc future"><span style="font-size:11px">21</span></div><div class="mc future"><span style="font-size:11px">22</span></div><div class="mc future"><span style="font-size:11px">23</span></div><div class="mc future"><span style="font-size:11px">24</span></div><div class="mc future"><span style="font-size:11px">25</span></div><div class="mc future"><span style="font-size:11px">26</span></div><div class="mc future"><span style="font-size:11px">27</span></div><div class="mc future"><span style="font-size:11px">28</span></div><div class="mc future"><span style="font-size:11px">29</span></div><div class="mc future"><span style="font-size:11px">30</span></div><div class="mc future"><span style="font-size:11px">31</span></div><div class="mc empty"></div></div></div>
+<div class="card sum-card" style="top:540px">
+  <div><span class="sum-num">17</span><span class="t-foot muted">days with<br>both photos</span></div><i></i>
+  <div><span class="sum-num">36</span><span class="t-foot muted">photos<br>this month</span></div><i></i>
+  <div><span class="sum-num">19</span><span class="t-foot muted">day<br>streak</span></div>
+</div>
+<div class="t-foot muted center" style="position:absolute;left:0;right:0;top:648px">Also on hontogame.com/app</div>
+<div class="tabwrap"><div class="tabbar glass-ui"><div class="tab"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.8v2M12 19.2v2M2.8 12h2M19.2 12h2M5.5 5.5l1.4 1.4M17.1 17.1l1.4 1.4M5.5 18.5l1.4-1.4M17.1 6.9l1.4-1.4"/></svg><span>Today</span></div><div class="tab"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Calendar</span></div><div class="tab on"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="7" y="3.5" width="13.5" height="13.5" rx="3"/><path d="M3.5 7.5v9.5a3.5 3.5 0 0 0 3.5 3.5h9.5"/><path d="M7.5 14.5l3.5-3.5 3 3 2-2 3.5 3.5"/></svg><span>Memories</span></div></div>
+<div class="tabcam glass-ui" title="Take photo"><svg class="ic " width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 8.8A2.6 2.6 0 0 1 6.6 6.2h1.6l1.5-2.2h4.6l1.5 2.2h1.6A2.6 2.6 0 0 1 20 8.8v8.6a2.6 2.6 0 0 1-2.6 2.6H6.6A2.6 2.6 0 0 1 4 17.4z"/><circle cx="12" cy="12.8" r="3.6"/></svg></div></div><div class="hb"></div></div><div class="scrim"></div>
+<div class="sheet glass-sheet">
+  <div class="grabber"></div>
+  <div class="sheet-head"><div><div class="cap muted">Day 411</div><div class="t-title3" style="margin-top:3px">Sunday, October 18</div></div><div class="circ glass-ui"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></div></div>
+  <div class="pair">
+    <div><div class="pp" style="background-image:url(assets/alfama2.jpg)"></div><div class="pp-meta"><span class="av av-mia" style="width:20px;height:20px;font-size:8px">M</span><b>Mia</b><span class="muted">7:48 PM · Lisbon</span></div><p class="t-foot">Sunday walk up to Graça. Rooftops for days.</p></div>
+    <div><div class="pp" style="background-image:url(assets/ibira.jpg)"></div><div class="pp-meta"><span class="av av-leo" style="width:20px;height:20px;font-size:8px">L</span><b>You</b><span class="muted">3:52 PM · São Paulo</span></div><p class="t-foot">Ibirapuera with Rafa. You would love this light.</p></div>
+  </div>
+  <div class="more-row"><div class="mini" style="background-image:url(assets/nata.jpg)"></div><div class="mini" style="background-image:url(assets/ibira2.jpg)"></div><span class="t-callout">2 more from this day</span><svg class="ic muted" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M9.5 5.5L16 12l-6.5 6.5"/></svg></div>
+  <div class="row2" style="margin-top:22px"><div class="btn btn-line sm"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M12 4v10.5M7.8 10.3L12 14.5l4.2-4.2M5 19.5h14"/></svg><span>Save</span></div><div class="btn btn-line sm"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M12 3.5v11M7.8 7.7L12 3.5l4.2 4.2M6 11.5v6.7A2.3 2.3 0 0 0 8.3 20.5h7.4a2.3 2.3 0 0 0 2.3-2.3v-6.7"/></svg><span>Share</span></div></div>
+</div><div class="hb"></div></div>
+<figcaption><b>Memories · opened day</b><span>Glass sheet with both photos.</span></figcaption></figure><figure class="item"><div class="phone  " id="settings-couple" data-shot><div class="sb"><span class="sb-time">9:41</span><span class="sb-ic">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.4l1.2 1.3A8.9 8.9 0 0 1 8 2.2zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4a7.2 7.2 0 0 0-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.4l2.2-2.3a3.4 3.4 0 0 0-4.4 0z"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><path d="M24.5 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" opacity=".45"/></svg></span></div>
+<div class="di"></div><div class="washi"></div>
+<div class="nav"><div class="circ glass-ui"><svg class="ic " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg></div><b class="t-head">Couple</b><div style="width:44px"></div></div>
+<div class="couple card" style="top:112px">
+  <div class="avs"><span class="av av-mia" style="width:52px;height:52px;font-size:22px">M</span><span class="av av-leo" style="width:52px;height:52px;font-size:22px">L</span><span class="hanko avs-stamp" style="width:22px;height:22px;font-size:12px">本</span></div>
+  <div><div class="t-title3">Mia &amp; Leo</div><div class="t-foot muted" style="margin-top:2px">412 days together · Premium</div></div>
+</div>
+<div class="group" style="top:232px">
+  <div class="g-row"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg><span class="l">Next meeting</span><span class="muted">Nov 11 · Lisbon</span><svg class="ic muted" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M9.5 5.5L16 12l-6.5 6.5"/></svg></div>
+  <div class="g-row"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M12 19.6s-7.3-4.4-7.3-9.9A4.2 4.2 0 0 1 12 7.1a4.2 4.2 0 0 1 7.3 2.6c0 5.5-7.3 9.9-7.3 9.9z"/></svg><span class="l">Together since</span><span class="muted">Sep 2, 2025</span><svg class="ic muted" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M9.5 5.5L16 12l-6.5 6.5"/></svg></div>
+  <div class="g-row"><span class="hanko " style="width:19px;height:19px;font-size:11px">本</span><span class="l">Honto Premium</span><span class="muted">Active</span><svg class="ic muted" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M9.5 5.5L16 12l-6.5 6.5"/></svg></div>
+</div>
+<div class="g-label" style="top:410px">Calendar privacy</div>
+<div class="group" style="top:436px">
+  <div class="g-row"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span class="l">Share busy and free</span><span class="tg on"><i></i></span></div>
+  <div class="g-row"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M3.5 3.5l17 17M10.6 6.1A8.6 8.6 0 0 1 12 6c5 0 8.5 6 8.5 6a14.8 14.8 0 0 1-2.6 3.2M6.3 7.6A14.5 14.5 0 0 0 3.5 12s3.5 6 8.5 6a8 8 0 0 0 3.6-.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg><span class="l">Share event titles</span><span class="tg"><i></i></span></div>
+</div>
+<p class="g-note" style="top:552px">Off by default. Mia only sees Busy and Free. Your event titles never leave this phone.</p>
+<div class="group" style="top:626px">
+  <div class="g-row danger"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M9 7.2l1.6-1.6a4.5 4.5 0 0 1 6.4 6.4L15.4 13.6M8.6 10.4L7 12a4.5 4.5 0 0 0 6.4 6.4L15 16.8M4 4l16 16"/></svg><span class="l">Unpair</span></div>
+</div>
+<p class="g-note" style="top:690px">Each of you keeps your own photos for 30 days, with export. Then everything is deleted.</p>
+<div class="hb"></div></div>
+<figcaption><b>Settings / Couple</b><span>Calendar privacy and Unpair.</span></figcaption></figure><figure class="item"><div class="phone dark " id="memories-dark" data-shot><div class="sb"><span class="sb-time">9:41</span><span class="sb-ic">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.4l1.2 1.3A8.9 8.9 0 0 1 8 2.2zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4a7.2 7.2 0 0 0-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.4l2.2-2.3a3.4 3.4 0 0 0-4.4 0z"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><path d="M24.5 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" opacity=".45"/></svg></span></div>
+<div class="di"></div><div class="washi"></div>
+<div class="nav"><div></div><div></div><div class="circ glass-ui"><svg class="ic " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></div></div>
+<div class="pad" style="top:100px"><h1 class="t-large">Memories</h1></div>
+<div class="month-row" style="top:166px"><div><span class="t-title3">October 2026</span><span class="jp">十月</span></div><div class="mnav"><span class="circ sm glass-ui"><svg class="ic " width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg></span><span class="circ sm glass-ui"><svg class="ic " width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M9.5 5.5L16 12l-6.5 6.5"/></svg></span></div></div>
+<div class="pad" style="top:220px"><div class="mgrid" style="--cell:45px;--gap:6px;--r:12px"><div class="wd">M</div><div class="wd">T</div><div class="wd">W</div><div class="wd">T</div><div class="wd">F</div><div class="wd">S</div><div class="wd">S</div><div class="mc empty"></div><div class="mc empty"></div><div class="mc empty"></div><div class="mc ph" style="background-image:url(assets/alfama.jpg)"><span style="font-size:11px">1</span></div><div class="mc ph" style="background-image:url(assets/nata.jpg)"><span style="font-size:11px">2</span></div><div class="mc ph" style="background-image:url(assets/tram2.jpg)"><span style="font-size:11px">3</span></div><div class="mc ph" style="background-image:url(assets/beach2.jpg)"><span style="font-size:11px">4</span></div><div class="mc ph" style="background-image:url(assets/miradouro.jpg)"><span style="font-size:11px">5</span></div><div class="mc ph" style="background-image:url(assets/azulejo.jpg)"><span style="font-size:11px">6</span></div><div class="mc half"><span style="font-size:11px">7</span><i></i></div><div class="mc ph" style="background-image:url(assets/belem.jpg)"><span style="font-size:11px">8</span></div><div class="mc ph" style="background-image:url(assets/leaf.jpg)"><span style="font-size:11px">9</span></div><div class="mc ph" style="background-image:url(assets/alcantara.jpg)"><span style="font-size:11px">10</span></div><div class="mc ph" style="background-image:url(assets/piccolo.jpg)"><span style="font-size:11px">11</span></div><div class="mc ph" style="background-image:url(assets/beach.jpg)"><span style="font-size:11px">12</span></div><div class="mc ph" style="background-image:url(assets/tram.jpg)"><span style="font-size:11px">13</span></div><div class="mc half"><span style="font-size:11px">14</span><i></i></div><div class="mc ph" style="background-image:url(assets/alcantara.jpg)"><span style="font-size:11px">15</span></div><div class="mc ph" style="background-image:url(assets/nata.jpg)"><span style="font-size:11px">16</span></div><div class="mc ph" style="background-image:url(assets/alfama.jpg)"><span style="font-size:11px">17</span></div><div class="mc ph" style="background-image:url(assets/alfama2.jpg)"><span style="font-size:11px">18</span></div><div class="mc today ph" style="background-image:url(assets/tram.jpg)"><span style="font-size:11px">19</span></div><div class="mc future"><span style="font-size:11px">20</span></div><div class="mc future"><span style="font-size:11px">21</span></div><div class="mc future"><span style="font-size:11px">22</span></div><div class="mc future"><span style="font-size:11px">23</span></div><div class="mc future"><span style="font-size:11px">24</span></div><div class="mc future"><span style="font-size:11px">25</span></div><div class="mc future"><span style="font-size:11px">26</span></div><div class="mc future"><span style="font-size:11px">27</span></div><div class="mc future"><span style="font-size:11px">28</span></div><div class="mc future"><span style="font-size:11px">29</span></div><div class="mc future"><span style="font-size:11px">30</span></div><div class="mc future"><span style="font-size:11px">31</span></div><div class="mc empty"></div></div></div>
+<div class="card sum-card" style="top:540px">
+  <div><span class="sum-num">17</span><span class="t-foot muted">days with<br>both photos</span></div><i></i>
+  <div><span class="sum-num">36</span><span class="t-foot muted">photos<br>this month</span></div><i></i>
+  <div><span class="sum-num">19</span><span class="t-foot muted">day<br>streak</span></div>
+</div>
+<div class="t-foot muted center" style="position:absolute;left:0;right:0;top:648px">Also on hontogame.com/app</div>
+<div class="tabwrap"><div class="tabbar glass-ui"><div class="tab"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.8v2M12 19.2v2M2.8 12h2M19.2 12h2M5.5 5.5l1.4 1.4M17.1 17.1l1.4 1.4M5.5 18.5l1.4-1.4M17.1 6.9l1.4-1.4"/></svg><span>Today</span></div><div class="tab"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Calendar</span></div><div class="tab on"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="7" y="3.5" width="13.5" height="13.5" rx="3"/><path d="M3.5 7.5v9.5a3.5 3.5 0 0 0 3.5 3.5h9.5"/><path d="M7.5 14.5l3.5-3.5 3 3 2-2 3.5 3.5"/></svg><span>Memories</span></div></div>
+<div class="tabcam glass-ui" title="Take photo"><svg class="ic " width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 8.8A2.6 2.6 0 0 1 6.6 6.2h1.6l1.5-2.2h4.6l1.5 2.2h1.6A2.6 2.6 0 0 1 20 8.8v8.6a2.6 2.6 0 0 1-2.6 2.6H6.6A2.6 2.6 0 0 1 4 17.4z"/><circle cx="12" cy="12.8" r="3.6"/></svg></div></div><div class="hb"></div></div>
+<figcaption><b>Memories · dark mode</b><span>Same tokens, night palette.</span></figcaption></figure></div></section><section class="sec"><h2>System surfaces</h2><div class="items"><figure class="item"><div class="phone  " id="widgets-ios" data-shot><svg class="wall" viewBox="0 0 393 852" preserveAspectRatio="xMidYMid slice"><defs>
+<linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3EBDD"/><stop offset=".55" stop-color="#E4E0DA"/><stop offset="1" stop-color="#B9C2D4"/></linearGradient>
+<linearGradient id="m1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C9CFDC"/><stop offset="1" stop-color="#AEB8CC"/></linearGradient>
+<linearGradient id="m2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8E9BB6"/><stop offset="1" stop-color="#6E7D9C"/></linearGradient>
+<linearGradient id="m3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4E5E80"/><stop offset="1" stop-color="#2E3A55"/></linearGradient></defs>
+<rect width="393" height="852" fill="url(#wg)"/>
+<path d="M0 470 C60 430 100 445 150 410 S250 380 300 420 S370 430 393 410 V852 H0z" fill="url(#m1)" opacity=".8"/>
+<path d="M0 560 C70 520 120 540 170 500 S270 470 320 515 S380 520 393 505 V852 H0z" fill="url(#m2)" opacity=".9"/>
+<path d="M0 660 C80 620 140 650 200 610 S300 590 350 625 S385 630 393 620 V852 H0z" fill="url(#m3)"/></svg><div class="washi strong"></div><div class="sb"><span class="sb-time">9:41</span><span class="sb-ic">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.4l1.2 1.3A8.9 8.9 0 0 1 8 2.2zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4a7.2 7.2 0 0 0-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.4l2.2-2.3a3.4 3.4 0 0 0-4.4 0z"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><path d="M24.5 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" opacity=".45"/></svg></span></div>
+<div class="di"></div>
+<div class="hs">
+  <div class="wg-m wg-photo" style="background-image:url(assets/tram.jpg)">
+    <div class="wg-shade"></div>
+    <div class="wg-tl"><span class="av av-mia" style="width:24px;height:24px;font-size:10px">M</span><b>Mia</b><span>8:05 AM</span></div>
+    <div class="wg-bl"><b>The 28 was on time.</b><span>First time ever.</span></div>
+  </div><div class="wl">Honto</div>
+  <div class="row-s">
+    <div><div class="wg-s wg-photo" style="background-image:url(assets/alfama2.jpg)"><div class="wg-shade"></div><div class="wg-bl"><b>Mia</b><span>1:41 PM · Lisbon</span></div></div><div class="wl">Honto</div></div>
+    <div><div class="wg-s wg-paper toy"><div class="toy-btn"><svg class="ic " width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M12 19.6s-7.3-4.4-7.3-9.9A4.2 4.2 0 0 1 12 7.1a4.2 4.2 0 0 1 7.3 2.6c0 5.5-7.3 9.9-7.3 9.9z"/></svg></div><b>Thinking of you</b><span class="muted">Tap to tell Mia</span></div><div class="wl">Honto</div></div>
+  </div>
+  <div class="wg-m wg-paper cd">
+    <div><div class="cap muted">Next meeting</div><div class="cd-num">23<small> days</small></div><div class="t-foot muted">Wed, Nov 11 · Lisbon</div></div>
+    <i class="vsep"></i>
+    <div><div class="cap muted">Mia now</div><div class="cd-num">1:41<small> PM</small></div><div class="t-foot muted"><span class="dot busy"></span>Busy until 3 PM</div></div>
+    <div class="cd-foot"><span class="hanko " style="width:14px;height:14px;font-size:8px">本</span><span>412 days together</span></div>
+  </div><div class="wl">Honto · Premium</div>
+</div>
+<div class="hs-search glass-ui"><svg class="ic " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><span>Search</span></div>
+<div class="dock glass-ui"><span class="app"><svg class="ic " width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M5.5 4h3l1.5 4-2 1.3a10 10 0 0 0 6.7 6.7l1.3-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 3.5 6.2 2 2 0 0 1 5.5 4z"/></svg></span><span class="app"><svg class="ic " width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M20 11.5c0 4.1-3.6 7.5-8 7.5a8.7 8.7 0 0 1-3.3-.6L4 19.5l1.3-3.6A7.2 7.2 0 0 1 4 11.5C4 7.4 7.6 4 12 4s8 3.4 8 7.5z"/></svg></span><span class="app"><svg class="ic " width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 8.8A2.6 2.6 0 0 1 6.6 6.2h1.6l1.5-2.2h4.6l1.5 2.2h1.6A2.6 2.6 0 0 1 20 8.8v8.6a2.6 2.6 0 0 1-2.6 2.6H6.6A2.6 2.6 0 0 1 4 17.4z"/><circle cx="12" cy="12.8" r="3.6"/></svg></span><span class="app"><svg class="ic " width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5"/></svg></span></div><div class="hb"></div></div>
+<figcaption><b>Home screen widgets</b><span>Photo S/M, Thinking of you (free), countdown + time (Premium).</span></figcaption></figure><figure class="item"><div class="phone  " id="lock-live-activity" data-shot><div class="hero" style="background-image:url(assets/spdusk.jpg);background-position:40% center"></div><div class="lock-shade"></div>
+<div class="sb light"><span class="sb-time"></span><span class="sb-ic">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.4l1.2 1.3A8.9 8.9 0 0 1 8 2.2zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4a7.2 7.2 0 0 0-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.4l2.2-2.3a3.4 3.4 0 0 0-4.4 0z"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><path d="M24.5 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" opacity=".45"/></svg></span></div>
+<div class="di"></div>
+<div class="lock-date">Wednesday, November 11</div>
+<div class="lock-time">7:20</div>
+<div class="la glass-dark-la">
+  <div class="la-top"><span class="hanko " style="width:18px;height:18px;font-size:10px">本</span><span>Trip day</span><span class="la-r">Mia · 10:20 PM in Lisbon</span></div>
+  <div class="la-main"><div><div class="la-sub">Together in</div><div class="la-num">7h 40m</div></div>
+    <div class="la-route"><b>GRU</b><svg class="ic " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M9.5 5.5L16 12l-6.5 6.5"/></svg><b>LIS</b></div></div>
+  <div class="prog"><i style="width:23%"></i><span class="plane" style="left:23%"><svg class="ic " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg></span></div>
+  <div class="la-foot"><span>Departed 5:00 PM</span><span>Lands 6:00 AM Lisbon</span></div>
+</div>
+<div class="lock-btns"><span class="circ glass-dark big"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M8 3.5h8v3.5l-2 3.5v10h-4v-10L8 7z"/><path d="M12 13.5v2"/></svg></span><span class="circ glass-dark big"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 8.8A2.6 2.6 0 0 1 6.6 6.2h1.6l1.5-2.2h4.6l1.5 2.2h1.6A2.6 2.6 0 0 1 20 8.8v8.6a2.6 2.6 0 0 1-2.6 2.6H6.6A2.6 2.6 0 0 1 4 17.4z"/><circle cx="12" cy="12.8" r="3.6"/></svg></span></div>
+<div class="hb light"></div></div>
+<figcaption><b>Lock screen · Live Activity</b><span>Trip day only (Premium).</span></figcaption></figure><figure class="item"><div class="phone dark board" id="dynamic-island" data-shot><div class="di-board">
+<div class="di-lab">Compact</div><div class="di-panel" style="height:120px"><div class="hero" style="background-image:url(assets/spdusk.jpg)"></div><div class="lock-shade"></div><div class="di-c"><span class="di-l"><svg class="ic " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg></span><span class="di-r">7h 40m</span></div></div>
+<div class="di-lab">Minimal · when another activity is live</div><div class="di-panel" style="height:120px"><div class="hero" style="background-image:url(assets/spdusk.jpg)"></div><div class="lock-shade"></div><div class="di-min-wrap"><div class="di-base"></div><div class="di-min"><span class="hanko " style="width:18px;height:18px;font-size:10px">本</span></div></div></div>
+<div class="di-lab">Expanded · long press</div><div class="di-panel" style="height:196px"><div class="hero" style="background-image:url(assets/spdusk.jpg)"></div><div class="lock-shade"></div><div class="di-x">
+      <div class="di-x-row"><div class="di-x-l"><span class="hanko " style="width:26px;height:26px;font-size:15px">本</span><div><b>Together in</b><span>GRU to LIS</span></div></div><div class="di-x-num">7h 40m</div></div>
+      <div class="prog dark"><i style="width:23%"></i><span class="plane" style="left:23%"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg></span></div>
+      <div class="di-x-foot"><span>Mia · 10:20 PM in Lisbon</span><span>Lands 6:00 AM</span></div></div></div>
+<p class="t-foot light-2" style="margin:18px 24px 0">Starts on trip day only (Live Activities run up to 8 h). Counts hours until you meet.</p></div></div>
+<figcaption><b>Dynamic Island</b><span>Compact, minimal, expanded.</span></figcaption></figure><figure class="item"><div class="android" id="android-home" data-shot><svg class="wall" viewBox="0 0 412 915" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="aw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B3550"/><stop offset="1" stop-color="#151B2B"/></linearGradient></defs><rect width="412" height="915" fill="url(#aw)"/>
+<path d="M0 640 C80 600 150 625 210 590 S320 565 412 600 V915 H0z" fill="#3C4A6B" opacity=".7"/><path d="M0 740 C90 700 170 730 240 700 S350 685 412 705 V915 H0z" fill="#232C44"/><circle cx="320" cy="520" r="38" fill="#E59C86" opacity=".35"/></svg>
+<div class="a-shade">
+  <div class="a-sb"><span>7:20</span><span class="a-punch"></span><span class="a-sbr">5G · 82%</span></div>
+  <div class="a-qs"><b>Wed, Nov 11</b></div>
+  <div class="a-notif">
+    <div class="a-n-top"><span class="hanko " style="width:18px;height:18px;font-size:10px">本</span><span>Honto · Trip day · now</span><svg class="ic a-mut" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M6 9.5l6 6 6-6"/></svg></div>
+    <div class="a-n-title">Together in 7h 40m</div>
+    <div class="a-n-text">GRU to LIS · lands 6:00 AM in Lisbon · Mia is up, 10:20 PM</div>
+    <div class="a-prog"><i style="width:23%"></i><span style="left:23%"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg></span></div>
+    <div class="a-n-act"><span>Thinking of you</span><span>Open Honto</span></div>
+  </div>
+  <div class="a-handle"></div>
+</div>
+<div class="a-wg">
+  <div class="a-w-photo" style="background-image:url(assets/tram.jpg)"><span class="a-chip">Mia · 8:05 AM</span></div>
+  <div class="a-w-info"><div class="cap a-mut">Next meeting</div><div class="a-w-num">23<small> days</small></div><div class="a-w-sub">Nov 11 · Lisbon</div><div class="a-w-sep"></div><div class="a-w-sub"><span class="dot busy"></span>Mia 1:41 PM · Busy</div></div>
+</div>
+<div class="a-toy"><svg class="ic " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M12 19.6s-7.3-4.4-7.3-9.9A4.2 4.2 0 0 1 12 7.1a4.2 4.2 0 0 1 7.3 2.6c0 5.5-7.3 9.9-7.3 9.9z"/></svg><span>Thinking of you</span></div>
+<div class="a-dock"><span class="a-app"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M5.5 4h3l1.5 4-2 1.3a10 10 0 0 0 6.7 6.7l1.3-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 3.5 6.2 2 2 0 0 1 5.5 4z"/></svg></span><span class="a-app"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M20 11.5c0 4.1-3.6 7.5-8 7.5a8.7 8.7 0 0 1-3.3-.6L4 19.5l1.3-3.6A7.2 7.2 0 0 1 4 11.5C4 7.4 7.6 4 12 4s8 3.4 8 7.5z"/></svg></span><span class="a-app"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M4 8.8A2.6 2.6 0 0 1 6.6 6.2h1.6l1.5-2.2h4.6l1.5 2.2h1.6A2.6 2.6 0 0 1 20 8.8v8.6a2.6 2.6 0 0 1-2.6 2.6H6.6A2.6 2.6 0 0 1 4 17.4z"/><circle cx="12" cy="12.8" r="3.6"/></svg></span><span class="a-app"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5"/></svg></span><span class="a-app"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.4 5.2 3.4 8.5s-1.1 6.1-3.4 8.5c-2.3-2.4-3.4-5.2-3.4-8.5S9.7 5.9 12 3.5z"/></svg></span></div>
+<div class="a-search"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><span>Search</span></div>
+<div class="a-gest"></div></div><figcaption><b>Android · home widget + ongoing notification</b><span>412 x 915 dp. Material 3 shapes, same tokens.</span></figcaption></figure></div></section><section class="sec"><h2>Web · hontogame.com/app</h2><div class="items"><figure class="item"><div class="web" id="web-memories" data-shot><div class="washi"></div>
+<header class="w-top"><span class="brand"><span class="hanko " style="width:28px;height:28px;font-size:16px">本</span><span style="font-size:19px">Honto</span></span><nav><span class="on">Memories</span><span>Settings</span></nav><div class="w-acc"><span class="w-prem"><span class="hanko " style="width:16px;height:16px;font-size:9px">本</span>Premium · active</span><span class="av av-leo" style="width:34px;height:34px;font-size:14px">L</span></div></header>
+<section class="w-strip" style="background-image:url(assets/tram.jpg)"><div class="w-strip-shade"></div>
+  <div class="w-chip glass-photo"><span class="av av-mia" style="width:40px;height:40px;font-size:17px">M</span><div><b>Mia · Lisbon</b><span><span class="dot busy"></span>1:41 PM · Busy until 3 PM</span></div></div>
+  <div class="w-chip glass-photo"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg><div><b>23 days until Lisbon</b><span>Wednesday, November 11</span></div></div>
+  <div class="w-chip glass-photo"><span class="hanko " style="width:28px;height:28px;font-size:16px">本</span><div><b>412 days together</b><span>Since September 2, 2025</span></div></div>
+</section>
+<section class="w-cal card">
+  <div class="w-cal-head"><div><span class="t-title2">October 2026</span><span class="jp big">十月</span></div><div class="mnav"><span class="circ sm glass-ui"><svg class="ic " width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg></span><span class="w-today">Today</span><span class="circ sm glass-ui"><svg class="ic " width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M9.5 5.5L16 12l-6.5 6.5"/></svg></span></div></div>
+  <div class="mgrid" style="--cell:106px;--gap:10px;--r:18px"><div class="wd">M</div><div class="wd">T</div><div class="wd">W</div><div class="wd">T</div><div class="wd">F</div><div class="wd">S</div><div class="wd">S</div><div class="mc empty"></div><div class="mc empty"></div><div class="mc empty"></div><div class="mc ph" style="background-image:url(assets/alfama.jpg)"><span style="font-size:13px">1</span></div><div class="mc ph" style="background-image:url(assets/nata.jpg)"><span style="font-size:13px">2</span></div><div class="mc ph" style="background-image:url(assets/tram2.jpg)"><span style="font-size:13px">3</span></div><div class="mc ph" style="background-image:url(assets/beach2.jpg)"><span style="font-size:13px">4</span></div><div class="mc ph" style="background-image:url(assets/miradouro.jpg)"><span style="font-size:13px">5</span></div><div class="mc ph" style="background-image:url(assets/azulejo.jpg)"><span style="font-size:13px">6</span></div><div class="mc half"><span style="font-size:13px">7</span><i></i></div><div class="mc ph" style="background-image:url(assets/belem.jpg)"><span style="font-size:13px">8</span></div><div class="mc ph" style="background-image:url(assets/leaf.jpg)"><span style="font-size:13px">9</span></div><div class="mc ph" style="background-image:url(assets/alcantara.jpg)"><span style="font-size:13px">10</span></div><div class="mc ph" style="background-image:url(assets/piccolo.jpg)"><span style="font-size:13px">11</span></div><div class="mc ph" style="background-image:url(assets/beach.jpg)"><span style="font-size:13px">12</span></div><div class="mc ph" style="background-image:url(assets/tram.jpg)"><span style="font-size:13px">13</span></div><div class="mc half"><span style="font-size:13px">14</span><i></i></div><div class="mc ph" style="background-image:url(assets/alcantara.jpg)"><span style="font-size:13px">15</span></div><div class="mc ph" style="background-image:url(assets/nata.jpg)"><span style="font-size:13px">16</span></div><div class="mc ph" style="background-image:url(assets/alfama.jpg)"><span style="font-size:13px">17</span></div><div class="mc opened ph" style="background-image:url(assets/alfama2.jpg)"><span style="font-size:13px">18</span></div><div class="mc today ph" style="background-image:url(assets/tram.jpg)"><span style="font-size:13px">19</span></div><div class="mc future"><span style="font-size:13px">20</span></div><div class="mc future"><span style="font-size:13px">21</span></div><div class="mc future"><span style="font-size:13px">22</span></div><div class="mc future"><span style="font-size:13px">23</span></div><div class="mc future"><span style="font-size:13px">24</span></div><div class="mc future"><span style="font-size:13px">25</span></div><div class="mc future"><span style="font-size:13px">26</span></div><div class="mc future"><span style="font-size:13px">27</span></div><div class="mc future"><span style="font-size:13px">28</span></div><div class="mc future"><span style="font-size:13px">29</span></div><div class="mc future"><span style="font-size:13px">30</span></div><div class="mc future"><span style="font-size:13px">31</span></div><div class="mc empty"></div></div>
+</section>
+<aside class="w-day card">
+  <div class="cap muted">Day 411</div><div class="t-title2" style="margin-top:4px">Sunday, October 18</div>
+  <div class="w-pair">
+    <div><div class="pp" style="background-image:url(assets/alfama2.jpg)"></div><div class="pp-meta"><span class="av av-mia" style="width:22px;height:22px;font-size:9px">M</span><b>Mia</b><span class="muted">7:48 PM · Lisbon</span></div><p class="t-foot">Sunday walk up to Graça. Rooftops for days.</p></div>
+    <div><div class="pp" style="background-image:url(assets/ibira.jpg)"></div><div class="pp-meta"><span class="av av-leo" style="width:22px;height:22px;font-size:9px">L</span><b>You</b><span class="muted">3:52 PM · São Paulo</span></div><p class="t-foot">Ibirapuera with Rafa. You would love this light.</p></div>
+  </div>
+  <div class="more-row"><div class="mini" style="background-image:url(assets/nata.jpg)"></div><div class="mini" style="background-image:url(assets/ibira2.jpg)"></div><span class="t-callout">2 more from this day</span></div>
+  <div class="row2" style="margin-top:22px"><div class="btn btn-line sm"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="" aria-hidden="true"><path d="M12 4v10.5M7.8 10.3L12 14.5l4.2-4.2M5 19.5h14"/></svg><span>Download day</span></div></div>
+  <p class="t-foot muted" style="margin-top:18px">Read-only on the web. Photos are posted from the app.</p>
+</aside></div><figcaption><b>Web · Memories</b><span>1440 wide. Read-only, shows Premium status, no checkout.</span></figcaption></figure></div></section>
+<footer class="g-foot">Photos: Wikimedia Commons (CC BY / CC BY-SA / CC0), placeholders only. See assets/CREDITS.md.</footer>
+</body></html>
