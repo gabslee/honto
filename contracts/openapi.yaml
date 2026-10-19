@@ -251,10 +251,90 @@ paths:
       summary: Delete the account (App Store 5.1.1(v)).
       description: |
         Unpairs first (same rules as `DELETE /api/v1/couple`), revokes every token and device, then
-        deletes the user's photos immediately (no 30-day grace for a deleted account).
+        deletes the user's photos and profile photo immediately (no 30-day grace for a deleted account).
       responses:
         '204': { description: Deleted. }
         '401': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [me]
+      operationId: updateProfile
+      summary: Edit my profile (display name).
+      description: |
+        Fixes a name typed wrong at sign-in. The partner sees the new name on their next read of
+        `/api/v1/couple`, `/api/v1/me` or `/api/v1/today`. Couple fields (start date, reunion) are edited with
+        `PATCH /api/v1/couple`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfilePatch' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/v1/me/avatar:
+    delete:
+      tags: [me]
+      operationId: deleteAvatar
+      summary: Remove my profile photo (the objects are deleted from storage).
+      responses:
+        '204': { description: Removed (also when there was none). }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/v1/me/avatar/upload:
+    post:
+      tags: [me]
+      operationId: createAvatarUpload
+      summary: Reserve a profile photo and get presigned PUT URLs (full + thumb), like `POST /api/v1/photos`.
+      description: |
+        The device crops to a square, compresses (long side 1024 px or less) and makes a 256 px thumbnail.
+        Upload both with `PUT` using exactly the returned `headers` (10 min), then call
+        `POST /api/v1/me/avatar/complete`. Works without a partner. 20 reservations per hour.
+        Shown next to the user's name in the app (comments, profile); not used by widgets.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AvatarUploadRequest' }
+      responses:
+        '201':
+          description: Reserved.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AvatarUploadResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '415': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/StorageNotConfigured' }
+  /api/v1/me/avatar/complete:
+    post:
+      tags: [me]
+      operationId: completeAvatar
+      summary: Confirm both uploads; the photo becomes my profile photo and the previous one is deleted.
+      description: |
+        The server `HEAD`s both objects and checks the declared sizes and types (`422 upload_missing` /
+        `upload_size_mismatch` / `unsupported_media_type`). Idempotent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AvatarCompleteRequest' }
+      responses:
+        '200':
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Avatar' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/me/timezone:
     put:
       tags: [me]
@@ -1039,6 +1119,7 @@ components:
         displayName: { type: string, maxLength: 80 }
         timeZone: { anyOf: [{ $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' }] }
         createdAt: { type: string, format: date-time }
+        avatar: { anyOf: [{ $ref: '#/components/schemas/Avatar' }, { type: 'null' }], description: 'My profile photo (null when none). Set on `GET /api/v1/me` and `PATCH /api/v1/me`; absent on sign-in responses and older servers.' }
     AuthSession:
       type: object
       required: [token, tokenType, expiresInDays, created, user]
@@ -1162,6 +1243,7 @@ components:
         timeZone: { anyOf: [{ $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' }], description: 'Use with the device tz database for the partner''s local time.' }
         utcOffsetMinutes: { type: [integer, 'null'], description: 'Offset at response time; hint for clients without tz data.' }
         timeZoneUpdatedAt: { type: [string, 'null'], format: date-time }
+        avatar: { anyOf: [{ $ref: '#/components/schemas/Avatar' }, { type: 'null' }], description: 'Partner''s profile photo (null when none). Optional: absent on older servers.' }
     Reunion:
       type: object
       required: [at, city, timeZone, daysUntil]
@@ -1309,6 +1391,40 @@ components:
           additionalProperties: { type: string }
           description: Send exactly these headers (Content-Type, Content-Length) or the signature fails.
         expiresAt: { type: string, format: date-time }
+    ProfilePatch:
+      type: object
+      required: [displayName]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 80, description: 'Trimmed; inner whitespace collapsed; control characters rejected.' }
+    Avatar:
+      type: object
+      required: [id, urls, updatedAt]
+      description: A profile photo. `urls` are presigned GETs of the private bucket (24 h), like photos; cache by `id`.
+      properties:
+        id: { type: string }
+        urls: { $ref: '#/components/schemas/PhotoUrls' }
+        updatedAt: { type: string, format: date-time }
+    AvatarUploadRequest:
+      type: object
+      required: [contentType, bytes, thumbContentType, thumbBytes, width, height]
+      properties:
+        contentType: { $ref: '#/components/schemas/PhotoContentType' }
+        bytes: { type: integer, minimum: 1, maximum: 1048576, description: 'Full image size (1 MB or less).' }
+        thumbContentType: { $ref: '#/components/schemas/PhotoContentType' }
+        thumbBytes: { type: integer, minimum: 1, maximum: 131072, description: 'Thumbnail size (128 KB or less).' }
+        width: { type: integer, minimum: 1, maximum: 2048 }
+        height: { type: integer, minimum: 1, maximum: 2048 }
+    AvatarUploadResponse:
+      type: object
+      required: [avatarId, upload]
+      properties:
+        avatarId: { type: string }
+        upload: { $ref: '#/components/schemas/PhotoUploadTargets' }
+    AvatarCompleteRequest:
+      type: object
+      required: [avatarId]
+      properties:
+        avatarId: { type: string }
     PhotoUploadTargets:
       type: object
       required: [full, thumb]
@@ -1351,6 +1467,7 @@ components:
         dailyPhoto: { anyOf: [{ $ref: '#/components/schemas/Photo' }, { type: 'null' }] }
         photoCount: { type: integer, description: 'Ready photos I took on my local day.' }
         weather: { anyOf: [{ $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' }], description: 'My last reported weather (null when older than 12 h or never reported). Optional: absent on older servers.' }
+        avatar: { anyOf: [{ $ref: '#/components/schemas/Avatar' }, { type: 'null' }], description: 'My profile photo (null when none). In-app only; widgets ignore it. Optional: absent on older servers.' }
     TodayPartner:
       type: object
       required: [userId, displayName, timeZone, utcOffsetMinutes, localDay, dailyPhoto, latestPhoto, photoCount, status]
@@ -1365,6 +1482,7 @@ components:
         photoCount: { type: integer }
         status: { anyOf: [{ $ref: '#/components/schemas/PartnerStatus' }, { type: 'null' }], description: 'Null when not Premium or never synced.' }
         weather: { anyOf: [{ $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' }], description: 'Partner''s last reported weather (null when older than 12 h or never reported). Optional: absent on older servers.' }
+        avatar: { anyOf: [{ $ref: '#/components/schemas/Avatar' }, { type: 'null' }], description: 'Partner''s profile photo (null when none). In-app only; widgets ignore it. Optional: absent on older servers.' }
     WeatherCondition:
       type: string
       enum: [clear, partly_cloudy, cloudy, fog, drizzle, rain, snow, thunderstorm]

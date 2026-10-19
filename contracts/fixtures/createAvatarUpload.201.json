@@ -1,0 +1,23 @@
+{
+  "avatarId": "av_ana_1019",
+  "upload": {
+    "full": {
+      "method": "PUT",
+      "url": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/avatars/usr_ana/av_ana_1019/full.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=600&X-Amz-Signature=fixture",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "180224"
+      },
+      "expiresAt": "2026-10-19T12:10:00Z"
+    },
+    "thumb": {
+      "method": "PUT",
+      "url": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/avatars/usr_ana/av_ana_1019/thumb.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=600&X-Amz-Signature=fixture",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "14336"
+      },
+      "expiresAt": "2026-10-19T12:10:00Z"
+    }
+  }
+}

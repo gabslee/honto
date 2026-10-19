@@ -1,9 +1,10 @@
 import type { NeonQueryFunction } from "@neondatabase/serverless";
-import type { Couple, Entitlement, EntitlementSource, Features, Invite, Me, NudgeState, PartnerInfo, PartnerStatus, PeriodType, Photo, Reunion, Today, Trip } from "../../contracts/honto-api";
+import type { Avatar, Couple, Entitlement, EntitlementSource, Features, Invite, Me, NudgeState, PartnerInfo, PartnerStatus, PeriodType, Photo, Reunion, Today, Trip } from "../../contracts/honto-api";
 import { database } from "../../app/server-auth";
 import { apiError, isCouplePremium, noStore, normalizeTimeZone, requireCouple, requireUser, toApiUser, type V1Couple, type V1Partner, type V1User } from "./context";
 import { ensureLifecycleSchema, getObjectStore, hitRateLimit, latestUnpair, optionalTables, randomId, type ObjectStore, type OptionalTables } from "./lifecycle";
 import { todayMilestones } from "./milestones";
+import { avatarsFor } from "./profile";
 import { weatherFor } from "./weather";
 
 type Sql = NeonQueryFunction<false, false>;
@@ -104,8 +105,8 @@ export async function resolveEntitlement(sql: Sql, userId: string, partnerId: st
 // ---------------------------------------------------------------------------------------------------
 // Couple view
 // ---------------------------------------------------------------------------------------------------
-export function partnerInfo(partner: V1Partner, now: Date): PartnerInfo {
-  return { userId: partner.id, displayName: partner.displayName, timeZone: partner.timeZone, utcOffsetMinutes: partner.timeZone ? utcOffsetMinutes(partner.timeZone, now) : null, timeZoneUpdatedAt: partner.timeZoneUpdatedAt };
+export function partnerInfo(partner: V1Partner, now: Date, avatar: Avatar | null = null): PartnerInfo {
+  return { userId: partner.id, displayName: partner.displayName, timeZone: partner.timeZone, utcOffsetMinutes: partner.timeZone ? utcOffsetMinutes(partner.timeZone, now) : null, timeZoneUpdatedAt: partner.timeZoneUpdatedAt, avatar };
 }
 
 function reunionView(couple: V1Couple, viewerZone: string | null, now: Date): Reunion | null {
@@ -117,8 +118,9 @@ function daysTogether(couple: V1Couple, viewerZone: string | null, now: Date) {
   return couple.startedOn ? Math.max(0, daysBetween(couple.startedOn, localDay(viewerZone, now))) : null;
 }
 
-export function coupleView({ user, couple, partner }: Paired, premium: boolean, now: Date): Couple {
-  return { id: couple.id, pairedAt: couple.pairedAt, startedOn: couple.startedOn, daysTogether: daysTogether(couple, user.timeZone, now), partner: partnerInfo(partner, now), reunion: reunionView(couple, user.timeZone, now), premium };
+/** `avatars` (from avatarsFor) supplies the partner's profile photo; without it the partner avatar is null. */
+export function coupleView({ user, couple, partner }: Paired, premium: boolean, now: Date, avatars?: Map<string, Avatar>): Couple {
+  return { id: couple.id, pairedAt: couple.pairedAt, startedOn: couple.startedOn, daysTogether: daysTogether(couple, user.timeZone, now), partner: partnerInfo(partner, now, avatars?.get(partner.id) ?? null), reunion: reunionView(couple, user.timeZone, now), premium };
 }
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) => Response.json(body, { status, headers: { ...noStore, ...headers } });
@@ -133,7 +135,8 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
 export async function getCoupleResponse(request: Request, now = new Date()) {
   const auth = await requireCouple(request);
   if (auth instanceof Response) return auth;
-  return json(coupleView(auth, await isCouplePremium(database()!, auth.couple.id), now));
+  const sql = database()!;
+  return json(coupleView(auth, await isCouplePremium(sql, auth.couple.id), now, await avatarsFor(sql, [auth.partner.id], now)));
 }
 
 /**
@@ -178,7 +181,7 @@ export async function patchCoupleResponse(request: Request, now = new Date()) {
   if (!rows[0]) return apiError(409, "not_paired", "Pair with your partner first.");
   // TODO(W2a push): send reunion.changed (widget push) to the partner when the reunion changed.
   const couple = { ...auth.couple, ...(rows[0] as Pick<V1Couple, "startedOn" | "reunionAt" | "reunionCity" | "reunionTimeZone">) };
-  return json(coupleView({ ...auth, couple }, await isCouplePremium(sql, couple.id), now));
+  return json(coupleView({ ...auth, couple }, await isCouplePremium(sql, couple.id), now, await avatarsFor(sql, [auth.partner.id], now)));
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -306,7 +309,7 @@ export async function joinCoupleResponse(request: Request, now = new Date()) {
   // TODO(W2a push): send couple.joined to both members.
   const view = await requireCouple(request);
   if (view instanceof Response) return view;
-  return json(coupleView(view, await isCouplePremium(sql, coupleId), now), 201);
+  return json(coupleView(view, await isCouplePremium(sql, coupleId), now, await avatarsFor(sql, [view.partner.id], now)), 201);
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -321,9 +324,10 @@ export async function meResponse(request: Request, now = new Date()) {
   await ensureLifecycleSchema(sql);
   const partnerId = paired instanceof Response ? null : paired.partner.id;
   const entitlement = await resolveEntitlement(sql, auth.user.id, partnerId);
+  const avatars = await avatarsFor(sql, partnerId ? [auth.user.id, partnerId] : [auth.user.id], now);
   const body: Me = {
-    user: toApiUser(auth.user),
-    couple: paired instanceof Response ? null : coupleView(paired, entitlement.premium, now),
+    user: { ...toApiUser(auth.user), avatar: avatars.get(auth.user.id) ?? null },
+    couple: paired instanceof Response ? null : coupleView(paired, entitlement.premium, now, avatars),
     entitlement,
     pendingUnpair: paired instanceof Response ? await latestUnpair(sql, auth.user.id) : null,
     hasPendingInvite: paired instanceof Response ? Boolean(await openInvite(sql, auth.user.id)) : false,
@@ -427,14 +431,16 @@ export async function buildToday(sql: Sql, { user, couple, partner }: Paired, no
   const photo = (row: Row | null | undefined) => row ? toApiPhoto(row, user.id, store, now) : Promise.resolve(null);
   const { streak, unseenMilestones } = await todayMilestones(sql, { user, couple, partner }, now);
   const weather = await optional("weather", true, () => weatherFor(sql, [user.id, partner.id], now), new Map());
+  const avatars = await avatarsFor(sql, [user.id, partner.id], now, store);
   return {
     generatedAt: toIso(now),
-    me: { displayName: user.displayName, localDay: myDay, timeZone: myZone, dailyPhoto: await photo(mine[0]), photoCount: mine.length, weather: weather.get(user.id) ?? null },
+    me: { displayName: user.displayName, localDay: myDay, timeZone: myZone, dailyPhoto: await photo(mine[0]), photoCount: mine.length, weather: weather.get(user.id) ?? null, avatar: avatars.get(user.id) ?? null },
     partner: {
       userId: partner.id, displayName: partner.displayName, timeZone: partner.timeZone, utcOffsetMinutes: partner.timeZone ? utcOffsetMinutes(partner.timeZone, now) : null, localDay: partnerDay,
       dailyPhoto: await photo(theirs[0]), latestPhoto: await photo(latest), photoCount: theirs.length,
       status: await optional("calendar", tables.calendar && entitlement.premium, () => partnerStatus(sql, partner.id, now), null),
       weather: weather.get(partner.id) ?? null,
+      avatar: avatars.get(partner.id) ?? null,
     },
     startedOn: couple.startedOn,
     daysTogether: daysTogether(couple, user.timeZone, now),

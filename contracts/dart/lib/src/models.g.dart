@@ -98,13 +98,15 @@ enum AuthPlatform {
 }
 
 class User {
-  const User({required this.id, required this.email, required this.displayName, required this.timeZone, required this.createdAt});
+  const User({required this.id, required this.email, required this.displayName, required this.timeZone, required this.createdAt, this.avatar});
 
   final String id;
   final String email;
   final String displayName;
   final TimeZoneId? timeZone;
   final DateTime createdAt;
+  /// My profile photo (null when none). Set on `GET /api/v1/me` and `PATCH /api/v1/me`; absent on sign-in responses and older servers.
+  final Avatar? avatar;
 
   factory User.fromJson(Map<String, dynamic> json) => User(
         id: json['id'] as String,
@@ -112,6 +114,7 @@ class User {
         displayName: json['displayName'] as String,
         timeZone: json['timeZone'] == null ? null : json['timeZone'] as String,
         createdAt: DateTime.parse(json['createdAt'] as String),
+        avatar: json['avatar'] == null ? null : Avatar.fromJson(json['avatar'] as Map<String, dynamic>),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -120,6 +123,7 @@ class User {
         'displayName': displayName,
         'timeZone': timeZone,
         'createdAt': createdAt.toUtc().toIso8601String(),
+        if (avatar != null) 'avatar': avatar!.toJson(),
       };
 
   @override
@@ -519,7 +523,7 @@ class Entitlement {
 }
 
 class PartnerInfo {
-  const PartnerInfo({required this.userId, required this.displayName, required this.timeZone, required this.utcOffsetMinutes, required this.timeZoneUpdatedAt});
+  const PartnerInfo({required this.userId, required this.displayName, required this.timeZone, required this.utcOffsetMinutes, required this.timeZoneUpdatedAt, this.avatar});
 
   final String userId;
   final String displayName;
@@ -528,6 +532,8 @@ class PartnerInfo {
   /// Offset at response time; hint for clients without tz data.
   final int? utcOffsetMinutes;
   final DateTime? timeZoneUpdatedAt;
+  /// Partner's profile photo (null when none). Optional: absent on older servers.
+  final Avatar? avatar;
 
   factory PartnerInfo.fromJson(Map<String, dynamic> json) => PartnerInfo(
         userId: json['userId'] as String,
@@ -535,6 +541,7 @@ class PartnerInfo {
         timeZone: json['timeZone'] == null ? null : json['timeZone'] as String,
         utcOffsetMinutes: json['utcOffsetMinutes'] == null ? null : (json['utcOffsetMinutes'] as num).toInt(),
         timeZoneUpdatedAt: json['timeZoneUpdatedAt'] == null ? null : DateTime.parse(json['timeZoneUpdatedAt'] as String),
+        avatar: json['avatar'] == null ? null : Avatar.fromJson(json['avatar'] as Map<String, dynamic>),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -543,6 +550,7 @@ class PartnerInfo {
         'timeZone': timeZone,
         'utcOffsetMinutes': utcOffsetMinutes,
         'timeZoneUpdatedAt': timeZoneUpdatedAt == null ? null : timeZoneUpdatedAt!.toUtc().toIso8601String(),
+        if (avatar != null) 'avatar': avatar!.toJson(),
       };
 
   @override
@@ -1047,6 +1055,119 @@ class PresignedUpload {
   String toString() => 'PresignedUpload(${toJson()})';
 }
 
+class ProfilePatch {
+  const ProfilePatch({required this.displayName});
+
+  /// Trimmed; inner whitespace collapsed; control characters rejected.
+  final String displayName;
+
+  factory ProfilePatch.fromJson(Map<String, dynamic> json) => ProfilePatch(
+        displayName: json['displayName'] as String,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'displayName': displayName,
+      };
+
+  @override
+  String toString() => 'ProfilePatch(${toJson()})';
+}
+
+/// A profile photo. `urls` are presigned GETs of the private bucket (24 h), like photos; cache by `id`.
+class Avatar {
+  const Avatar({required this.id, required this.urls, required this.updatedAt});
+
+  final String id;
+  final PhotoUrls urls;
+  final DateTime updatedAt;
+
+  factory Avatar.fromJson(Map<String, dynamic> json) => Avatar(
+        id: json['id'] as String,
+        urls: PhotoUrls.fromJson(json['urls'] as Map<String, dynamic>),
+        updatedAt: DateTime.parse(json['updatedAt'] as String),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'urls': urls.toJson(),
+        'updatedAt': updatedAt.toUtc().toIso8601String(),
+      };
+
+  @override
+  String toString() => 'Avatar(${toJson()})';
+}
+
+class AvatarUploadRequest {
+  const AvatarUploadRequest({required this.contentType, required this.bytes, required this.thumbContentType, required this.thumbBytes, required this.width, required this.height});
+
+  final PhotoContentType contentType;
+  /// Full image size (1 MB or less).
+  final int bytes;
+  final PhotoContentType thumbContentType;
+  /// Thumbnail size (128 KB or less).
+  final int thumbBytes;
+  final int width;
+  final int height;
+
+  factory AvatarUploadRequest.fromJson(Map<String, dynamic> json) => AvatarUploadRequest(
+        contentType: PhotoContentType.fromJson(json['contentType'] as String),
+        bytes: (json['bytes'] as num).toInt(),
+        thumbContentType: PhotoContentType.fromJson(json['thumbContentType'] as String),
+        thumbBytes: (json['thumbBytes'] as num).toInt(),
+        width: (json['width'] as num).toInt(),
+        height: (json['height'] as num).toInt(),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'contentType': contentType.toJson(),
+        'bytes': bytes,
+        'thumbContentType': thumbContentType.toJson(),
+        'thumbBytes': thumbBytes,
+        'width': width,
+        'height': height,
+      };
+
+  @override
+  String toString() => 'AvatarUploadRequest(${toJson()})';
+}
+
+class AvatarUploadResponse {
+  const AvatarUploadResponse({required this.avatarId, required this.upload});
+
+  final String avatarId;
+  final PhotoUploadTargets upload;
+
+  factory AvatarUploadResponse.fromJson(Map<String, dynamic> json) => AvatarUploadResponse(
+        avatarId: json['avatarId'] as String,
+        upload: PhotoUploadTargets.fromJson(json['upload'] as Map<String, dynamic>),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'avatarId': avatarId,
+        'upload': upload.toJson(),
+      };
+
+  @override
+  String toString() => 'AvatarUploadResponse(${toJson()})';
+}
+
+class AvatarCompleteRequest {
+  const AvatarCompleteRequest({required this.avatarId});
+
+  final String avatarId;
+
+  factory AvatarCompleteRequest.fromJson(Map<String, dynamic> json) => AvatarCompleteRequest(
+        avatarId: json['avatarId'] as String,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'avatarId': avatarId,
+      };
+
+  @override
+  String toString() => 'AvatarCompleteRequest(${toJson()})';
+}
+
 class PhotoUploadTargets {
   const PhotoUploadTargets({required this.full, required this.thumb});
 
@@ -1157,7 +1278,7 @@ class NudgeState {
 }
 
 class TodaySelf {
-  const TodaySelf({required this.displayName, required this.localDay, required this.timeZone, required this.dailyPhoto, required this.photoCount, this.weather});
+  const TodaySelf({required this.displayName, required this.localDay, required this.timeZone, required this.dailyPhoto, required this.photoCount, this.weather, this.avatar});
 
   final String displayName;
   final LocalDay localDay;
@@ -1167,6 +1288,8 @@ class TodaySelf {
   final int photoCount;
   /// My last reported weather (null when older than 12 h or never reported). Optional: absent on older servers.
   final WeatherSummary? weather;
+  /// My profile photo (null when none). In-app only; widgets ignore it. Optional: absent on older servers.
+  final Avatar? avatar;
 
   factory TodaySelf.fromJson(Map<String, dynamic> json) => TodaySelf(
         displayName: json['displayName'] as String,
@@ -1175,6 +1298,7 @@ class TodaySelf {
         dailyPhoto: json['dailyPhoto'] == null ? null : Photo.fromJson(json['dailyPhoto'] as Map<String, dynamic>),
         photoCount: (json['photoCount'] as num).toInt(),
         weather: json['weather'] == null ? null : WeatherSummary.fromJson(json['weather'] as Map<String, dynamic>),
+        avatar: json['avatar'] == null ? null : Avatar.fromJson(json['avatar'] as Map<String, dynamic>),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -1184,6 +1308,7 @@ class TodaySelf {
         'dailyPhoto': dailyPhoto == null ? null : dailyPhoto!.toJson(),
         'photoCount': photoCount,
         if (weather != null) 'weather': weather!.toJson(),
+        if (avatar != null) 'avatar': avatar!.toJson(),
       };
 
   @override
@@ -1191,7 +1316,7 @@ class TodaySelf {
 }
 
 class TodayPartner {
-  const TodayPartner({required this.userId, required this.displayName, required this.timeZone, required this.utcOffsetMinutes, required this.localDay, required this.dailyPhoto, required this.latestPhoto, required this.photoCount, required this.status, this.weather});
+  const TodayPartner({required this.userId, required this.displayName, required this.timeZone, required this.utcOffsetMinutes, required this.localDay, required this.dailyPhoto, required this.latestPhoto, required this.photoCount, required this.status, this.weather, this.avatar});
 
   final String userId;
   final String displayName;
@@ -1207,6 +1332,8 @@ class TodayPartner {
   final PartnerStatus? status;
   /// Partner's last reported weather (null when older than 12 h or never reported). Optional: absent on older servers.
   final WeatherSummary? weather;
+  /// Partner's profile photo (null when none). In-app only; widgets ignore it. Optional: absent on older servers.
+  final Avatar? avatar;
 
   factory TodayPartner.fromJson(Map<String, dynamic> json) => TodayPartner(
         userId: json['userId'] as String,
@@ -1219,6 +1346,7 @@ class TodayPartner {
         photoCount: (json['photoCount'] as num).toInt(),
         status: json['status'] == null ? null : PartnerStatus.fromJson(json['status'] as Map<String, dynamic>),
         weather: json['weather'] == null ? null : WeatherSummary.fromJson(json['weather'] as Map<String, dynamic>),
+        avatar: json['avatar'] == null ? null : Avatar.fromJson(json['avatar'] as Map<String, dynamic>),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -1232,6 +1360,7 @@ class TodayPartner {
         'photoCount': photoCount,
         'status': status == null ? null : status!.toJson(),
         if (weather != null) 'weather': weather!.toJson(),
+        if (avatar != null) 'avatar': avatar!.toJson(),
       };
 
   @override
@@ -2535,6 +2664,11 @@ final Map<String, Object Function(Map<String, dynamic>)> hontoModelDecoders = <S
   'Photo': Photo.fromJson,
   'PhotoCreateRequest': PhotoCreateRequest.fromJson,
   'PresignedUpload': PresignedUpload.fromJson,
+  'ProfilePatch': ProfilePatch.fromJson,
+  'Avatar': Avatar.fromJson,
+  'AvatarUploadRequest': AvatarUploadRequest.fromJson,
+  'AvatarUploadResponse': AvatarUploadResponse.fromJson,
+  'AvatarCompleteRequest': AvatarCompleteRequest.fromJson,
   'PhotoUploadTargets': PhotoUploadTargets.fromJson,
   'PhotoCreateResponse': PhotoCreateResponse.fromJson,
   'PartnerStatus': PartnerStatus.fromJson,

@@ -34,6 +34,8 @@ export interface User {
   displayName: string;
   timeZone: TimeZoneId | null;
   createdAt: IsoDateTime;
+  /** My profile photo (null when none). Set on `GET /api/v1/me` and `PATCH /api/v1/me`; absent on sign-in responses and older servers. */
+  avatar?: Avatar | null;
 }
 
 export interface AuthSession {
@@ -160,6 +162,8 @@ export interface PartnerInfo {
   /** Offset at response time; hint for clients without tz data. */
   utcOffsetMinutes: number | null;
   timeZoneUpdatedAt: IsoDateTime | null;
+  /** Partner's profile photo (null when none). Optional: absent on older servers. */
+  avatar?: Avatar | null;
 }
 
 export interface Reunion {
@@ -305,6 +309,38 @@ export interface PresignedUpload {
   expiresAt: IsoDateTime;
 }
 
+export interface ProfilePatch {
+  /** Trimmed; inner whitespace collapsed; control characters rejected. */
+  displayName: string;
+}
+
+/** A profile photo. `urls` are presigned GETs of the private bucket (24 h), like photos; cache by `id`. */
+export interface Avatar {
+  id: string;
+  urls: PhotoUrls;
+  updatedAt: IsoDateTime;
+}
+
+export interface AvatarUploadRequest {
+  contentType: PhotoContentType;
+  /** Full image size (1 MB or less). */
+  bytes: number;
+  thumbContentType: PhotoContentType;
+  /** Thumbnail size (128 KB or less). */
+  thumbBytes: number;
+  width: number;
+  height: number;
+}
+
+export interface AvatarUploadResponse {
+  avatarId: string;
+  upload: PhotoUploadTargets;
+}
+
+export interface AvatarCompleteRequest {
+  avatarId: string;
+}
+
 export interface PhotoUploadTargets {
   full: PresignedUpload;
   thumb: PresignedUpload;
@@ -344,6 +380,8 @@ export interface TodaySelf {
   photoCount: number;
   /** My last reported weather (null when older than 12 h or never reported). Optional: absent on older servers. */
   weather?: WeatherSummary | null;
+  /** My profile photo (null when none). In-app only; widgets ignore it. Optional: absent on older servers. */
+  avatar?: Avatar | null;
 }
 
 export interface TodayPartner {
@@ -361,6 +399,8 @@ export interface TodayPartner {
   status: PartnerStatus | null;
   /** Partner's last reported weather (null when older than 12 h or never reported). Optional: absent on older servers. */
   weather?: WeatherSummary | null;
+  /** Partner's profile photo (null when none). In-app only; widgets ignore it. Optional: absent on older servers. */
+  avatar?: Avatar | null;
 }
 
 export const WeatherConditionValues = ["clear", "partly_cloudy", "cloudy", "fog", "drizzle", "rain", "snow", "thunderstorm"] as const;
@@ -808,8 +848,16 @@ export interface Operations {
   logout: { method: "POST"; path: "/api/v1/auth/logout"; pathParams: never; query: never; body: never; responses: { 200: LogoutResponse; 401: ApiError } };
   /** GET /api/v1/me: Current user, couple (or null), entitlement and pending-unpair state. */
   getMe: { method: "GET"; path: "/api/v1/me"; pathParams: never; query: never; body: never; responses: { 200: Me; 401: ApiError } };
+  /** PATCH /api/v1/me: Edit my profile (display name). */
+  updateProfile: { method: "PATCH"; path: "/api/v1/me"; pathParams: never; query: never; body: ProfilePatch; responses: { 200: User; 400: ApiError; 401: ApiError } };
   /** DELETE /api/v1/me: Delete the account (App Store 5.1.1(v)). */
   deleteMe: { method: "DELETE"; path: "/api/v1/me"; pathParams: never; query: never; body: never; responses: { 204: void; 401: ApiError } };
+  /** DELETE /api/v1/me/avatar: Remove my profile photo (the objects are deleted from storage). */
+  deleteAvatar: { method: "DELETE"; path: "/api/v1/me/avatar"; pathParams: never; query: never; body: never; responses: { 204: void; 401: ApiError } };
+  /** POST /api/v1/me/avatar/upload: Reserve a profile photo and get presigned PUT URLs (full + thumb), like `POST /api/v1/photos`. */
+  createAvatarUpload: { method: "POST"; path: "/api/v1/me/avatar/upload"; pathParams: never; query: never; body: AvatarUploadRequest; responses: { 201: AvatarUploadResponse; 400: ApiError; 401: ApiError; 413: ApiError; 415: ApiError; 429: ApiError; 503: ApiError } };
+  /** POST /api/v1/me/avatar/complete: Confirm both uploads; the photo becomes my profile photo and the previous one is deleted. */
+  completeAvatar: { method: "POST"; path: "/api/v1/me/avatar/complete"; pathParams: never; query: never; body: AvatarCompleteRequest; responses: { 200: Avatar; 400: ApiError; 401: ApiError; 404: ApiError; 422: ApiError; 503: ApiError } };
   /** PUT /api/v1/me/timezone: Report the device IANA time zone (sent on every app open/foreground). */
   updateTimeZone: { method: "PUT"; path: "/api/v1/me/timezone"; pathParams: never; query: never; body: TimeZoneUpdate; responses: { 200: TimeZoneResult; 400: ApiError; 401: ApiError } };
   /** PUT /api/v1/me/weather: Report the weather where I am now (coarse summary only, never coordinates). */
@@ -896,7 +944,11 @@ export const operations = {
   refreshSession: { method: "POST", path: "/api/v1/auth/refresh", auth: [] },
   logout: { method: "POST", path: "/api/v1/auth/logout", auth: ["bearerAuth","cookieAuth"] },
   getMe: { method: "GET", path: "/api/v1/me", auth: ["bearerAuth","cookieAuth"] },
+  updateProfile: { method: "PATCH", path: "/api/v1/me", auth: ["bearerAuth","cookieAuth"] },
   deleteMe: { method: "DELETE", path: "/api/v1/me", auth: ["bearerAuth","cookieAuth"] },
+  deleteAvatar: { method: "DELETE", path: "/api/v1/me/avatar", auth: ["bearerAuth","cookieAuth"] },
+  createAvatarUpload: { method: "POST", path: "/api/v1/me/avatar/upload", auth: ["bearerAuth","cookieAuth"] },
+  completeAvatar: { method: "POST", path: "/api/v1/me/avatar/complete", auth: ["bearerAuth","cookieAuth"] },
   updateTimeZone: { method: "PUT", path: "/api/v1/me/timezone", auth: ["bearerAuth","cookieAuth"] },
   reportWeather: { method: "PUT", path: "/api/v1/me/weather", auth: ["bearerAuth","cookieAuth"] },
   clearWeather: { method: "DELETE", path: "/api/v1/me/weather", auth: ["bearerAuth","cookieAuth"] },
