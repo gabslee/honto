@@ -1,0 +1,36 @@
+{
+  "photo": {
+    "id": "ph_ana_1019b",
+    "author": "me",
+    "authorUserId": "usr_ana",
+    "localDay": "2026-10-19",
+    "isDaily": false,
+    "status": "pending",
+    "phraseKey": null,
+    "phrase": "Morning coffee for two",
+    "width": 1080,
+    "height": 1440,
+    "createdAt": "2026-10-19T12:00:00Z",
+    "urls": null
+  },
+  "upload": {
+    "full": {
+      "method": "PUT",
+      "url": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/couples/cpl_01/photos/ph_ana_1019b/full.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=600&X-Amz-Signature=fixture",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "204800"
+      },
+      "expiresAt": "2026-10-19T12:10:00Z"
+    },
+    "thumb": {
+      "method": "PUT",
+      "url": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/couples/cpl_01/photos/ph_ana_1019b/thumb.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=600&X-Amz-Signature=fixture",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "19456"
+      },
+      "expiresAt": "2026-10-19T12:10:00Z"
+    }
+  }
+}

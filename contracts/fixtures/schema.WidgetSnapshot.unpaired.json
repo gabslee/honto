@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-19T12:00:00Z",
+  "paired": false,
+  "premium": false,
+  "me": {
+    "displayName": "Ana",
+    "postedToday": false
+  },
+  "partner": null,
+  "startedOn": null,
+  "reunion": null,
+  "nudges": {
+    "lastSentAt": null,
+    "lastReceivedAt": null,
+    "nextAllowedAt": null
+  }
+}

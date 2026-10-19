@@ -1,0 +1,8 @@
+{
+  "installationId": "ins_9b2f0c",
+  "kind": "apns_widget",
+  "token": "f0e1d2c3b4a5968778695a4b3c2d1e0ff0e1d2c3b4a5968778695a4b3c2d1e0f",
+  "env": "production",
+  "platform": "ios",
+  "appVersion": "1.0.0+3"
+}

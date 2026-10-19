@@ -1,0 +1,10 @@
+name: honto_native_pigeons
+description: Pigeon contract for packages/honto_native (Flutter <-> Swift/Kotlin). Generation only.
+version: 1.0.0-w0
+publish_to: none
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dev_dependencies:
+  pigeon: ^26.0.0

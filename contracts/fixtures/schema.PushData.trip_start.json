@@ -1,0 +1,6 @@
+{
+  "type": "trip.start",
+  "coupleId": "cpl_01",
+  "sentAt": "2026-11-14T01:30:00Z",
+  "tripId": "trp_01"
+}

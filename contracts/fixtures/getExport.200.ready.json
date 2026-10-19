@@ -1,0 +1,7 @@
+{
+  "status": "ready",
+  "url": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/exports/usr_ana/2026-10-18.zip?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+  "expiresAt": "2026-10-20T20:05:00Z",
+  "photoCount": 214,
+  "photosAvailableUntil": "2026-11-17T20:00:00Z"
+}

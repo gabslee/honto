@@ -1,0 +1,5 @@
+{
+  "error": "Too many emails. Try again in a minute.",
+  "code": "rate_limited",
+  "retryAfterSeconds": 60
+}

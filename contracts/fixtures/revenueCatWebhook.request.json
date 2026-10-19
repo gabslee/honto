@@ -1,0 +1,22 @@
+{
+  "api_version": "1.0",
+  "event": {
+    "id": "6C0E2F1A-0B1C-4D2E-9F3A-1B2C3D4E5F60",
+    "type": "INITIAL_PURCHASE",
+    "app_user_id": "usr_ana",
+    "original_app_user_id": "usr_ana",
+    "aliases": [
+      "usr_ana"
+    ],
+    "product_id": "honto_premium_annual",
+    "entitlement_ids": [
+      "premium"
+    ],
+    "period_type": "TRIAL",
+    "purchased_at_ms": 1792411200000,
+    "expiration_at_ms": 1793016000000,
+    "event_timestamp_ms": 1792411201000,
+    "environment": "PRODUCTION",
+    "store": "APP_STORE"
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "error": "This link has expired or was already used.",
+  "code": "invalid_token"
+}

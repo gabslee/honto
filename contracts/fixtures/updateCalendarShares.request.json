@@ -1,0 +1,14 @@
+{
+  "calendars": [
+    {
+      "calendarRef": "cal_7f3a9c",
+      "displayName": "Personal",
+      "shareTitles": true
+    },
+    {
+      "calendarRef": "cal_0b11e4",
+      "displayName": "Work",
+      "shareTitles": false
+    }
+  ]
+}

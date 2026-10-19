@@ -1,0 +1,70 @@
+{
+  "generatedAt": "2026-10-19T12:00:00Z",
+  "me": {
+    "displayName": "Ana",
+    "localDay": "2026-10-19",
+    "timeZone": "America/Sao_Paulo",
+    "dailyPhoto": null,
+    "photoCount": 0
+  },
+  "partner": {
+    "userId": "usr_kenji",
+    "displayName": "Kenji",
+    "timeZone": "Asia/Tokyo",
+    "utcOffsetMinutes": 540,
+    "localDay": "2026-10-20",
+    "dailyPhoto": null,
+    "latestPhoto": {
+      "id": "ph_kenji_1018",
+      "author": "partner",
+      "authorUserId": "usr_kenji",
+      "localDay": "2026-10-18",
+      "isDaily": true,
+      "status": "ready",
+      "phraseKey": null,
+      "phrase": null,
+      "width": 1080,
+      "height": 1440,
+      "createdAt": "2026-10-18T09:12:00Z",
+      "urls": {
+        "full": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/couples/cpl_01/photos/ph_kenji_1018/full.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+        "thumb": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/couples/cpl_01/photos/ph_kenji_1018/thumb.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+        "expiresAt": "2026-10-20T12:00:00Z"
+      }
+    },
+    "photoCount": 0,
+    "status": null
+  },
+  "startedOn": "2024-03-02",
+  "daysTogether": 961,
+  "reunion": {
+    "at": "2026-11-14T09:30:00Z",
+    "city": "Tokyo",
+    "timeZone": "Asia/Tokyo",
+    "daysUntil": 26
+  },
+  "activeTrip": null,
+  "nudges": {
+    "lastSentAt": null,
+    "lastReceivedAt": null,
+    "nextAllowedAt": null
+  },
+  "entitlement": {
+    "premium": false,
+    "source": null,
+    "productId": null,
+    "periodType": null,
+    "expiresAt": null,
+    "willRenew": null,
+    "grantedBy": null,
+    "trialEligible": true,
+    "features": {
+      "fullHistory": false,
+      "calendar": false,
+      "eventTitles": false,
+      "liveActivity": false,
+      "countdownWidget": false,
+      "nudge": true
+    }
+  }
+}

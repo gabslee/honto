@@ -1,0 +1,49 @@
+{
+  "user": {
+    "id": "usr_ana",
+    "email": "ana@example.com",
+    "displayName": "Ana",
+    "timeZone": "America/Sao_Paulo",
+    "createdAt": "2026-10-01T13:20:00Z"
+  },
+  "couple": {
+    "id": "cpl_01",
+    "pairedAt": "2026-10-02T22:10:00Z",
+    "startedOn": "2024-03-02",
+    "daysTogether": 961,
+    "partner": {
+      "userId": "usr_kenji",
+      "displayName": "Kenji",
+      "timeZone": "Asia/Tokyo",
+      "utcOffsetMinutes": 540,
+      "timeZoneUpdatedAt": "2026-10-19T11:58:00Z"
+    },
+    "reunion": {
+      "at": "2026-11-14T09:30:00Z",
+      "city": "Tokyo",
+      "timeZone": "Asia/Tokyo",
+      "daysUntil": 26
+    },
+    "premium": true
+  },
+  "entitlement": {
+    "premium": true,
+    "source": "revenuecat",
+    "productId": "honto_premium_annual",
+    "periodType": "trial",
+    "expiresAt": "2026-10-26T12:00:00Z",
+    "willRenew": true,
+    "grantedBy": "me",
+    "trialEligible": false,
+    "features": {
+      "fullHistory": true,
+      "calendar": true,
+      "eventTitles": true,
+      "liveActivity": true,
+      "countdownWidget": true,
+      "nudge": true
+    }
+  },
+  "pendingUnpair": null,
+  "hasPendingInvite": false
+}

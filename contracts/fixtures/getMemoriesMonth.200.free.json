@@ -1,0 +1,39 @@
+{
+  "month": "2026-10",
+  "historyLimitDays": 7,
+  "days": [
+    {
+      "day": "2026-10-03",
+      "locked": true,
+      "photoCount": 3,
+      "me": null,
+      "partner": null
+    },
+    {
+      "day": "2026-10-18",
+      "locked": false,
+      "photoCount": 1,
+      "me": null,
+      "partner": {
+        "photoId": "ph_kenji_1018",
+        "thumbUrl": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/couples/cpl_01/photos/ph_kenji_1018/thumb.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+        "expiresAt": "2026-10-20T12:00:00Z"
+      }
+    },
+    {
+      "day": "2026-10-19",
+      "locked": false,
+      "photoCount": 3,
+      "me": {
+        "photoId": "ph_ana_1019",
+        "thumbUrl": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/couples/cpl_01/photos/ph_ana_1019/thumb.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+        "expiresAt": "2026-10-20T12:00:00Z"
+      },
+      "partner": {
+        "photoId": "ph_kenji_1019",
+        "thumbUrl": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/couples/cpl_01/photos/ph_kenji_1019/thumb.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+        "expiresAt": "2026-10-20T12:00:00Z"
+      }
+    }
+  ]
+}

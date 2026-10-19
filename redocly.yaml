@@ -1,0 +1,8 @@
+# Lint config for contracts/openapi.yaml (npm run contracts:lint).
+extends:
+  - recommended
+rules:
+  # Push / Live Activity / widget snapshot schemas are intentionally not referenced by HTTP paths.
+  no-unused-components: off
+  # The second server is the local mock server.
+  no-server-example.com: off

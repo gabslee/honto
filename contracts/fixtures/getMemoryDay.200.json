@@ -1,0 +1,59 @@
+{
+  "day": "2026-10-19",
+  "photos": [
+    {
+      "id": "ph_ana_1019",
+      "author": "me",
+      "authorUserId": "usr_ana",
+      "localDay": "2026-10-19",
+      "isDaily": true,
+      "status": "ready",
+      "phraseKey": null,
+      "phrase": "Morning coffee for two",
+      "width": 1080,
+      "height": 1440,
+      "createdAt": "2026-10-19T11:42:00Z",
+      "urls": {
+        "full": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/couples/cpl_01/photos/ph_ana_1019/full.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+        "thumb": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/couples/cpl_01/photos/ph_ana_1019/thumb.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+        "expiresAt": "2026-10-20T12:00:00Z"
+      }
+    },
+    {
+      "id": "ph_kenji_1019",
+      "author": "partner",
+      "authorUserId": "usr_kenji",
+      "localDay": "2026-10-19",
+      "isDaily": true,
+      "status": "ready",
+      "phraseKey": "aitai",
+      "phrase": "会いたい · I miss you",
+      "width": 1080,
+      "height": 1440,
+      "createdAt": "2026-10-19T10:05:00Z",
+      "urls": {
+        "full": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/couples/cpl_01/photos/ph_kenji_1019/full.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+        "thumb": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/couples/cpl_01/photos/ph_kenji_1019/thumb.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+        "expiresAt": "2026-10-20T12:00:00Z"
+      }
+    },
+    {
+      "id": "ph_ana_1019b",
+      "author": "me",
+      "authorUserId": "usr_ana",
+      "localDay": "2026-10-19",
+      "isDaily": false,
+      "status": "ready",
+      "phraseKey": null,
+      "phrase": null,
+      "width": 1080,
+      "height": 1440,
+      "createdAt": "2026-10-19T12:00:40Z",
+      "urls": {
+        "full": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/couples/cpl_01/photos/ph_ana_1019b/full.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+        "thumb": "https://honto-photos-kwrqb3lgl-pn.t3.storageapi.dev/couples/cpl_01/photos/ph_ana_1019b/thumb.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=86400&X-Amz-Signature=fixture",
+        "expiresAt": "2026-10-20T12:00:00Z"
+      }
+    }
+  ]
+}
