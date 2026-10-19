@@ -3,6 +3,7 @@ import type { Couple, Entitlement, EntitlementSource, Features, Invite, Me, Nudg
 import { database } from "../../app/server-auth";
 import { apiError, isCouplePremium, noStore, normalizeTimeZone, requireCouple, requireUser, toApiUser, type V1Couple, type V1Partner, type V1User } from "./context";
 import { ensureLifecycleSchema, getObjectStore, hitRateLimit, latestUnpair, optionalTables, randomId, type ObjectStore, type OptionalTables } from "./lifecycle";
+import { todayMilestones } from "./milestones";
 
 type Sql = NeonQueryFunction<false, false>;
 type Row = Record<string, unknown>;
@@ -423,6 +424,7 @@ export async function buildToday(sql: Sql, { user, couple, partner }: Paired, no
   const theirs = await optional("photos", tables.photos && Boolean(partnerDay), () => dayPhotos(sql, couple.id, partner.id, partnerDay!), []);
   const latest = await optional("photos", tables.photos, () => latestPhoto(sql, couple.id, partner.id), null);
   const photo = (row: Row | null | undefined) => row ? toApiPhoto(row, user.id, store, now) : Promise.resolve(null);
+  const { streak, unseenMilestones } = await todayMilestones(sql, { user, couple, partner }, now);
   return {
     generatedAt: toIso(now),
     me: { displayName: user.displayName, localDay: myDay, timeZone: myZone, dailyPhoto: await photo(mine[0]), photoCount: mine.length },
@@ -437,6 +439,8 @@ export async function buildToday(sql: Sql, { user, couple, partner }: Paired, no
     activeTrip: await optional("trips", tables.trips, () => activeTrip(sql, couple.id, user.id, entitlement.premium, now), null),
     nudges: await optional("nudges", tables.nudges, () => nudgeState(sql, couple.id, user.id, now), { lastSentAt: null, lastReceivedAt: null, nextAllowedAt: null }),
     entitlement,
+    streak,
+    unseenMilestones,
   };
 }
 

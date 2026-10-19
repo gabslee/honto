@@ -1,0 +1,20 @@
+{
+  "milestones": [
+    {
+      "id": "ms_first_photo",
+      "type": "first_photo",
+      "value": null,
+      "localDay": "2026-10-03",
+      "achievedAt": "2026-10-03T11:20:00Z",
+      "seenAt": "2026-10-03T11:25:00Z"
+    },
+    {
+      "id": "ms_streak_7",
+      "type": "streak",
+      "value": 7,
+      "localDay": "2026-10-14",
+      "achievedAt": "2026-10-14T10:05:00Z",
+      "seenAt": "2026-10-14T10:06:00Z"
+    }
+  ]
+}

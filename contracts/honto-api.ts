@@ -370,6 +370,46 @@ export interface Today {
   activeTrip: Trip | null;
   nudges: NudgeState;
   entitlement: Entitlement;
+  streak?: CoupleStreak;
+  /** Milestones I have not seen yet (oldest first), so the app can show the CelebrationSheet without another call. Usually empty. */
+  unseenMilestones?: Array<Milestone>;
+}
+
+/** Couple streak (Free): consecutive days on which both partners have a ready photo on that local day */
+/** (each photo counts on its photographer's own local day, as in `me.localDay` / `partner.localDay`). */
+/** A day only breaks the streak once it is over for both of us, so the partner who is a day ahead never */
+/** sees a reset before the other one could post. `current` is 0 once a day passes without both photos. */
+export interface CoupleStreak {
+  current: number;
+  /** Longest streak this couple ever had (kept even if photos are later deleted). */
+  best: number;
+  /** `meDoneToday && partnerDoneToday`. */
+  todayComplete: boolean;
+  /** I have a ready photo on my local day (same day as `me.dailyPhoto`). */
+  meDoneToday: boolean;
+  /** My partner has a ready photo on their local day (false while their zone is unknown). */
+  partnerDoneToday: boolean;
+  /** Most recent day with both photos. */
+  lastCompleteDay: LocalDay | null;
+}
+
+export const MilestoneTypeValues = ["first_photo", "days_together", "anniversary", "reunion", "streak"] as const;
+export type MilestoneType = (typeof MilestoneTypeValues)[number];
+
+export interface Milestone {
+  id: string;
+  type: MilestoneType;
+  /** `days_together`: 100; `anniversary`: years; `streak`: 7, 30 or 100; otherwise null. */
+  value: number | null;
+  localDay: LocalDay;
+  /** When the server recorded it. */
+  achievedAt: IsoDateTime;
+  /** When I marked it seen (per user). */
+  seenAt: IsoDateTime | null;
+}
+
+export interface MilestoneList {
+  milestones: Array<Milestone>;
 }
 
 export interface PhotoThumb {
@@ -795,6 +835,10 @@ export interface Operations {
   updateTrip: { method: "PATCH"; path: "/api/v1/trips/{tripId}"; pathParams: { tripId: string }; query: never; body: TripPatch; responses: { 200: Trip; 400: ApiError; 401: ApiError; 404: ApiError } };
   /** DELETE /api/v1/trips/{tripId}: Cancel a trip (sends `trip.end` if its Live Activity is running). */
   deleteTrip: { method: "DELETE"; path: "/api/v1/trips/{tripId}"; pathParams: { tripId: string }; query: never; body: never; responses: { 204: void; 401: ApiError; 404: ApiError } };
+  /** GET /api/v1/milestones: Milestones the couple reached (Free), for Memories and the CelebrationSheet. */
+  listMilestones: { method: "GET"; path: "/api/v1/milestones"; pathParams: never; query: { unseen?: string }; body: never; responses: { 200: MilestoneList; 400: ApiError; 401: ApiError; 409: ApiError } };
+  /** POST /api/v1/milestones/{milestoneId}/seen: Mark a milestone as seen by me (the CelebrationSheet was shown). Idempotent. */
+  markMilestoneSeen: { method: "POST"; path: "/api/v1/milestones/{milestoneId}/seen"; pathParams: { milestoneId: string }; query: never; body: never; responses: { 200: Milestone; 401: ApiError; 404: ApiError; 409: ApiError } };
   /** POST /api/v1/nudges: "Thinking of you" (Free). Sends an alert + widget refresh to the partner. */
   sendNudge: { method: "POST"; path: "/api/v1/nudges"; pathParams: never; query: never; body: NudgeRequest; responses: { 201: NudgeResult; 401: ApiError; 409: ApiError; 429: ApiError } };
   /** POST /api/v1/billing/revenuecat: RevenueCat webhook → entitlements. */
@@ -847,6 +891,8 @@ export const operations = {
   createTrip: { method: "POST", path: "/api/v1/trips", auth: ["bearerAuth","cookieAuth"] },
   updateTrip: { method: "PATCH", path: "/api/v1/trips/{tripId}", auth: ["bearerAuth","cookieAuth"] },
   deleteTrip: { method: "DELETE", path: "/api/v1/trips/{tripId}", auth: ["bearerAuth","cookieAuth"] },
+  listMilestones: { method: "GET", path: "/api/v1/milestones", auth: ["bearerAuth","cookieAuth"] },
+  markMilestoneSeen: { method: "POST", path: "/api/v1/milestones/{milestoneId}/seen", auth: ["bearerAuth","cookieAuth"] },
   sendNudge: { method: "POST", path: "/api/v1/nudges", auth: ["bearerAuth","cookieAuth"] },
   revenueCatWebhook: { method: "POST", path: "/api/v1/billing/revenuecat", auth: ["revenueCatAuth"] },
   cronTrips: { method: "GET", path: "/api/cron/trips", auth: ["cronAuth"] },

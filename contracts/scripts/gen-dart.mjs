@@ -151,7 +151,7 @@ export function generateDart(spec) {
   for (const op of ops) {
     let path = dartStr(op.path);
     for (const p of op.pathParams) path = path.replace(`{${p.name}}`, `\${Uri.encodeComponent(${p.name})}`);
-    const query = op.queryParams.length ? `, query: {${op.queryParams.map((p) => `${dartStr(p.name)}: ${p.name}`).join(", ")}}` : "";
+    const query = op.queryParams.length ? `, query: {${op.queryParams.map((p) => p.required ? `${dartStr(p.name)}: ${p.name}` : `if (${p.name} != null) ${dartStr(p.name)}: ${p.name}`).join(", ")}}` : "";
     const body = op.body ? ", body: body.toJson()" : "";
     const ret = op.successSchema ? typeName(op.successSchema) : null;
     a.push("  @override");

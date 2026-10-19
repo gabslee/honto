@@ -27,6 +27,10 @@ class FakeHontoApi implements HontoApi {
     _paired = scenario == FakeScenario.pairedPremium || scenario == FakeScenario.pairedFree;
     _premium = scenario == FakeScenario.pairedPremium;
     _today = _json(_premium ? 'getToday.200' : 'getToday.200.free_no_photos');
+    final seen = (_json('listMilestones.200')['milestones'] as List<dynamic>).cast<Map<String, dynamic>>();
+    final unseen = ((_today['unseenMilestones'] as List<dynamic>?) ?? const []).cast<Map<String, dynamic>>();
+    // Premium: first photo + 7-day streak, both seen. Free: first photo seen, 7-day streak not seen yet.
+    _milestones.addAll(_premium ? seen : [seen.first, ...unseen]);
   }
 
   final FakeScenario scenario;
@@ -38,6 +42,7 @@ class FakeHontoApi implements HontoApi {
   late Map<String, dynamic> _today;
   DateTime? _lastNudge;
   final Map<String, Map<String, dynamic>> _pendingPhotos = {};
+  final List<Map<String, dynamic>> _milestones = [];
 
   /// Makes the next call to [operationId] throw, using the error fixture `<operationId>.<status>` if present.
   void failNext(String operationId, int status) {
@@ -71,6 +76,26 @@ class FakeHontoApi implements HontoApi {
       HontoApiException(statusCode, ApiError(error: message, code: ErrorCode.premiumRequired));
 
   String _iso(DateTime d) => d.toUtc().toIso8601String();
+
+  List<Map<String, dynamic>> get _unseen => [for (final m in _milestones) if (m['seenAt'] == null) m];
+
+  /// Records a milestone (unseen) like the server would, e.g. to preview the CelebrationSheet from a debug
+  /// menu. Same `type` + `value` twice is a no-op (milestones are recorded once per couple).
+  Milestone simulateMilestone(MilestoneType type, {int? value, String? localDay}) {
+    final existing = _milestones.where((m) => m['type'] == type.wire && m['value'] == value);
+    if (existing.isNotEmpty) return Milestone.fromJson(existing.first);
+    final now = _clock();
+    final json = <String, dynamic>{
+      'id': 'ms_fake_${type.wire}_${value ?? 0}',
+      'type': type.wire,
+      'value': value,
+      'localDay': localDay ?? (_today['me'] as Map<String, dynamic>)['localDay'],
+      'achievedAt': _iso(now),
+      'seenAt': null,
+    };
+    _milestones.add(json);
+    return Milestone.fromJson(json);
+  }
 
   Map<String, dynamic> _meJson() {
     final me = _json(switch (scenario) {
@@ -204,7 +229,7 @@ class FakeHontoApi implements HontoApi {
 
   // ---- today / photos / memories -------------------------------------------------------------
   @override
-  Future<Today> getToday() => _run('getToday', () => Today.fromJson(_today), needsCouple: true);
+  Future<Today> getToday() => _run('getToday', () => Today.fromJson({..._today, 'unseenMilestones': _unseen}), needsCouple: true);
 
   @override
   Future<PhotoCreateResponse> createPhoto(PhotoCreateRequest body) => _run('createPhoto', () {
@@ -230,10 +255,28 @@ class FakeHontoApi implements HontoApi {
           ..['status'] = 'ready'
           ..['isDaily'] = me['dailyPhoto'] == null
           ..['urls'] = _json('completePhoto.200')['urls'];
-        if (me['dailyPhoto'] == null) me['dailyPhoto'] = photo;
+        if (me['dailyPhoto'] == null) {
+          me['dailyPhoto'] = photo;
+          _markMeDoneToday(me['localDay'] as String);
+        }
         me['photoCount'] = (me['photoCount'] as int) + 1;
         return Photo.fromJson(photo);
       }, needsCouple: true);
+
+  /// My first photo of the day: updates the streak like the server (complete when both posted).
+  void _markMeDoneToday(String day) {
+    final streak = _today['streak'] as Map<String, dynamic>?;
+    if (streak == null || streak['meDoneToday'] == true) return;
+    streak['meDoneToday'] = true;
+    if (streak['partnerDoneToday'] != true) return;
+    streak['todayComplete'] = true;
+    final current = (streak['current'] as int) + 1;
+    streak
+      ..['current'] = current
+      ..['best'] = current > (streak['best'] as int) ? current : streak['best']
+      ..['lastCompleteDay'] = day;
+    if (const [7, 30, 100].contains(current)) simulateMilestone(MilestoneType.streak, value: current, localDay: day);
+  }
 
   @override
   Future<void> deletePhoto(String photoId) => _run('deletePhoto', () {
@@ -254,6 +297,24 @@ class FakeHontoApi implements HontoApi {
           throw HontoApiException(403, ApiError.fromJson(_json('getMemoryDay.403')));
         }
         return MemoryDay.fromJson(_json('getMemoryDay.200')..['day'] = day);
+      }, needsCouple: true);
+
+  // ---- milestones ----------------------------------------------------------------------------
+  @override
+  Future<MilestoneList> listMilestones({String? unseen}) => _run('listMilestones', () {
+        final list = unseen == 'true' ? _unseen : _milestones;
+        final sorted = [...list]..sort((a, b) => (a['localDay'] as String).compareTo(b['localDay'] as String));
+        return MilestoneList.fromJson({'milestones': sorted});
+      }, needsCouple: true);
+
+  /// Idempotent: the first `seenAt` is kept.
+  @override
+  Future<Milestone> markMilestoneSeen(String milestoneId) => _run('markMilestoneSeen', () {
+        final match = _milestones.where((m) => m['id'] == milestoneId);
+        if (match.isEmpty) throw HontoApiException(404, ApiError.fromJson(_json('markMilestoneSeen.404')));
+        final milestone = match.first;
+        milestone['seenAt'] ??= _iso(_clock());
+        return Milestone.fromJson(milestone);
       }, needsCouple: true);
 
   // ---- devices -------------------------------------------------------------------------------

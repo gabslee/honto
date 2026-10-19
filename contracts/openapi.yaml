@@ -51,6 +51,8 @@ tags:
     description: 'Daily photos via presigned uploads to private S3-compatible object storage.'
   - name: memories
     description: 'Monthly history and day detail.'
+  - name: milestones
+    description: 'Couple milestones (celebrations, Free) listed in Memories.'
   - name: devices
     description: 'Push tokens (FCM, APNs alert/widget) and Live Activity tokens.'
   - name: calendar
@@ -752,6 +754,52 @@ paths:
         '204': { description: Deleted. }
         '401': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+  /api/v1/milestones:
+    get:
+      tags: [milestones]
+      operationId: listMilestones
+      summary: Milestones the couple reached (Free), for Memories and the CelebrationSheet.
+      description: |
+        Recorded once per couple, ascending by `localDay` (the day the milestone belongs to in Memories).
+        Types: `first_photo` (first ready photo of the couple), `days_together` (`value` 100), `anniversary`
+        (`value` = years since `startedOn`), `reunion` (the reunion day of the countdown is reached; one per
+        reunion date) and `streak` (`value` 7, 30 or 100 consecutive days with both daily photos). Date
+        milestones only count from the day the couple paired, so a couple together for years does not get a
+        burst of past anniversaries. Milestones are detected when this endpoint or `GET /api/v1/today` is
+        read. `seenAt` is per user: show the CelebrationSheet for each milestone with `seenAt: null`, then
+        call `POST /api/v1/milestones/{milestoneId}/seen`. `unseen=true` returns only those.
+      parameters:
+        - name: unseen
+          in: query
+          required: false
+          schema: { type: string, enum: ['true', 'false'] }
+          description: '`true` = only milestones I have not seen yet.'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MilestoneList' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/milestones/{milestoneId}/seen:
+    post:
+      tags: [milestones]
+      operationId: markMilestoneSeen
+      summary: Mark a milestone as seen by me (the CelebrationSheet was shown). Idempotent.
+      description: The first `seenAt` is kept on repeats. My partner's `seenAt` is independent.
+      parameters:
+        - $ref: '#/components/parameters/MilestoneId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Milestone' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
   /api/v1/nudges:
     post:
       tags: [nudges]
@@ -848,6 +896,11 @@ components:
   parameters:
     PhotoId:
       name: photoId
+      in: path
+      required: true
+      schema: { type: string }
+    MilestoneId:
+      name: milestoneId
       in: path
       required: true
       schema: { type: string }
@@ -1294,6 +1347,44 @@ components:
         activeTrip: { anyOf: [{ $ref: '#/components/schemas/Trip' }, { type: 'null' }], description: 'Next trip whose Live Activity window is open or opens within 24h.' }
         nudges: { $ref: '#/components/schemas/NudgeState' }
         entitlement: { $ref: '#/components/schemas/Entitlement' }
+        streak: { $ref: '#/components/schemas/CoupleStreak' }
+        unseenMilestones:
+          type: array
+          items: { $ref: '#/components/schemas/Milestone' }
+          description: 'Milestones I have not seen yet (oldest first), so the app can show the CelebrationSheet without another call. Usually empty.'
+    CoupleStreak:
+      type: object
+      required: [current, best, todayComplete, meDoneToday, partnerDoneToday, lastCompleteDay]
+      description: |
+        Couple streak (Free): consecutive days on which both partners have a ready photo on that local day
+        (each photo counts on its photographer's own local day, as in `me.localDay` / `partner.localDay`).
+        A day only breaks the streak once it is over for both of us, so the partner who is a day ahead never
+        sees a reset before the other one could post. `current` is 0 once a day passes without both photos.
+      properties:
+        current: { type: integer, minimum: 0 }
+        best: { type: integer, minimum: 0, description: 'Longest streak this couple ever had (kept even if photos are later deleted).' }
+        todayComplete: { type: boolean, description: '`meDoneToday && partnerDoneToday`.' }
+        meDoneToday: { type: boolean, description: 'I have a ready photo on my local day (same day as `me.dailyPhoto`).' }
+        partnerDoneToday: { type: boolean, description: 'My partner has a ready photo on their local day (false while their zone is unknown).' }
+        lastCompleteDay: { anyOf: [{ $ref: '#/components/schemas/LocalDay' }, { type: 'null' }], description: 'Most recent day with both photos.' }
+    MilestoneType:
+      type: string
+      enum: [first_photo, days_together, anniversary, reunion, streak]
+    Milestone:
+      type: object
+      required: [id, type, value, localDay, achievedAt, seenAt]
+      properties:
+        id: { type: string }
+        type: { $ref: '#/components/schemas/MilestoneType' }
+        value: { type: [integer, 'null'], description: '`days_together`: 100; `anniversary`: years; `streak`: 7, 30 or 100; otherwise null.' }
+        localDay: { $ref: '#/components/schemas/LocalDay' }
+        achievedAt: { type: string, format: date-time, description: 'When the server recorded it.' }
+        seenAt: { type: [string, 'null'], format: date-time, description: 'When I marked it seen (per user).' }
+    MilestoneList:
+      type: object
+      required: [milestones]
+      properties:
+        milestones: { type: array, items: { $ref: '#/components/schemas/Milestone' } }
     PhotoThumb:
       type: object
       required: [photoId, thumbUrl, expiresAt]

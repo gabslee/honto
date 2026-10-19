@@ -70,4 +70,36 @@ void main() {
     expect(trip.liveActivity.startsAt, DateTime.utc(2026, 11, 14, 6));
     expect(trip.liveActivity.endsAt, DateTime.utc(2026, 11, 14, 10, 30));
   });
+  test('streak and milestones: unseen celebration, mark seen once, photo updates the streak', () async {
+    final api = FakeHontoApi(scenario: FakeScenario.pairedFree, clock: clock);
+    final today = await api.getToday();
+    expect(today.streak?.current, 7);
+    expect(today.streak?.meDoneToday, isFalse);
+    expect(today.unseenMilestones?.single.type, MilestoneType.streak);
+    final unseen = (await api.listMilestones(unseen: 'true')).milestones;
+    expect(unseen.single.value, 7);
+    final seen = await api.markMilestoneSeen(unseen.single.id);
+    expect(seen.seenAt, isNotNull);
+    expect((await api.markMilestoneSeen(unseen.single.id)).seenAt, seen.seenAt, reason: 'idempotent');
+    expect((await api.getToday()).unseenMilestones, isEmpty);
+    expect((await api.listMilestones()).milestones.map((m) => m.type), [MilestoneType.firstPhoto, MilestoneType.streak]);
+    await expectLater(api.markMilestoneSeen('ms_nope'), throwsA(isA<HontoApiException>().having((e) => e.statusCode, 's', 404)));
+    final created = await api.createPhoto(const PhotoCreateRequest(
+        clientId: '7a2c9a3e-6c55-4c0f-9a3e-2b9d7e1a4c11', contentType: PhotoContentType.imageJpeg, bytes: 200000,
+        thumbContentType: PhotoContentType.imageJpeg, thumbBytes: 20000, width: 1080, height: 1440,
+        localDay: '2026-10-19', timeZone: 'America/Sao_Paulo'));
+    await api.completePhoto(created.photo.id);
+    final after = (await api.getToday()).streak!;
+    expect([after.meDoneToday, after.todayComplete, after.current], [true, false, 7], reason: 'partner has not posted yet');
+    final preview = api.simulateMilestone(MilestoneType.anniversary, value: 3);
+    expect((await api.getToday()).unseenMilestones?.single.id, preview.id);
+  });
+
+  test('premium fixture: streak complete today, no unseen milestones', () async {
+    final api = FakeHontoApi(clock: clock);
+    final today = await api.getToday();
+    expect([today.streak?.current, today.streak?.todayComplete], [12, true]);
+    expect(today.unseenMilestones, isEmpty);
+    expect((await api.listMilestones()).milestones, hasLength(2));
+  });
 }
