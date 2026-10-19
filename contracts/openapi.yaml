@@ -377,7 +377,7 @@ paths:
         '415': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/photos/{photoId}/complete:
     post:
       tags: [photos]
@@ -398,7 +398,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/photos/{photoId}:
     delete:
       tags: [photos]
@@ -411,7 +411,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/memories:
     get:
       tags: [memories]
@@ -434,7 +434,7 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/memories/{day}:
     get:
       tags: [memories]
@@ -456,7 +456,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/devices:
     post:
       tags: [devices]
@@ -798,6 +798,14 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    StorageNotConfigured:
+      description: Object storage is not configured (the S3_* settings, e.g. the bucket keys, are missing). Retry later.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: Photo storage is not configured yet.
+            code: storage_not_configured
     AuthSession:
       description: Signed in (200 existing account, 201 new account).
       content:
