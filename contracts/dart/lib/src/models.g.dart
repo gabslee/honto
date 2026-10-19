@@ -1230,7 +1230,7 @@ class TodayPartner {
 }
 
 class Today {
-  const Today({required this.generatedAt, required this.me, required this.partner, required this.startedOn, required this.daysTogether, required this.reunion, required this.activeTrip, required this.nudges, required this.entitlement});
+  const Today({required this.generatedAt, required this.me, required this.partner, required this.startedOn, required this.daysTogether, required this.reunion, required this.activeTrip, required this.nudges, required this.entitlement, this.streak, this.unseenMilestones});
 
   final DateTime generatedAt;
   final TodaySelf me;
@@ -1242,6 +1242,9 @@ class Today {
   final Trip? activeTrip;
   final NudgeState nudges;
   final Entitlement entitlement;
+  final CoupleStreak? streak;
+  /// Milestones I have not seen yet (oldest first), so the app can show the CelebrationSheet without another call. Usually empty.
+  final List<Milestone>? unseenMilestones;
 
   factory Today.fromJson(Map<String, dynamic> json) => Today(
         generatedAt: DateTime.parse(json['generatedAt'] as String),
@@ -1253,6 +1256,8 @@ class Today {
         activeTrip: json['activeTrip'] == null ? null : Trip.fromJson(json['activeTrip'] as Map<String, dynamic>),
         nudges: NudgeState.fromJson(json['nudges'] as Map<String, dynamic>),
         entitlement: Entitlement.fromJson(json['entitlement'] as Map<String, dynamic>),
+        streak: json['streak'] == null ? null : CoupleStreak.fromJson(json['streak'] as Map<String, dynamic>),
+        unseenMilestones: json['unseenMilestones'] == null ? null : (json['unseenMilestones'] as List<dynamic>).map((e) => Milestone.fromJson(e as Map<String, dynamic>)).toList(),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -1265,10 +1270,121 @@ class Today {
         'activeTrip': activeTrip == null ? null : activeTrip!.toJson(),
         'nudges': nudges.toJson(),
         'entitlement': entitlement.toJson(),
+        if (streak != null) 'streak': streak!.toJson(),
+        if (unseenMilestones != null) 'unseenMilestones': unseenMilestones!.map((e) => e.toJson()).toList(),
       };
 
   @override
   String toString() => 'Today(${toJson()})';
+}
+
+/// Couple streak (Free): consecutive days on which both partners have a ready photo on that local day
+/// (each photo counts on its photographer's own local day, as in `me.localDay` / `partner.localDay`).
+/// A day only breaks the streak once it is over for both of us, so the partner who is a day ahead never
+/// sees a reset before the other one could post. `current` is 0 once a day passes without both photos.
+class CoupleStreak {
+  const CoupleStreak({required this.current, required this.best, required this.todayComplete, required this.meDoneToday, required this.partnerDoneToday, required this.lastCompleteDay});
+
+  final int current;
+  /// Longest streak this couple ever had (kept even if photos are later deleted).
+  final int best;
+  /// `meDoneToday && partnerDoneToday`.
+  final bool todayComplete;
+  /// I have a ready photo on my local day (same day as `me.dailyPhoto`).
+  final bool meDoneToday;
+  /// My partner has a ready photo on their local day (false while their zone is unknown).
+  final bool partnerDoneToday;
+  /// Most recent day with both photos.
+  final LocalDay? lastCompleteDay;
+
+  factory CoupleStreak.fromJson(Map<String, dynamic> json) => CoupleStreak(
+        current: (json['current'] as num).toInt(),
+        best: (json['best'] as num).toInt(),
+        todayComplete: json['todayComplete'] as bool,
+        meDoneToday: json['meDoneToday'] as bool,
+        partnerDoneToday: json['partnerDoneToday'] as bool,
+        lastCompleteDay: json['lastCompleteDay'] == null ? null : json['lastCompleteDay'] as String,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'current': current,
+        'best': best,
+        'todayComplete': todayComplete,
+        'meDoneToday': meDoneToday,
+        'partnerDoneToday': partnerDoneToday,
+        'lastCompleteDay': lastCompleteDay,
+      };
+
+  @override
+  String toString() => 'CoupleStreak(${toJson()})';
+}
+
+enum MilestoneType {
+  firstPhoto('first_photo'),
+  daysTogether('days_together'),
+  anniversary('anniversary'),
+  reunion('reunion'),
+  streak('streak'),
+  /// A value added to the API after this client was built.
+  unrecognized('');
+
+  const MilestoneType(this.wire);
+  final String wire;
+
+  static MilestoneType fromJson(String value) => values.firstWhere((e) => e.wire == value && e != unrecognized, orElse: () => unrecognized);
+  String toJson() => wire;
+}
+
+class Milestone {
+  const Milestone({required this.id, required this.type, required this.value, required this.localDay, required this.achievedAt, required this.seenAt});
+
+  final String id;
+  final MilestoneType type;
+  /// `days_together`: 100; `anniversary`: years; `streak`: 7, 30 or 100; otherwise null.
+  final int? value;
+  final LocalDay localDay;
+  /// When the server recorded it.
+  final DateTime achievedAt;
+  /// When I marked it seen (per user).
+  final DateTime? seenAt;
+
+  factory Milestone.fromJson(Map<String, dynamic> json) => Milestone(
+        id: json['id'] as String,
+        type: MilestoneType.fromJson(json['type'] as String),
+        value: json['value'] == null ? null : (json['value'] as num).toInt(),
+        localDay: json['localDay'] as String,
+        achievedAt: DateTime.parse(json['achievedAt'] as String),
+        seenAt: json['seenAt'] == null ? null : DateTime.parse(json['seenAt'] as String),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'type': type.toJson(),
+        'value': value,
+        'localDay': localDay,
+        'achievedAt': achievedAt.toUtc().toIso8601String(),
+        'seenAt': seenAt == null ? null : seenAt!.toUtc().toIso8601String(),
+      };
+
+  @override
+  String toString() => 'Milestone(${toJson()})';
+}
+
+class MilestoneList {
+  const MilestoneList({required this.milestones});
+
+  final List<Milestone> milestones;
+
+  factory MilestoneList.fromJson(Map<String, dynamic> json) => MilestoneList(
+        milestones: (json['milestones'] as List<dynamic>).map((e) => Milestone.fromJson(e as Map<String, dynamic>)).toList(),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'milestones': milestones.map((e) => e.toJson()).toList(),
+      };
+
+  @override
+  String toString() => 'MilestoneList(${toJson()})';
 }
 
 class PhotoThumb {
@@ -2334,6 +2450,9 @@ final Map<String, Object Function(Map<String, dynamic>)> hontoModelDecoders = <S
   'TodaySelf': TodaySelf.fromJson,
   'TodayPartner': TodayPartner.fromJson,
   'Today': Today.fromJson,
+  'CoupleStreak': CoupleStreak.fromJson,
+  'Milestone': Milestone.fromJson,
+  'MilestoneList': MilestoneList.fromJson,
   'PhotoThumb': PhotoThumb.fromJson,
   'MemoryDaySummary': MemoryDaySummary.fromJson,
   'MemoriesMonth': MemoriesMonth.fromJson,

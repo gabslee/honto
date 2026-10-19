@@ -64,6 +64,8 @@ Auth is `Authorization: Bearer hm_u_…` (apps) or the `honto_session` cookie (w
 | DELETE | `/api/v1/photos/{photoId}` | Author only |
 | GET | `/api/v1/memories?month=YYYY-MM` | Days with both thumbs; Free = last 7 days, older `locked` |
 | GET | `/api/v1/memories/{day}` | All photos of both for a local day; 403 `premium_required` when locked |
+| GET | `/api/v1/milestones[?unseen=true]` | Couple milestones (Free) for Memories, with my `seenAt`; `GET /api/v1/today` also returns `streak` and `unseenMilestones` |
+| POST | `/api/v1/milestones/{id}/seen` | Marks a milestone seen by me (CelebrationSheet shown once per user), idempotent |
 | POST / DELETE | `/api/v1/devices`, `/api/v1/devices/{id}` | `fcm`, `apns_alert`, `apns_widget` (+ `env`) |
 | POST / DELETE | `/api/v1/live-activity/tokens`, `/{id}` | `push_to_start` / `update` (APNs direct) |
 | PUT | `/api/v1/calendar/busy` | Atomic window replace (≤ 14 days); all-day dropped; titles only Premium + opted in |

@@ -124,5 +124,14 @@
       "countdownWidget": true,
       "nudge": true
     }
-  }
+  },
+  "streak": {
+    "current": 12,
+    "best": 12,
+    "todayComplete": true,
+    "meDoneToday": true,
+    "partnerDoneToday": true,
+    "lastCompleteDay": "2026-10-19"
+  },
+  "unseenMilestones": []
 }

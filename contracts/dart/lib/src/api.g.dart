@@ -114,6 +114,12 @@ abstract class HontoApi {
   /// `DELETE /api/v1/trips/{tripId}`: Cancel a trip (sends `trip.end` if its Live Activity is running).
   Future<void> deleteTrip(String tripId);
 
+  /// `GET /api/v1/milestones`: Milestones the couple reached (Free), for Memories and the CelebrationSheet.
+  Future<MilestoneList> listMilestones({String? unseen});
+
+  /// `POST /api/v1/milestones/{milestoneId}/seen`: Mark a milestone as seen by me (the CelebrationSheet was shown). Idempotent.
+  Future<Milestone> markMilestoneSeen(String milestoneId);
+
   /// `POST /api/v1/nudges`: "Thinking of you" (Free). Sends an alert + widget refresh to the partner.
   Future<NudgeResult> sendNudge(NudgeRequest body);
 
@@ -333,6 +339,18 @@ class HttpHontoApi implements HontoApi {
   @override
   Future<void> deleteTrip(String tripId) async {
     await transport.send('DELETE', '/api/v1/trips/${Uri.encodeComponent(tripId)}');
+  }
+
+  @override
+  Future<MilestoneList> listMilestones({String? unseen}) async {
+    final json = await transport.send('GET', '/api/v1/milestones', query: {if (unseen != null) 'unseen': unseen});
+    return MilestoneList.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Milestone> markMilestoneSeen(String milestoneId) async {
+    final json = await transport.send('POST', '/api/v1/milestones/${Uri.encodeComponent(milestoneId)}/seen');
+    return Milestone.fromJson(json as Map<String, dynamic>);
   }
 
   @override

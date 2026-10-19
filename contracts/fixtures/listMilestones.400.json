@@ -1,0 +1,4 @@
+{
+  "error": "unseen must be true or false.",
+  "code": "bad_request"
+}
