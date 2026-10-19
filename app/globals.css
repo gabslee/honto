@@ -82,7 +82,7 @@ body { margin:0; color:var(--ink); background:var(--paper); font-family:"Arial R
 button,input,textarea { font:inherit; color:inherit; }
 button { cursor:pointer; }
 button:disabled { cursor:not-allowed; opacity:.55; }
-.landing { min-height:100svh; padding:0 5vw 100px; overflow:hidden; position:relative; display:flex; flex-direction:column; background:radial-gradient(circle at 90% 12%,#ffd9e5 0 12%,transparent 12.2%),linear-gradient(118deg,var(--paper) 0 62%,#ffe9b8 62%); }
+.landing { min-height:100svh; padding:0 5vw 100px; overflow-x:clip; position:relative; display:flex; flex-direction:column; background:radial-gradient(circle at 90% 12%,#ffd9e5 0 12%,transparent 12.2%),linear-gradient(118deg,var(--paper) 0 62%,#ffe9b8 62%); }
 .landing nav,.topbar { height:88px; display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid rgba(23,36,61,.15); position:relative; z-index:2; }
 .logo,.brand { display:flex; align-items:flex-start; gap:2px; border:0; background:none; font-size:30px; font-weight:1000; letter-spacing:-2px; }
 .landing-nav-tools { display:flex; align-items:center; gap:30px; }.language-picker,.language-menu { position:relative; display:inline-flex; align-items:center; gap:6px; font-size:9px; font-weight:1000; letter-spacing:.08em; }.language-trigger { display:inline-flex; align-items:center; gap:6px; border:0; background:transparent; padding:3px 0; font-size:inherit; font-weight:inherit; letter-spacing:inherit; white-space:nowrap; }.language-trigger strong { font-size:10px; }.language-trigger i { font-style:normal; font-size:12px; line-height:1; }.language-menu .language-trigger { gap:4px; padding:6px 8px; border:2px solid var(--ink); border-radius:8px; background:#fffdf8; }.language-menu .language-trigger span { color:var(--red); font-size:13px; }.language-options { position:absolute; z-index:90; top:calc(100% + 8px); right:0; min-width:112px; padding:4px; border:2px solid var(--ink); border-radius:10px; background:#fffdf8; box-shadow:4px 4px 0 var(--ink); animation:language-menu-in .16s ease both; }.language-options button { display:block; width:100%; border:0; border-radius:6px; background:transparent; padding:9px 10px; text-align:left; font-size:11px; font-weight:900; }.language-options button:hover,.language-options button.selected { background:var(--yellow); }
@@ -482,9 +482,9 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .session-clock { max-width:112px; }
 }
 
-/* The landing screen is a single mobile viewport, not a long marketing page. */
+/* Compact mobile hero; the landing itself scrolls so the sections below the fold stay reachable. */
 @media (max-width:800px) {
-  .landing { height:100svh; min-height:100svh; padding:0 16px; overflow:hidden; }
+  .landing { height:auto; min-height:100svh; padding:0 16px 32px; overflow-x:clip; overflow-y:visible; }
   .landing nav { height:56px; flex:0 0 56px; }
   .landing .logo { font-size:25px; }
   .landing .logo b { font-size:28px; }
@@ -516,11 +516,12 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
   .entry-card .hero-price { margin-top:7px !important; font-size:9px !important; line-height:1.25 !important; }
   .account-slot { margin-top:8px; }
   .account-control { min-height:30px; padding:6px 9px; font-size:8px; }
-  .landing > footer { display:none; }
+  .landing > footer { padding:24px 0 max(12px,env(safe-area-inset-bottom)); }
 }
 
-/* Viewport-first product surfaces: only long-form legal pages should scroll. */
-.landing, .pricing-page { height:100svh; min-height:100svh; overflow:hidden; }
+/* Viewport-first pricing surface. The landing is a normal document-scrolling page; scroll locks live only on .app-shell (room/game). */
+.pricing-page { height:100svh; min-height:100svh; overflow:hidden; }
+.landing { height:auto; min-height:100svh; overflow-x:clip; overflow-y:visible; }
 .app-shell { height:100svh; min-height:0; overflow:hidden; display:flex; flex-direction:column; }
 .app-shell > .topbar { flex:0 0 auto; }
 .app-shell > .game-stage, .app-shell > .lobby, .app-shell > .finished { min-height:0; flex:1 1 auto; overflow-y:auto; padding-bottom:24px; overscroll-behavior:contain; }
