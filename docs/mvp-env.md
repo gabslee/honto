@@ -86,3 +86,12 @@ device tokens are never logged. APNs host is per token (`env`: sandbox / product
 `drizzle/0009_photos_push.sql` (applied lazily by `ensurePhotosSchema()` in `api/v1/photos-schema.ts`).
 The same bucket backs W1b's object-store seam (`getObjectStore()` in `api/v1/lifecycle.ts` defaults to
 `app/storage.ts` once `S3_*` is complete): Today photo URLs, the export ZIP (`exports/`) and the retention cron.
+
+## claude/api-v1-calendar-billing-37k6wl (W3 calendar + RevenueCat)
+
+| Name | Used by | Notes |
+|---|---|---|
+| `REVENUECAT_WEBHOOK_SECRET` | `POST /api/v1/billing/revenuecat` | exact `Authorization` header value configured in the RevenueCat webhook (secret). Replaces the `REVENUECAT_WEBHOOK_AUTH` name above. Unset or empty: every webhook call gets 401 |
+
+The calendar endpoints (`PUT /api/v1/calendar/busy`, `GET /api/v1/calendar`) need no new variables
+(`DATABASE_URL`, `AUTH_SESSION_SALT`). `REVENUECAT_SECRET_API_KEY` is not used yet.

@@ -590,7 +590,8 @@ export interface NudgeResult {
 export interface RevenueCatEvent {
   id: string;
   type: string;
-  app_user_id: string;
+  /** Required for every type except `TRANSFER`, which only has `transferred_from` / `transferred_to`. */
+  app_user_id?: string;
   original_app_user_id?: string;
   aliases?: Array<string>;
   transferred_from?: Array<string>;
@@ -781,7 +782,7 @@ export interface Operations {
   /** PUT /api/v1/calendar/busy: Atomically replace my busy blocks for a window (max 14 days ahead). */
   uploadCalendarBusy: { method: "PUT"; path: "/api/v1/calendar/busy"; pathParams: never; query: never; body: CalendarBusyUpload; responses: { 200: CalendarBusyResult; 400: ApiError; 401: ApiError; 409: ApiError } };
   /** GET /api/v1/calendar: My blocks and my partner's, plus the partner's current status. Premium. */
-  getCalendar: { method: "GET"; path: "/api/v1/calendar"; pathParams: never; query: { from: string; to: string }; body: never; responses: { 200: CalendarView; 400: ApiError; 401: ApiError; 403: ApiError; 409: ApiError } };
+  getCalendar: { method: "GET"; path: "/api/v1/calendar"; pathParams: never; query: { from: string; to: string }; body: never; responses: { 200: CalendarView; 400: ApiError; 401: ApiError; 402: ApiError; 409: ApiError } };
   /** GET /api/v1/calendar/shares: My per-calendar title opt-ins. */
   getCalendarShares: { method: "GET"; path: "/api/v1/calendar/shares"; pathParams: never; query: never; body: never; responses: { 200: CalendarShares; 401: ApiError } };
   /** PUT /api/v1/calendar/shares: Replace my per-calendar title opt-ins (default off). Turning one on requires Premium. */
