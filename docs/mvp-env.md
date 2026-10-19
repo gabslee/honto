@@ -65,3 +65,6 @@ Existing names used: `DATABASE_URL`, `AUTH_SESSION_SALT` (also salts magic-link,
 system variable `VERCEL_ENV` (`production` = links always on `https://hontogame.com`, no console sender; otherwise
 links use the request's own origin so they work on a Preview URL).
 No new variables for the refresh tokens or the AASA file (app ID `4AW8H42XNA.com.hontogame.app` is fixed in code).
+`POST /api/v1/auth/google` and `/apple` reuse the existing `GOOGLE_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`,
+`GOOGLE_ANDROID_CLIENT_ID` (accepted Google audiences; none set = `503 missing_config`) and `APPLE_IOS_BUNDLE_ID`
+(Apple audience, default `com.hontogame.app`). No new variables.

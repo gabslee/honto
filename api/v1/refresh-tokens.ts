@@ -2,7 +2,7 @@ import type { NeonQueryFunction } from "@neondatabase/serverless";
 import type { AuthPlatform, AuthSession, User } from "../../contracts/honto-api";
 import { createMobileToken, database, revokeMobileToken } from "../../app/server-auth";
 import { apiError, noStore } from "./context";
-import { clientIp, ensureLifecycleSchema, hitRateLimit, randomId, saltedHash } from "./lifecycle";
+import { clientIp, ensureLifecycleSchema, hitRateLimit, randomId, saltedHash, sessionTokenHash } from "./lifecycle";
 
 type Sql = NeonQueryFunction<false, false>;
 
@@ -11,11 +11,15 @@ export const REFRESH_TTL_DAYS = 365;
 const RETRY_GRACE_SECONDS = 10;
 const PLATFORMS: AuthPlatform[] = ["ios", "android"];
 
-/** New single-use `hm_r_` refresh token for the apps. `familyId` ties a sign-in to all its rotations. */
-export async function issueRefreshToken(sql: Sql, userId: string, platform: AuthPlatform, familyId = randomId("rf_")) {
+/**
+ * New single-use `hm_r_` refresh token for the apps. `familyId` ties a sign-in to all its rotations;
+ * `accessToken` is the `hm_u_` issued with it (only its hash is kept), so logout can end the chain.
+ */
+export async function issueRefreshToken(sql: Sql, userId: string, platform: AuthPlatform, familyId = randomId("rf_"), accessToken: string | null = null) {
   await ensureLifecycleSchema(sql);
   const token = `hm_r_${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url")}`;
-  await sql`INSERT INTO v1_refresh_tokens (token_hash, user_id, family_id, platform, expires_at) VALUES (${await saltedHash("refresh", token)}, ${userId}, ${familyId}, ${platform}, now() + make_interval(days => ${REFRESH_TTL_DAYS}::int))`;
+  const accessHash = accessToken ? await sessionTokenHash(accessToken) : null;
+  await sql`INSERT INTO v1_refresh_tokens (token_hash, user_id, family_id, platform, expires_at, access_hash) VALUES (${await saltedHash("refresh", token)}, ${userId}, ${familyId}, ${platform}, now() + make_interval(days => ${REFRESH_TTL_DAYS}::int), ${accessHash})`;
   return token;
 }
 
@@ -56,7 +60,7 @@ export async function refreshSessionResponse(request: Request) {
   const user = (await sql`SELECT id, email, display_name AS "displayName", time_zone AS "timeZone", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt" FROM users WHERE id = ${userId}`)[0] as User | undefined;
   if (!user) return invalid();
   const token = await createMobileToken({ kind: "user", userId, platform });
-  const next = await issueRefreshToken(sql, userId, platform, String(used[0].familyId));
+  const next = await issueRefreshToken(sql, userId, platform, String(used[0].familyId), token);
   const result: AuthSession = { token, tokenType: "Bearer", expiresInDays: 365, created: false, user: { id: user.id, email: user.email, displayName: user.displayName, timeZone: user.timeZone ?? null, createdAt: user.createdAt }, refreshToken: next, refreshExpiresInDays: REFRESH_TTL_DAYS };
   return Response.json(result, { headers: noStore });
 }

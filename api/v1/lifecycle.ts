@@ -28,7 +28,10 @@ export function ensureLifecycleSchema(sql: Sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_email_login_tokens_email ON email_login_tokens(email, created_at DESC)`;
     // Rotating refresh tokens for the apps (hm_r_, single use). A family is one sign-in and all its rotations.
     await sql`CREATE TABLE IF NOT EXISTS v1_refresh_tokens (token_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, family_id text NOT NULL, platform text NOT NULL CHECK (platform IN ('ios', 'android')), created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL, used_at timestamptz, revoked_at timestamptz)`;
+    // Hash of the hm_u_ access token issued with each refresh token, so logout can end that chain.
+    await sql`ALTER TABLE v1_refresh_tokens ADD COLUMN IF NOT EXISTS access_hash text`;
     await sql`CREATE INDEX IF NOT EXISTS idx_v1_refresh_tokens_family ON v1_refresh_tokens(family_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_v1_refresh_tokens_access ON v1_refresh_tokens(access_hash) WHERE access_hash IS NOT NULL`;
     await sql`CREATE INDEX IF NOT EXISTS idx_v1_refresh_tokens_user ON v1_refresh_tokens(user_id)`;
     await sql`CREATE TABLE IF NOT EXISTS v1_rate_limits (scope text NOT NULL, subject text NOT NULL, window_start timestamptz NOT NULL, hits integer NOT NULL DEFAULT 0, PRIMARY KEY (scope, subject, window_start))`;
     await sql`CREATE TABLE IF NOT EXISTS photo_exports (id text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'ready', 'failed')), object_key text, photo_count integer NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now(), ready_at timestamptz, expires_at timestamptz)`;
@@ -80,6 +83,15 @@ export async function optionalTables(sql: Sql): Promise<OptionalTables> {
 /** Salted SHA-256 (same salt as user_sessions / mobile_tokens); `scope` keeps link, code, refresh and IP hashes apart. */
 export async function saltedHash(scope: string, value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${process.env.AUTH_SESSION_SALT ?? "honto-auth"}:${scope}:${value}`));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * The hash app/server-auth.ts stores for `mobile_tokens` and `user_sessions` (salted SHA-256, no scope). That
+ * helper is private and frozen, so it is mirrored here; tests check both agree (a revoked row stops working).
+ */
+export async function sessionTokenHash(token: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${process.env.AUTH_SESSION_SALT ?? "honto-auth"}:${token}`));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 

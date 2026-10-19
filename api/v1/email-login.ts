@@ -200,7 +200,7 @@ export async function verifyEmailSignIn(request: Request) {
   if (platform === "web") headers["Set-Cookie"] = userCookie(await createUserSession(userId));
   else {
     bearer = await createMobileToken({ kind: "user", userId, platform });
-    refreshToken = await issueRefreshToken(sql, userId, platform);
+    refreshToken = await issueRefreshToken(sql, userId, platform, undefined, bearer);
   }
   const result: AuthSession = { token: bearer, tokenType: "Bearer", expiresInDays: platform === "web" ? 30 : 365, created, user: { id: user.id, email: user.email, displayName: user.displayName, timeZone: user.timeZone ?? null, createdAt: user.createdAt }, refreshToken, refreshExpiresInDays: refreshToken ? REFRESH_TTL_DAYS : null };
   return Response.json(result, { status: created ? 201 : 200, headers });

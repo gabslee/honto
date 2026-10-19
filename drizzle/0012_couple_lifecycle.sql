@@ -33,7 +33,10 @@ CREATE TABLE IF NOT EXISTS v1_refresh_tokens (
   used_at timestamptz,                                    -- rotated
   revoked_at timestamptz
 );
+-- Hash of the hm_u_ access token issued with each refresh token, so POST /api/v1/auth/logout ends that chain.
+ALTER TABLE v1_refresh_tokens ADD COLUMN IF NOT EXISTS access_hash text;
 CREATE INDEX IF NOT EXISTS idx_v1_refresh_tokens_family ON v1_refresh_tokens(family_id);
+CREATE INDEX IF NOT EXISTS idx_v1_refresh_tokens_access ON v1_refresh_tokens(access_hash) WHERE access_hash IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_v1_refresh_tokens_user ON v1_refresh_tokens(user_id);
 
 -- Fixed-window counters (join attempts, invites, email start/verify per IP hash, exports). Purged after 2 days.
