@@ -49,6 +49,7 @@ Auth is `Authorization: Bearer hm_u_…` (apps) or the `honto_session` cookie (w
 | POST | `/api/v1/auth/google`, `/api/v1/auth/apple` | Public. Same behavior as `/api/mobile/auth/*` (which stays frozen for build 2). 200 existing / 201 new account |
 | POST | `/api/v1/auth/email/start` | Public. Magic link + 6-digit code, 15 min, 202 (503 `email_unavailable` with no provider) |
 | POST | `/api/v1/auth/email/verify` | Public. `token` or `email`+`code`; `platform: web` sets the cookie and returns `token: null` |
+| POST | `/api/v1/auth/refresh` | Public. Rotates an `hm_r_` refresh token (single use, reuse revokes the chain) for a new `hm_u_` |
 | POST | `/api/v1/auth/logout` | Revokes the token |
 | GET / DELETE | `/api/v1/me` | User + couple + entitlement + `pendingUnpair`; DELETE = account deletion |
 | PUT | `/api/v1/me/timezone` | IANA zone, on every open/foreground |

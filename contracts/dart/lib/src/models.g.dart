@@ -125,7 +125,7 @@ class User {
 }
 
 class AuthSession {
-  const AuthSession({required this.token, required this.tokenType, required this.expiresInDays, required this.created, required this.user});
+  const AuthSession({required this.token, required this.tokenType, required this.expiresInDays, required this.created, required this.user, this.refreshToken, this.refreshExpiresInDays});
 
   /// `hm_u_…`; null for `platform: web` (cookie set instead).
   final String? token;
@@ -135,6 +135,10 @@ class AuthSession {
   /// True when the account was created by this sign-in.
   final bool created;
   final User user;
+  /// `hm_r_…`, single use (see `POST /api/v1/auth/refresh`). Null or absent for `platform: web` and for sign-ins that do not issue one yet.
+  final String? refreshToken;
+  /// Lifetime of `refreshToken`; every refresh issues a new one.
+  final int? refreshExpiresInDays;
 
   factory AuthSession.fromJson(Map<String, dynamic> json) => AuthSession(
         token: json['token'] == null ? null : json['token'] as String,
@@ -142,6 +146,8 @@ class AuthSession {
         expiresInDays: (json['expiresInDays'] as num).toInt(),
         created: json['created'] as bool,
         user: User.fromJson(json['user'] as Map<String, dynamic>),
+        refreshToken: json['refreshToken'] == null ? null : json['refreshToken'] as String,
+        refreshExpiresInDays: json['refreshExpiresInDays'] == null ? null : (json['refreshExpiresInDays'] as num).toInt(),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -150,10 +156,32 @@ class AuthSession {
         'expiresInDays': expiresInDays,
         'created': created,
         'user': user.toJson(),
+        if (refreshToken != null) 'refreshToken': refreshToken!,
+        if (refreshExpiresInDays != null) 'refreshExpiresInDays': refreshExpiresInDays!,
       };
 
   @override
   String toString() => 'AuthSession(${toJson()})';
+}
+
+class RefreshRequest {
+  const RefreshRequest({required this.refreshToken, required this.platform});
+
+  final String refreshToken;
+  final AuthPlatform platform;
+
+  factory RefreshRequest.fromJson(Map<String, dynamic> json) => RefreshRequest(
+        refreshToken: json['refreshToken'] as String,
+        platform: AuthPlatform.fromJson(json['platform'] as String),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'refreshToken': refreshToken,
+        'platform': platform.toJson(),
+      };
+
+  @override
+  String toString() => 'RefreshRequest(${toJson()})';
 }
 
 class GoogleSignInRequest {
@@ -2201,6 +2229,7 @@ final Map<String, Object Function(Map<String, dynamic>)> hontoModelDecoders = <S
   'ApiError': ApiError.fromJson,
   'User': User.fromJson,
   'AuthSession': AuthSession.fromJson,
+  'RefreshRequest': RefreshRequest.fromJson,
   'GoogleSignInRequest': GoogleSignInRequest.fromJson,
   'AppleSignInRequest': AppleSignInRequest.fromJson,
   'EmailStartRequest': EmailStartRequest.fromJson,

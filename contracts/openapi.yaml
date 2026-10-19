@@ -143,6 +143,29 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/RateLimited' }
+  /api/v1/auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refreshSession
+      summary: Rotate a refresh token for a new hm_u_ access token (instead of sending the user back to sign-in).
+      description: |
+        Call it when a request answers 401 `unauthorized`. Send the `refreshToken` from the last sign-in or
+        refresh (and, if still held, the old access token as `Authorization: Bearer hm_u_…`, which is revoked).
+        Rotation: every refresh token works once; the answer carries a new access token and a new refresh token.
+        Presenting a refresh token that was already used revokes its whole chain (possible theft): sign in again.
+        `401 invalid_token` when unknown, expired, reused or revoked. Refresh tokens are issued to the apps
+        (`ios` / `android`) only, never to `platform: web`. 30 calls per IP per 15 minutes.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AuthSession' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/RateLimited' }
   /api/v1/auth/logout:
     post:
       tags: [auth]
@@ -874,6 +897,14 @@ components:
         expiresInDays: { type: integer }
         created: { type: boolean, description: 'True when the account was created by this sign-in.' }
         user: { $ref: '#/components/schemas/User' }
+        refreshToken: { type: [string, 'null'], description: '`hm_r_…`, single use (see `POST /api/v1/auth/refresh`). Null or absent for `platform: web` and for sign-ins that do not issue one yet.' }
+        refreshExpiresInDays: { type: [integer, 'null'], description: 'Lifetime of `refreshToken`; every refresh issues a new one.' }
+    RefreshRequest:
+      type: object
+      required: [refreshToken, platform]
+      properties:
+        refreshToken: { type: string, maxLength: 128 }
+        platform: { $ref: '#/components/schemas/AuthPlatform' }
     GoogleSignInRequest:
       type: object
       required: [idToken, platform]

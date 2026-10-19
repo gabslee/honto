@@ -105,6 +105,15 @@ class FakeHontoApi implements HontoApi {
       });
 
   @override
+  Future<AuthSession> refreshSession(RefreshRequest body) => _run('refreshSession', () {
+        // Any token containing "reused" simulates a revoked or reused refresh token.
+        if (body.refreshToken.contains('reused')) {
+          throw HontoApiException(401, ApiError.fromJson(_json('refreshSession.401')));
+        }
+        return AuthSession.fromJson(_json('refreshSession.200'));
+      });
+
+  @override
   Future<LogoutResponse> logout() => _run('logout', () => LogoutResponse.fromJson(_json('logout.200')));
 
   // ---- me ------------------------------------------------------------------------------------

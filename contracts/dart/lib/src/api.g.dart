@@ -18,6 +18,9 @@ abstract class HontoApi {
   /// `POST /api/v1/auth/email/verify`: Exchange the magic-link token (or email + code) for a session.
   Future<AuthSession> verifyEmailSignIn(EmailVerifyRequest body);
 
+  /// `POST /api/v1/auth/refresh`: Rotate a refresh token for a new hm_u_ access token (instead of sending the user back to sign-in).
+  Future<AuthSession> refreshSession(RefreshRequest body);
+
   /// `POST /api/v1/auth/logout`: Revoke the bearer token (or clear the web cookie).
   Future<LogoutResponse> logout();
 
@@ -139,6 +142,12 @@ class HttpHontoApi implements HontoApi {
   @override
   Future<AuthSession> verifyEmailSignIn(EmailVerifyRequest body) async {
     final json = await transport.send('POST', '/api/v1/auth/email/verify', body: body.toJson());
+    return AuthSession.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<AuthSession> refreshSession(RefreshRequest body) async {
+    final json = await transport.send('POST', '/api/v1/auth/refresh', body: body.toJson());
     return AuthSession.fromJson(json as Map<String, dynamic>);
   }
 

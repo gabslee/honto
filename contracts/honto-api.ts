@@ -45,6 +45,15 @@ export interface AuthSession {
   /** True when the account was created by this sign-in. */
   created: boolean;
   user: User;
+  /** `hm_r_…`, single use (see `POST /api/v1/auth/refresh`). Null or absent for `platform: web` and for sign-ins that do not issue one yet. */
+  refreshToken?: string | null;
+  /** Lifetime of `refreshToken`; every refresh issues a new one. */
+  refreshExpiresInDays?: number | null;
+}
+
+export interface RefreshRequest {
+  refreshToken: string;
+  platform: AuthPlatform;
 }
 
 export interface GoogleSignInRequest {
@@ -700,6 +709,8 @@ export interface Operations {
   startEmailSignIn: { method: "POST"; path: "/api/v1/auth/email/start"; pathParams: never; query: never; body: EmailStartRequest; responses: { 202: EmailStartResponse; 400: ApiError; 429: ApiError; 503: ApiError } };
   /** POST /api/v1/auth/email/verify: Exchange the magic-link token (or email + code) for a session. */
   verifyEmailSignIn: { method: "POST"; path: "/api/v1/auth/email/verify"; pathParams: never; query: never; body: EmailVerifyRequest; responses: { 200: AuthSession; 201: AuthSession; 400: ApiError; 401: ApiError; 429: ApiError } };
+  /** POST /api/v1/auth/refresh: Rotate a refresh token for a new hm_u_ access token (instead of sending the user back to sign-in). */
+  refreshSession: { method: "POST"; path: "/api/v1/auth/refresh"; pathParams: never; query: never; body: RefreshRequest; responses: { 200: AuthSession; 400: ApiError; 401: ApiError; 429: ApiError } };
   /** POST /api/v1/auth/logout: Revoke the bearer token (or clear the web cookie). */
   logout: { method: "POST"; path: "/api/v1/auth/logout"; pathParams: never; query: never; body: never; responses: { 200: LogoutResponse; 401: ApiError } };
   /** GET /api/v1/me: Current user, couple (or null), entitlement and pending-unpair state. */
@@ -780,6 +791,7 @@ export const operations = {
   signInWithApple: { method: "POST", path: "/api/v1/auth/apple", auth: [] },
   startEmailSignIn: { method: "POST", path: "/api/v1/auth/email/start", auth: [] },
   verifyEmailSignIn: { method: "POST", path: "/api/v1/auth/email/verify", auth: [] },
+  refreshSession: { method: "POST", path: "/api/v1/auth/refresh", auth: [] },
   logout: { method: "POST", path: "/api/v1/auth/logout", auth: ["bearerAuth","cookieAuth"] },
   getMe: { method: "GET", path: "/api/v1/me", auth: ["bearerAuth","cookieAuth"] },
   deleteMe: { method: "DELETE", path: "/api/v1/me", auth: ["bearerAuth","cookieAuth"] },
