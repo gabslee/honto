@@ -6,7 +6,7 @@ import { generateAppleClientSecret } from "../../app/apple-auth";
 
 type Sql = NeonQueryFunction<false, false>;
 
-const REVENUECAT_API = "https://api.revenuecat.com/v1/subscribers/";
+const REVENUECAT_API = "https://api.revenuecat.com/v2/projects/";
 const APPLE_TOKEN_URL = "https://appleid.apple.com/auth/token";
 const APPLE_REVOKE_URL = "https://appleid.apple.com/auth/revoke";
 const TIMEOUT_MS = 10_000;
@@ -14,22 +14,27 @@ const TIMEOUT_MS = 10_000;
 const errorText = (cause: unknown) => (cause instanceof Error ? cause.message : "unknown error");
 
 /**
- * DELETE /v1/subscribers/{app_user_id} (RevenueCat REST API v1, secret key). The app logs in to RevenueCat with
- * the Honto user id, so that is the app_user_id. 404 (never purchased) counts as done. Without
- * REVENUECAT_SECRET_API_KEY it logs a warning and does nothing. Resolves with the HTTP status, or null.
+ * DELETE /v2/projects/{project_id}/customers/{customer_id} (RevenueCat REST API v2; needs a v2 secret key with
+ * customer_information:customers:read_write). The app logs in to RevenueCat with the Honto user id, so that is the
+ * customer id. 404 (never purchased, or already gone) counts as done. Without REVENUECAT_SECRET_API_KEY or
+ * REVENUECAT_PROJECT_ID it logs a warning and does nothing. Resolves with the HTTP status, or null.
  */
-export async function deleteRevenueCatSubscriber(userId: string, env: Record<string, string | undefined> = process.env): Promise<number | null> {
+export async function deleteRevenueCatCustomer(userId: string, env: Record<string, string | undefined> = process.env): Promise<number | null> {
   const key = env.REVENUECAT_SECRET_API_KEY?.trim();
-  if (!key) {
-    console.warn("[v1/account] REVENUECAT_SECRET_API_KEY is not set; the RevenueCat subscriber of the deleted account was not deleted");
+  const projectId = env.REVENUECAT_PROJECT_ID?.trim();
+  const missing = [!key && "REVENUECAT_SECRET_API_KEY", !projectId && "REVENUECAT_PROJECT_ID"].filter(Boolean);
+  if (missing.length) {
+    console.warn(`[v1/account] ${missing.join(" and ")} not set; the RevenueCat customer of the deleted account was not deleted`);
     return null;
   }
+  const url = `${REVENUECAT_API}${encodeURIComponent(projectId!)}/customers/${encodeURIComponent(userId)}`;
   try {
-    const response = await fetch(REVENUECAT_API + encodeURIComponent(userId), { method: "DELETE", headers: { authorization: `Bearer ${key}`, accept: "application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS) });
-    if (!response.ok && response.status !== 404) console.error(`[v1/account] RevenueCat subscriber delete failed (${response.status})`);
+    const response = await fetch(url, { method: "DELETE", headers: { authorization: `Bearer ${key}`, accept: "application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (response.status === 404) return 404;
+    if (!response.ok) console.error(`[v1/account] RevenueCat customer delete failed (${response.status})`);
     return response.status;
   } catch (cause) {
-    console.error(`[v1/account] RevenueCat subscriber delete failed: ${errorText(cause)}`);
+    console.error(`[v1/account] RevenueCat customer delete failed: ${errorText(cause)}`);
     return null;
   }
 }

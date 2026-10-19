@@ -3,7 +3,7 @@ import type { CronRetentionResult, ExportStatus, UnpairReason, UnpairResult, Unp
 import { ensureEntitlementsSchema } from "../../app/entitlements";
 import { notifyPartner, type NotifySummary, type PushEvent } from "../../app/push/index";
 import { deleteObjects, getObject, listPrefix, presignGet, putObject, storageConfig } from "../../app/storage";
-import { deleteRevenueCatSubscriber, revokeAppleTokens, type AppleToken } from "./account-cleanup";
+import { deleteRevenueCatCustomer, revokeAppleTokens, type AppleToken } from "./account-cleanup";
 import { ensureFoundationSchema } from "./foundation-schema";
 
 type Sql = NeonQueryFunction<false, false>;
@@ -311,8 +311,8 @@ async function isPaired(sql: Sql, userId: string) {
  *    entitlements, ...).
  * Any failure rolls all of it back. After the commit (best effort, never throws): the queued objects are deleted
  * from storage (failures stay queued for the retention cron), the partner gets `couple.unpaired`
- * `{ reason: partner_deleted }` plus a widget reload, the RevenueCat subscriber is deleted
- * (REVENUECAT_SECRET_API_KEY) and the Sign in with Apple refresh tokens are revoked.
+ * `{ reason: partner_deleted }` plus a widget reload, the RevenueCat customer is deleted
+ * (API v2: REVENUECAT_SECRET_API_KEY + REVENUECAT_PROJECT_ID) and the Sign in with Apple refresh tokens are revoked.
  * Returns false when the user no longer exists.
  */
 export async function deleteAccount(sql: Sql, userId: string, store = getObjectStore()): Promise<boolean> {
@@ -379,7 +379,7 @@ export async function deleteAccount(sql: Sql, userId: string, store = getObjectS
     }
   }
   await notifyUnpaired(couples, userId, "partner_deleted");
-  await deleteRevenueCatSubscriber(userId);
+  await deleteRevenueCatCustomer(userId);
   await revokeAppleTokens(appleTokens);
   return true;
 }

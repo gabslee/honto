@@ -657,7 +657,7 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
 
       const { generateKeyPairSync } = await import('node:crypto');
       const appleKey = generateKeyPairSync('ec', { namedCurve: 'prime256v1', privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } }).privateKey;
-      const env = { REVENUECAT_SECRET_API_KEY: 'sk_test_value', APPLE_TEAM_ID: 'TEAM123456', APPLE_KEY_ID: 'KEY1234567', APPLE_PRIVATE_KEY: appleKey };
+      const env = { REVENUECAT_SECRET_API_KEY: 'sk_test_value', REVENUECAT_PROJECT_ID: 'projtest1', APPLE_TEAM_ID: 'TEAM123456', APPLE_KEY_ID: 'KEY1234567', APPLE_PRIVATE_KEY: appleKey };
       const savedEnv = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]));
       Object.assign(process.env, env);
       const calls = [];
@@ -685,7 +685,7 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
       assertContract('Me', sam.json);
       assert.deepEqual([sam.json.couple, sam.json.pendingUnpair?.reason], [null, 'partner_deleted']);
       const rc = calls.find((c) => c.url.startsWith('https://api.revenuecat.com/'));
-      assert.deepEqual([rc.url, rc.method, rc.authorization], ['https://api.revenuecat.com/v1/subscribers/usr_rio', 'DELETE', 'Bearer sk_test_value']);
+      assert.deepEqual([rc.url, rc.method, rc.authorization], ['https://api.revenuecat.com/v2/projects/projtest1/customers/usr_rio', 'DELETE', 'Bearer sk_test_value']);
       const revoke = calls.find((c) => c.url === 'https://appleid.apple.com/auth/revoke');
       const form = new URLSearchParams(revoke.body);
       assert.deepEqual([revoke.method, form.get('client_id'), form.get('token'), form.get('token_type_hint')], ['POST', 'com.hontogame.app', 'apple-refresh-rio', 'refresh_token']);

@@ -94,7 +94,15 @@ The same bucket backs W1b's object-store seam (`getObjectStore()` in `api/v1/lif
 | `REVENUECAT_WEBHOOK_SECRET` | `POST /api/v1/billing/revenuecat` | exact `Authorization` header value configured in the RevenueCat webhook (secret). Replaces the `REVENUECAT_WEBHOOK_AUTH` name above. Unset or empty: every webhook call gets 401 |
 
 The calendar endpoints (`PUT /api/v1/calendar/busy`, `GET /api/v1/calendar`) need no new variables
-(`DATABASE_URL`, `AUTH_SESSION_SALT`). `REVENUECAT_SECRET_API_KEY` is not used yet.
+(`DATABASE_URL`, `AUTH_SESSION_SALT`).
+
+## fix/account-deletion (account deletion cleanup)
+
+| Name | Used by | Notes |
+|---|---|---|
+| `REVENUECAT_SECRET_API_KEY` | account deletion (`DELETE /api/v1/me`, admin `deleteUser`) | RevenueCat REST API **v2** secret key with `customer_information:customers:read_write`. Calls `DELETE https://api.revenuecat.com/v2/projects/{REVENUECAT_PROJECT_ID}/customers/{user id}` after the delete commits; 404 counts as done. Unset: warning logged, RevenueCat skipped. Secret |
+| `REVENUECAT_PROJECT_ID` | account deletion | RevenueCat project id (`proj...`). No default; unset: warning logged, RevenueCat skipped |
+| `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` | Sign in with Apple token exchange and revoke | same key as the web flow; must have Sign in with Apple for the bundle id (`APPLE_IOS_BUNDLE_ID`) and the services id (`APPLE_CLIENT_ID`). Unset: refresh tokens are not stored or revoked (warning logged) |
 
 ## feat/web-app-memories (W4, `hontogame.com/app`)
 
