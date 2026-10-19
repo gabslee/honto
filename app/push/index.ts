@@ -10,9 +10,10 @@ import { fcmConfig, sendFcm, type FcmResult } from "./fcm";
 
 type Sql = NeonQueryFunction<false, false>;
 
-/** Events W2a sends. `reunion.changed` is a widget refresh only (no visible alert). */
+/** Events W2a sends (plus `nudge.new`, feedback r1). `reunion.changed` is a widget refresh only (no visible alert). */
 export type PushEvent =
   | { type: "photo.new"; photoId: string; thumbUrl?: string | null; fromName?: string | null }
+  | { type: "nudge.new"; nudgeId: string; fromName?: string | null }
   | { type: "couple.joined"; fromName?: string | null }
   | { type: "reunion.changed" };
 
@@ -30,6 +31,7 @@ export function pushData(coupleId: string, event: PushEvent, now = new Date()): 
     data.photoId = event.photoId;
     if (event.thumbUrl) data.thumbUrl = event.thumbUrl;
   }
+  if (event.type === "nudge.new") data.nudgeId = event.nudgeId;
   if (event.type !== "reunion.changed" && event.fromName) data.fromName = event.fromName;
   return data;
 }
@@ -38,6 +40,8 @@ export function pushData(coupleId: string, event: PushEvent, now = new Date()): 
 export function apnsAlertPayload(data: PushData) {
   const from = data.fromName || "Your partner";
   if (data.type === "photo.new") return { aps: { alert: { title: from, body: "Sent you a photo" }, sound: "default", "mutable-content": 1, "thread-id": data.coupleId }, honto: data };
+  // "Thinking of you": short and silent (no sound); the NSE refreshes the widget snapshot.
+  if (data.type === "nudge.new") return { aps: { alert: { title: from, body: "Thinking of you" }, "mutable-content": 1, "thread-id": data.coupleId }, honto: data };
   if (data.type === "couple.joined") return { aps: { alert: { title: "Honto", body: `You are now paired with ${from}` }, sound: "default", "thread-id": data.coupleId }, honto: data };
   return null;
 }

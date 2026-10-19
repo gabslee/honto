@@ -5,7 +5,13 @@
   "premium": true,
   "me": {
     "displayName": "Ana",
-    "postedToday": true
+    "postedToday": true,
+    "weather": {
+      "condition": "clear",
+      "temperatureC": 24,
+      "isDay": true,
+      "observedAt": "2026-10-19T14:40:00Z"
+    }
   },
   "partner": {
     "displayName": "Kenji",
@@ -23,6 +29,12 @@
       "freeUntil": null,
       "title": null,
       "syncedAt": "2026-10-19T10:55:00Z"
+    },
+    "weather": {
+      "condition": "rain",
+      "temperatureC": 14,
+      "isDay": true,
+      "observedAt": "2026-10-19T14:20:00Z"
     }
   },
   "startedOn": "2024-03-02",
@@ -34,5 +46,10 @@
     "lastSentAt": "2026-10-19T11:30:00Z",
     "lastReceivedAt": "2026-10-19T10:06:00Z",
     "nextAllowedAt": null
+  },
+  "streak": {
+    "current": 12,
+    "best": 12,
+    "todayComplete": true
   }
 }

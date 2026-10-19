@@ -2,7 +2,7 @@ import { apiError, noStore, requireCouple } from "../../../../../../api/v1/conte
 import { ensurePhotosSchema } from "../../../../../../api/v1/photos-schema";
 import { notifyPartner } from "../../../../../push/index";
 import { database } from "../../../../../server-auth";
-import { headObject } from "../../../../../storage";
+import { headObject, StorageError } from "../../../../../storage";
 import { MAX_FULL_BYTES, MAX_THUMB_BYTES, photoById, storageUnavailable, toApiPhoto } from "../../photo-rows";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ pho
   if (!row || row.authorUserId !== user.id) return apiError(404, "not_found", "Photo not found.");
   if (row.status === "ready") return Response.json(await toApiPhoto(row, user.id), { headers: noStore });
 
-  const [full, thumb] = await Promise.all([headObject(row.objectKey as string), headObject(row.thumbKey as string)]);
+  let full, thumb;
+  try {
+    [full, thumb] = await Promise.all([headObject(row.objectKey as string), headObject(row.thumbKey as string)]);
+  } catch (error) {
+    // A bucket answering 4xx/5xx (misconfigured endpoint or keys, outage) is retryable for the app: 503 keeps
+    // the photo queued on the device instead of a 500 that ends its retries.
+    if (!(error instanceof StorageError)) throw error;
+    console.error(`[v1/photos] complete: ${error.message}`);
+    return apiError(503, "storage_not_configured", "Photo storage is unavailable right now. Try again shortly.", { "Retry-After": "60" });
+  }
   if (!full || !thumb) return apiError(422, "upload_missing", "The photo upload was not found. Upload again.");
   if (full.size !== row.bytes || thumb.size !== row.thumbBytes || full.size > MAX_FULL_BYTES || thumb.size > MAX_THUMB_BYTES) {
     return apiError(422, "upload_size_mismatch", "The uploaded file does not match the declared size. Upload again.");

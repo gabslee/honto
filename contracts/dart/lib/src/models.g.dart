@@ -1157,7 +1157,7 @@ class NudgeState {
 }
 
 class TodaySelf {
-  const TodaySelf({required this.displayName, required this.localDay, required this.timeZone, required this.dailyPhoto, required this.photoCount});
+  const TodaySelf({required this.displayName, required this.localDay, required this.timeZone, required this.dailyPhoto, required this.photoCount, this.weather});
 
   final String displayName;
   final LocalDay localDay;
@@ -1165,6 +1165,8 @@ class TodaySelf {
   final Photo? dailyPhoto;
   /// Ready photos I took on my local day.
   final int photoCount;
+  /// My last reported weather (null when older than 12 h or never reported). Optional: absent on older servers.
+  final WeatherSummary? weather;
 
   factory TodaySelf.fromJson(Map<String, dynamic> json) => TodaySelf(
         displayName: json['displayName'] as String,
@@ -1172,6 +1174,7 @@ class TodaySelf {
         timeZone: json['timeZone'] as String,
         dailyPhoto: json['dailyPhoto'] == null ? null : Photo.fromJson(json['dailyPhoto'] as Map<String, dynamic>),
         photoCount: (json['photoCount'] as num).toInt(),
+        weather: json['weather'] == null ? null : WeatherSummary.fromJson(json['weather'] as Map<String, dynamic>),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -1180,6 +1183,7 @@ class TodaySelf {
         'timeZone': timeZone,
         'dailyPhoto': dailyPhoto == null ? null : dailyPhoto!.toJson(),
         'photoCount': photoCount,
+        if (weather != null) 'weather': weather!.toJson(),
       };
 
   @override
@@ -1187,7 +1191,7 @@ class TodaySelf {
 }
 
 class TodayPartner {
-  const TodayPartner({required this.userId, required this.displayName, required this.timeZone, required this.utcOffsetMinutes, required this.localDay, required this.dailyPhoto, required this.latestPhoto, required this.photoCount, required this.status});
+  const TodayPartner({required this.userId, required this.displayName, required this.timeZone, required this.utcOffsetMinutes, required this.localDay, required this.dailyPhoto, required this.latestPhoto, required this.photoCount, required this.status, this.weather});
 
   final String userId;
   final String displayName;
@@ -1201,6 +1205,8 @@ class TodayPartner {
   final int photoCount;
   /// Null when not Premium or never synced.
   final PartnerStatus? status;
+  /// Partner's last reported weather (null when older than 12 h or never reported). Optional: absent on older servers.
+  final WeatherSummary? weather;
 
   factory TodayPartner.fromJson(Map<String, dynamic> json) => TodayPartner(
         userId: json['userId'] as String,
@@ -1212,6 +1218,7 @@ class TodayPartner {
         latestPhoto: json['latestPhoto'] == null ? null : Photo.fromJson(json['latestPhoto'] as Map<String, dynamic>),
         photoCount: (json['photoCount'] as num).toInt(),
         status: json['status'] == null ? null : PartnerStatus.fromJson(json['status'] as Map<String, dynamic>),
+        weather: json['weather'] == null ? null : WeatherSummary.fromJson(json['weather'] as Map<String, dynamic>),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -1224,10 +1231,59 @@ class TodayPartner {
         'latestPhoto': latestPhoto == null ? null : latestPhoto!.toJson(),
         'photoCount': photoCount,
         'status': status == null ? null : status!.toJson(),
+        if (weather != null) 'weather': weather!.toJson(),
       };
 
   @override
   String toString() => 'TodayPartner(${toJson()})';
+}
+
+enum WeatherCondition {
+  clear('clear'),
+  partlyCloudy('partly_cloudy'),
+  cloudy('cloudy'),
+  fog('fog'),
+  drizzle('drizzle'),
+  rain('rain'),
+  snow('snow'),
+  thunderstorm('thunderstorm'),
+  /// A value added to the API after this client was built.
+  unrecognized('');
+
+  const WeatherCondition(this.wire);
+  final String wire;
+
+  static WeatherCondition fromJson(String value) => values.firstWhere((e) => e.wire == value && e != unrecognized, orElse: () => unrecognized);
+  String toJson() => wire;
+}
+
+/// Coarse current weather where a person is. No place name and no coordinates are ever stored.
+class WeatherSummary {
+  const WeatherSummary({required this.condition, required this.temperatureC, required this.isDay, required this.observedAt});
+
+  final WeatherCondition condition;
+  /// Rounded air temperature in Celsius.
+  final int temperatureC;
+  final bool isDay;
+  /// When the device read it (at most 6 h in the past).
+  final DateTime observedAt;
+
+  factory WeatherSummary.fromJson(Map<String, dynamic> json) => WeatherSummary(
+        condition: WeatherCondition.fromJson(json['condition'] as String),
+        temperatureC: (json['temperatureC'] as num).toInt(),
+        isDay: json['isDay'] as bool,
+        observedAt: DateTime.parse(json['observedAt'] as String),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'condition': condition.toJson(),
+        'temperatureC': temperatureC,
+        'isDay': isDay,
+        'observedAt': observedAt.toUtc().toIso8601String(),
+      };
+
+  @override
+  String toString() => 'WeatherSummary(${toJson()})';
 }
 
 class Today {
@@ -2304,7 +2360,7 @@ class WidgetSnapshotPhoto {
 /// Written by Flutter (Pigeon `WidgetsHostApi`), the NSE and the Android FCM service; read by the widgets
 /// and the nudge App Intent. Derived from `GET /api/v1/today`. Breaking change = new version + new file name.
 class WidgetSnapshot {
-  const WidgetSnapshot({required this.version, required this.generatedAt, required this.paired, required this.premium, required this.me, required this.partner, required this.startedOn, required this.reunion, required this.nudges});
+  const WidgetSnapshot({required this.version, required this.generatedAt, required this.paired, required this.premium, required this.me, required this.partner, required this.startedOn, required this.reunion, required this.nudges, this.streak});
 
   /// Always 1 for this file.
   final int version;
@@ -2316,6 +2372,8 @@ class WidgetSnapshot {
   final LocalDay? startedOn;
   final WidgetSnapshotReunion? reunion;
   final NudgeState nudges;
+  /// Couple streak from `/today` (optional; absent in older snapshots).
+  final WidgetSnapshotStreak? streak;
 
   factory WidgetSnapshot.fromJson(Map<String, dynamic> json) => WidgetSnapshot(
         version: (json['version'] as num).toInt(),
@@ -2327,6 +2385,7 @@ class WidgetSnapshot {
         startedOn: json['startedOn'] == null ? null : json['startedOn'] as String,
         reunion: json['reunion'] == null ? null : WidgetSnapshotReunion.fromJson(json['reunion'] as Map<String, dynamic>),
         nudges: NudgeState.fromJson(json['nudges'] as Map<String, dynamic>),
+        streak: json['streak'] == null ? null : WidgetSnapshotStreak.fromJson(json['streak'] as Map<String, dynamic>),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -2339,26 +2398,54 @@ class WidgetSnapshot {
         'startedOn': startedOn,
         'reunion': reunion == null ? null : reunion!.toJson(),
         'nudges': nudges.toJson(),
+        if (streak != null) 'streak': streak!.toJson(),
       };
 
   @override
   String toString() => 'WidgetSnapshot(${toJson()})';
 }
 
+class WidgetSnapshotStreak {
+  const WidgetSnapshotStreak({required this.current, required this.best, required this.todayComplete});
+
+  final int current;
+  final int best;
+  final bool todayComplete;
+
+  factory WidgetSnapshotStreak.fromJson(Map<String, dynamic> json) => WidgetSnapshotStreak(
+        current: (json['current'] as num).toInt(),
+        best: (json['best'] as num).toInt(),
+        todayComplete: json['todayComplete'] as bool,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'current': current,
+        'best': best,
+        'todayComplete': todayComplete,
+      };
+
+  @override
+  String toString() => 'WidgetSnapshotStreak(${toJson()})';
+}
+
 class WidgetSnapshotMe {
-  const WidgetSnapshotMe({required this.displayName, required this.postedToday});
+  const WidgetSnapshotMe({required this.displayName, required this.postedToday, this.weather});
 
   final String displayName;
   final bool postedToday;
+  /// Optional; absent in older snapshots.
+  final WeatherSummary? weather;
 
   factory WidgetSnapshotMe.fromJson(Map<String, dynamic> json) => WidgetSnapshotMe(
         displayName: json['displayName'] as String,
         postedToday: json['postedToday'] as bool,
+        weather: json['weather'] == null ? null : WeatherSummary.fromJson(json['weather'] as Map<String, dynamic>),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'displayName': displayName,
         'postedToday': postedToday,
+        if (weather != null) 'weather': weather!.toJson(),
       };
 
   @override
@@ -2366,18 +2453,21 @@ class WidgetSnapshotMe {
 }
 
 class WidgetSnapshotPartner {
-  const WidgetSnapshotPartner({required this.displayName, required this.timeZone, required this.photo, required this.status});
+  const WidgetSnapshotPartner({required this.displayName, required this.timeZone, required this.photo, required this.status, this.weather});
 
   final String displayName;
   final TimeZoneId? timeZone;
   final WidgetSnapshotPhoto? photo;
   final PartnerStatus? status;
+  /// Optional; absent in older snapshots.
+  final WeatherSummary? weather;
 
   factory WidgetSnapshotPartner.fromJson(Map<String, dynamic> json) => WidgetSnapshotPartner(
         displayName: json['displayName'] as String,
         timeZone: json['timeZone'] == null ? null : json['timeZone'] as String,
         photo: json['photo'] == null ? null : WidgetSnapshotPhoto.fromJson(json['photo'] as Map<String, dynamic>),
         status: json['status'] == null ? null : PartnerStatus.fromJson(json['status'] as Map<String, dynamic>),
+        weather: json['weather'] == null ? null : WeatherSummary.fromJson(json['weather'] as Map<String, dynamic>),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -2385,6 +2475,7 @@ class WidgetSnapshotPartner {
         'timeZone': timeZone,
         'photo': photo == null ? null : photo!.toJson(),
         'status': status == null ? null : status!.toJson(),
+        if (weather != null) 'weather': weather!.toJson(),
       };
 
   @override
@@ -2450,6 +2541,7 @@ final Map<String, Object Function(Map<String, dynamic>)> hontoModelDecoders = <S
   'NudgeState': NudgeState.fromJson,
   'TodaySelf': TodaySelf.fromJson,
   'TodayPartner': TodayPartner.fromJson,
+  'WeatherSummary': WeatherSummary.fromJson,
   'Today': Today.fromJson,
   'CoupleStreak': CoupleStreak.fromJson,
   'Milestone': Milestone.fromJson,
@@ -2484,6 +2576,7 @@ final Map<String, Object Function(Map<String, dynamic>)> hontoModelDecoders = <S
   'TripActivityContentState': TripActivityContentState.fromJson,
   'WidgetSnapshotPhoto': WidgetSnapshotPhoto.fromJson,
   'WidgetSnapshot': WidgetSnapshot.fromJson,
+  'WidgetSnapshotStreak': WidgetSnapshotStreak.fromJson,
   'WidgetSnapshotMe': WidgetSnapshotMe.fromJson,
   'WidgetSnapshotPartner': WidgetSnapshotPartner.fromJson,
   'WidgetSnapshotReunion': WidgetSnapshotReunion.fromJson,

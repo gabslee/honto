@@ -1,7 +1,7 @@
 import { apiError, noStore, requireCouple } from "../../../../../api/v1/context";
 import { ensurePhotosSchema } from "../../../../../api/v1/photos-schema";
 import { database } from "../../../../server-auth";
-import { deleteObjects } from "../../../../storage";
+import { deleteObjects, StorageError } from "../../../../storage";
 import { photoById, storageUnavailable } from "../photo-rows";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,14 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ p
   if (row.authorUserId !== user.id) return apiError(403, "forbidden", "Only the author can delete a photo.");
 
   if (row.storage === "s3") {
-    const { errors } = await deleteObjects([row.objectKey, row.thumbKey].filter((key): key is string => Boolean(key)));
+    let errors: { key: string; code: string }[];
+    try {
+      ({ errors } = await deleteObjects([row.objectKey, row.thumbKey].filter((key): key is string => Boolean(key))));
+    } catch (error) {
+      if (!(error instanceof StorageError)) throw error;
+      console.error(`[v1/photos] delete: ${error.message}`);
+      return apiError(503, "storage_not_configured", "Photo storage is unavailable right now. Try again shortly.", { "Retry-After": "60" });
+    }
     if (errors.length) return apiError(500, "internal", "Could not delete the photo. Try again.");
   }
   await sql`DELETE FROM couple_photos WHERE id = ${row.id}`;

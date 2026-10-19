@@ -54,6 +54,7 @@ Auth is `Authorization: Bearer hm_u_…` (apps) or the `honto_session` cookie (w
 | POST | `/api/v1/auth/logout` | Revokes the token |
 | GET / DELETE | `/api/v1/me` | User + couple + entitlement + `pendingUnpair`; DELETE = account deletion |
 | PUT | `/api/v1/me/timezone` | IANA zone, on every open/foreground |
+| PUT / DELETE | `/api/v1/me/weather` | Coarse weather summary from the device (condition, °C, day/night); no location stored. `GET /api/v1/today` returns `me.weather` / `partner.weather` (null after 12 h) |
 | GET / POST | `/api/v1/me/export` | ZIP of my own photos (while paired and 30 days after unpairing) |
 | GET / POST | `/api/v1/couple/invite` | 6-char code, 48h, single use |
 | POST | `/api/v1/couple/join` | 404 invalid, 410 expired, 409 already paired, 422 own code |
