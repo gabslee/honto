@@ -279,8 +279,8 @@ paths:
       operationId: reportWeather
       summary: Report the weather where I am now (coarse summary only, never coordinates).
       description: |
-        The app reads a coarse location on the device, asks a free weather source on the device (Open-Meteo /
-        WeatherKit) and sends only this summary, so the partner sees "It's raining over there today". The
+        The app reads a coarse location on the device, asks Apple WeatherKit on the device and
+        sends only this summary, so the partner sees "It's raining over there today". The
         server stores no location at all. Summaries older than 12 h are not returned in `/today`.
       requestBody:
         required: true
