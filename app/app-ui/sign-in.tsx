@@ -7,19 +7,18 @@ import { AppleMark, GoogleMark, Hanko, Icon } from "./icons";
 
 const api = createHontoClient();
 
-/** Copy for `/api/v1/auth/email/*` failures (W1b endpoints). */
-export function emailErrorMessage(error: unknown, step: "start" | "verify" | "link") {
+/** Copy for `/api/v1/auth/email/*` failures. The link itself lands on `/auth/email` (app/auth/email, W1b). */
+export function emailErrorMessage(error: unknown, step: "start" | "verify") {
   if (error instanceof HontoApiError) {
     if (error.status === 429) {
       const wait = error.body?.retryAfterSeconds;
       return wait ? `Too many tries. Try again in ${wait} seconds.` : "Too many tries. Try again in a minute.";
     }
-    if (error.status === 404 || error.status === 405) return "Email sign-in is not available right now. Use Apple or Google for now.";
+    if (error.status === 404 || error.status === 405 || error.status === 503) return "Email sign-in is not available right now. Use Apple or Google for now.";
     if (step === "start" && error.status === 400) return "Enter a valid email address.";
     if (step === "verify" && (error.status === 400 || error.status === 401)) return "That code is not right or has expired.";
-    if (step === "link" && (error.status === 400 || error.status === 401)) return "This link has expired or was already used. Request a new one.";
   }
-  // A non-JSON answer means `/api/v1/auth/email/*` is not deployed here (or failed upstream).
+  // A non-JSON answer means `/api/v1/auth/email/*` failed upstream (or is not deployed on this preview).
   if (error instanceof SyntaxError) return "Email sign-in is not available right now. Use Apple or Google for now.";
   return "Something went wrong. Try again.";
 }

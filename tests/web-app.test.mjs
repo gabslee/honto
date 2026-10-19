@@ -195,7 +195,7 @@ test("email sign-in errors map the W1b responses", () => {
   const { HontoApiError } = load(join(root, "contracts/honto-client"));
   assert.equal(emailErrorMessage(new HontoApiError(429, { error: "x", code: "rate_limited", retryAfterSeconds: 30 }), "start"), "Too many tries. Try again in 30 seconds.");
   assert.equal(emailErrorMessage(new HontoApiError(401, { error: "x", code: "invalid_code" }), "verify"), "That code is not right or has expired.");
-  assert.match(emailErrorMessage(new HontoApiError(401, { error: "x", code: "invalid_token" }), "link"), /expired or was already used/);
+  assert.match(emailErrorMessage(new HontoApiError(503, { error: "x", code: "email_unavailable" }), "start"), /not available right now/);
   assert.match(emailErrorMessage(new SyntaxError("Unexpected token <"), "start"), /not available right now/);
 });
 
@@ -322,6 +322,15 @@ test("no placeholder photo from the design reference is committed under public/"
     assert.ok(!/\.(jpe?g|webp|avif|heic)$/i.test(file), file);
     if (extname(file) === ".png") assert.equal(file, "og.png");
   }
+});
+
+test("the magic link lands on W1b's /auth/email page, which sends the visitor to /app", () => {
+  assert.ok(!existsSync(join(root, "app/(couple)/auth")), "only one page may resolve to /auth/email");
+  assert.ok(!existsSync(join(root, "app/app-ui/email-link-verify.tsx")));
+  const landing = readFileSync(join(root, "app/auth/email/email-sign-in.tsx"), "utf8");
+  assert.match(landing, /\/api\/v1\/auth\/email\/verify/);
+  assert.match(landing, /window\.location\.replace\("\/app"\)/);
+  assert.match(landing, /href="\/app">Back to sign in/);
 });
 
 test("dev fixtures are never served on the production deployment", () => {
