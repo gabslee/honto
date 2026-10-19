@@ -3,9 +3,10 @@
 -- app/entitlements.ts; this file is the reviewable record. Idempotent. Needs 0008_v1_foundation (couples).
 
 -- Busy blocks of a member, scoped to the couple they were uploaded in. PUT /api/v1/calendar/busy replaces
--- the rows overlapping its window in one transaction. All-day events and titles are never stored here
--- (the per-calendar title opt-in adds its columns later). pruneCalendar() deletes rows that ended more
--- than a day ago and rows of members who left the couple.
+-- the rows overlapping its window in one transaction. All-day events are never stored. `title` is reserved
+-- for the per-calendar title opt-in (the Today partner status already reads it); nothing writes it yet, so
+-- it is always NULL. pruneCalendar() deletes rows that ended more than a day ago and rows of members who
+-- left the couple.
 CREATE TABLE IF NOT EXISTS calendar_busy (
   id bigserial PRIMARY KEY,
   couple_id text NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
@@ -14,6 +15,7 @@ CREATE TABLE IF NOT EXISTS calendar_busy (
   ends_at timestamptz NOT NULL CHECK (ends_at > starts_at),
   synced_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE calendar_busy ADD COLUMN IF NOT EXISTS title text CHECK (title IS NULL OR char_length(title) <= 80);
 CREATE INDEX IF NOT EXISTS idx_calendar_busy_user ON calendar_busy(user_id, starts_at);
 CREATE INDEX IF NOT EXISTS idx_calendar_busy_couple ON calendar_busy(couple_id, starts_at);
 CREATE INDEX IF NOT EXISTS idx_calendar_busy_ends ON calendar_busy(ends_at);

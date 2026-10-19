@@ -34,7 +34,8 @@ export type BusyUpload = { from: number; to: number; timeZone: string; blocks: I
  * Validates a `CalendarBusyUpload`. Window: `from < to`, at most 14 days long, ending at most 14 days from
  * now and starting at most 2 days ago. Blocks: at most 500, valid `start < end`. `allDay: true` blocks are
  * rejected (counted in `ignoredAllDay`, never stored); titles are never stored yet (counted in
- * `droppedTitles`). Blocks are clipped to the window; blocks outside it are skipped.
+ * `droppedTitles`). Blocks are clipped to the window and to now + 14 days (the retention cron deletes
+ * blocks starting later); blocks left empty are skipped.
  */
 export function parseBusyUpload(body: unknown, now: number): BusyUpload | { error: string } {
   if (!body || typeof body !== "object" || Array.isArray(body)) return { error: "Send a JSON object." };
@@ -63,7 +64,7 @@ export function parseBusyUpload(body: unknown, now: number): BusyUpload | { erro
     const end = parseInstant(block.end);
     if (start === null || end === null || start >= end) return { error: "Each block needs RFC 3339 start and end with start before end." };
     if (typeof block.title === "string" && block.title.trim()) droppedTitles += 1;
-    const clipped = { start: Math.max(start, from), end: Math.min(end, to) };
+    const clipped = { start: Math.max(start, from), end: Math.min(end, to, now + MAX_WINDOW_MS) };
     if (clipped.start < clipped.end) blocks.push(clipped);
   }
   return { from, to, timeZone, blocks, ignoredAllDay, droppedTitles };

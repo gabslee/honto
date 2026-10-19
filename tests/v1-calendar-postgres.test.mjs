@@ -123,6 +123,12 @@ test('computePartnerStatus and input parsing (pure)', async (t) => {
     bad([]);
     bad({ ...base, blocks: 'nope' });
     bad({ ...base, to: iso(now + 14 * DAY + 2 * HOUR), blocks: [] }); // more than 14 days ahead
+    // Within the clock-skew allowance the window is accepted, but nothing is stored past now + 14 days.
+    const edge = parseBusyUpload({ from: iso(now + HOUR), to: iso(now + 14 * DAY + 30 * MIN), timeZone: 'UTC', blocks: [
+      { start: iso(now + 14 * DAY - 30 * MIN), end: iso(now + 14 * DAY + 20 * MIN) },
+      { start: iso(now + 14 * DAY + 10 * MIN), end: iso(now + 14 * DAY + 20 * MIN) },
+    ] }, now);
+    assert.deepEqual(edge.blocks, [{ start: now + 14 * DAY - 30 * MIN, end: now + 14 * DAY }]);
     bad({ ...base, from: iso(now - 3 * DAY), to: iso(now + DAY), blocks: [] }); // too far back
     bad({ from: iso(now), to: iso(now + 15 * DAY), timeZone: 'UTC', blocks: [] }); // window longer than 14 days
     bad({ ...base, from: base.to, blocks: [] });
@@ -157,8 +163,8 @@ test('drizzle/0010_calendar_entitlements.sql is idempotent', async () => {
   await fresh.exec("INSERT INTO users (id, email, display_name) VALUES ('ua', 'a@x', 'A'); INSERT INTO couples (id, legacy) VALUES ('c1', false)");
   await assert.rejects(fresh.exec("INSERT INTO calendar_busy (couple_id, user_id, starts_at, ends_at) VALUES ('c1', 'ua', '2026-10-19T12:00Z', '2026-10-19T11:00Z')"), 'inverted ranges are rejected');
   await assert.rejects(fresh.exec("INSERT INTO entitlements (user_id, source) VALUES ('ua', 'paypal')"));
-  const { rows } = await fresh.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'calendar_busy' AND column_name IN ('title', 'calendar_ref')");
-  assert.deepEqual(rows, [], 'no title columns in this version');
+  const { rows } = await fresh.query("SELECT column_name, is_nullable FROM information_schema.columns WHERE table_name = 'calendar_busy' AND column_name IN ('title', 'calendar_ref')");
+  assert.deepEqual(rows, [{ column_name: 'title', is_nullable: 'YES' }], 'title is reserved (nullable, never written yet)');
   await fresh.close();
 });
 
@@ -171,6 +177,7 @@ test('PUT /api/v1/calendar/busy, GET /api/v1/calendar and pruneCalendar', async 
   const service = await import('../app/api/v1/calendar/calendar-service.ts');
   const busyRoute = await import('../app/api/v1/calendar/busy/route.ts');
   const calendarRoute = await import('../app/api/v1/calendar/route.ts');
+  const { partnerStatus: todayPartnerStatus } = await import('../api/v1/couple.ts');
   const sql = auth.database();
 
   await ensureFoundationSchema(sql);
@@ -230,6 +237,7 @@ test('PUT /api/v1/calendar/busy, GET /api/v1/calendar and pruneCalendar', async 
     // Nothing of the title is stored anywhere.
     const dump = JSON.stringify((await db.query('SELECT * FROM calendar_busy')).rows) + JSON.stringify((await db.query('SELECT * FROM calendar_sync')).rows);
     assert.ok(!dump.includes('Pilates'));
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM calendar_busy WHERE title IS NOT NULL')).rows[0].n, 0);
     // The cookie works too.
     assert.equal((await put(null, { ...window, timeZone: 'America/Sao_Paulo', blocks: request.blocks }, { cookie: `honto_session=${anaCookie}` })).status, 200);
   });
@@ -302,6 +310,8 @@ test('PUT /api/v1/calendar/busy, GET /api/v1/calendar and pruneCalendar', async 
     assert.equal(view.status, 200);
     assertContract('CalendarView', view.json);
     assert.deepEqual(view.json.partnerStatus, { state: 'busy', busyUntil: iso(hour + 3 * HOUR), freeUntil: null, title: null, syncedAt: view.json.partner.syncedAt });
+    // W1b's Today partner status reads the same tables (including the reserved title column) and agrees.
+    assert.deepEqual(await todayPartnerStatus(sql, 'usr_kenji', new Date()), view.json.partnerStatus);
     assert.equal(view.json.partner.timeZone, 'Asia/Tokyo', 'zone of the upload when the profile has none');
     assert.deepEqual(view.json.partner.blocks.map((block) => block.start), [iso(start), iso(hour + 2 * HOUR), iso(hour + 5 * HOUR)]);
     // The status ignores the requested window: next week's view still reports "now".
@@ -312,6 +322,7 @@ test('PUT /api/v1/calendar/busy, GET /api/v1/calendar and pruneCalendar', async 
     assert.equal((await put('kenji', { ...tokyo, blocks: tokyo.blocks.slice(2) })).status, 200);
     const free = await get('ana', fromSaoPaulo);
     assert.deepEqual(free.json.partnerStatus, { state: 'free', busyUntil: null, freeUntil: iso(hour + 5 * HOUR), title: null, syncedAt: free.json.partner.syncedAt });
+    assert.deepEqual(await todayPartnerStatus(sql, 'usr_kenji', new Date()), free.json.partnerStatus);
   });
 
   await t.test('pruneCalendar: old blocks and blocks of members who left', async () => {
@@ -335,7 +346,7 @@ test('PUT /api/v1/calendar/busy, GET /api/v1/calendar and pruneCalendar', async 
     await fresh.exec(foundation);
     await fresh.exec(migration);
     const expected = await schemaShape(fresh);
-    assert.equal(expected.rows.length, 29);
+    assert.equal(expected.rows.length, 30);
     assert.deepEqual(await schemaShape(db), expected);
     await db.exec(migration);
     assert.deepEqual(await schemaShape(db), expected);

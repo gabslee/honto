@@ -6,8 +6,9 @@ let ready: Promise<void> | null = null;
 
 /**
  * Idempotent calendar schema (mirrors the calendar part of drizzle/0010_calendar_entitlements.sql):
- * - calendar_busy: busy blocks of a member, scoped to the couple they were uploaded in. No titles yet
- *   (the per-calendar title opt-in adds its columns later); all-day events are never stored.
+ * - calendar_busy: busy blocks of a member, scoped to the couple they were uploaded in. All-day events are
+ *   never stored. `title` exists for the per-calendar title opt-in (and is read by the Today partner status)
+ *   but nothing writes it yet, so it is always NULL.
  * - calendar_sync: last upload per user (window, device zone, time), so "never synced" differs from
  *   "synced, nothing busy" and the partner status knows which span the blocks cover.
  */
@@ -15,6 +16,7 @@ export function ensureCalendarSchema(sql: Sql) {
   if (!ready) ready = (async () => {
     await ensureFoundationSchema(sql);
     await sql`CREATE TABLE IF NOT EXISTS calendar_busy (id bigserial PRIMARY KEY, couple_id text NOT NULL REFERENCES couples(id) ON DELETE CASCADE, user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, starts_at timestamptz NOT NULL, ends_at timestamptz NOT NULL CHECK (ends_at > starts_at), synced_at timestamptz NOT NULL DEFAULT now())`;
+    await sql`ALTER TABLE calendar_busy ADD COLUMN IF NOT EXISTS title text CHECK (title IS NULL OR char_length(title) <= 80)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_calendar_busy_user ON calendar_busy(user_id, starts_at)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_calendar_busy_couple ON calendar_busy(couple_id, starts_at)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_calendar_busy_ends ON calendar_busy(ends_at)`;
