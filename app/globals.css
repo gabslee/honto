@@ -731,3 +731,9 @@ button.honto-playing-card:active:not(:disabled) { transform:rotate(2deg) transla
 .history-list article { border-top:1px dashed #17243d55; padding-top:10px; }
 .history-list h3 { margin:4px 0; font-size:18px; }
 .history-list p { margin:2px 0; font:14px/1.4 Arial,sans-serif; }
+/* Honto app legal and help pages: system font stack (SF Pro on Apple devices, Inter elsewhere). */
+.legal-app, .legal-app h1, .legal-app h2, .legal-app .eyebrow, .legal-app .pricing-brand { font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+.legal-app .pricing-brand { letter-spacing:-.03em; font-weight:800; }
+.legal-app h1 { letter-spacing:-.04em; }
+.legal-app .legal-section p, .legal-app .legal-section li { font-size:15px; line-height:1.6; }
+.legal-app .legal-section h3 { margin:16px 0 4px; font-size:15px; letter-spacing:-.01em; }

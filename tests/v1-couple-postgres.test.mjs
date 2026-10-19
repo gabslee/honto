@@ -542,6 +542,46 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
       assert.deepEqual((await db.query('SELECT attempts, last_error FROM storage_deletions')).rows, [{ attempts: 1, last_error: 'S3 503' }]);
     });
 
+    await t.test('DELETE /api/v1/me: account gone, partner unpaired and kept, my photos removed from storage', async () => {
+      const zoeCouple = (await db.query("SELECT couple_id FROM couple_members WHERE user_id = 'usr_zoe' AND left_at IS NULL")).rows[0].couple_id;
+      await photo('ph_zoe_1', 'zoe', '2026-10-19', 'UTC', '2026-10-19T10:00:00Z', { daily: true, coupleOf: zoeCouple });
+      await photo('ph_yuki_1', 'yuki', '2026-10-19', 'UTC', '2026-10-19T10:00:00Z', { daily: true, coupleOf: zoeCouple });
+      await db.query("INSERT INTO calendar_busy (user_id, starts_at, ends_at) VALUES ('usr_zoe', now() + interval '1 hour', now() + interval '2 hours'), ('usr_yuki', now() + interval '1 hour', now() + interval '2 hours')");
+      await db.query("INSERT INTO photo_exports (id, user_id, status, object_key, photo_count, ready_at, expires_at) VALUES ('exp_zoe', 'usr_zoe', 'ready', 'exports/usr_zoe/exp_zoe.zip', 1, now(), now() + interval '7 days')");
+      store.objects.set('exports/usr_zoe/exp_zoe.zip', { body: new Uint8Array(1), lastModified: new Date() });
+      await db.query("INSERT INTO email_login_tokens (token_hash, email, code_hash, platform, expires_at) VALUES ('zoe-tok', 'zoe@example.com', 'c', 'ios', now() + interval '10 minutes')");
+      const zoeKeys = ['full', 'thumb'].map((kind) => `couples/${zoeCouple}/photos/ph_zoe_1/${kind}.jpg`).concat('exports/usr_zoe/exp_zoe.zip');
+      lifecycle.setObjectStore(store);
+
+      expectError(await call(meRoute.DELETE, null, { method: 'DELETE' }), 401, 'unauthorized');
+      const res = await call(meRoute.DELETE, 'zoe', { method: 'DELETE' });
+      assert.equal(res.status, 204);
+      assert.match(res.headers.get('set-cookie') ?? '', /Max-Age=0/);
+      const count = async (query, params = []) => (await db.query(query, params)).rows[0].n;
+      assert.equal(await count("SELECT count(*)::int AS n FROM users WHERE id = 'usr_zoe'"), 0);
+      for (const table of ['mobile_tokens', 'couple_members', 'photo_exports', 'calendar_busy']) assert.equal(await count(`SELECT count(*)::int AS n FROM ${table} WHERE user_id = 'usr_zoe'`), 0, table);
+      assert.equal(await count("SELECT count(*)::int AS n FROM couple_photos WHERE author_user_id = 'usr_zoe'"), 0);
+      assert.equal(await count("SELECT count(*)::int AS n FROM email_login_tokens WHERE email = 'zoe@example.com'"), 0);
+      for (const key of zoeKeys) assert.ok(!store.objects.has(key) && store.deleted.includes(key), key);
+      assert.equal(await count('SELECT count(*)::int AS n FROM storage_deletions WHERE object_key = ANY($1)', [zoeKeys]), 0, 'deleted keys are not left queued');
+      expectError(await call(meRoute.GET, 'zoe'), 401, 'unauthorized');
+
+      // The partner keeps the account, is unpaired, and keeps their own photos for the 30-day grace.
+      const yuki = await call(meRoute.GET, 'yuki');
+      assert.equal(yuki.status, 200);
+      assert.equal(yuki.json.couple, null);
+      assert.ok(yuki.json.pendingUnpair?.photosAvailableUntil);
+      assert.equal(await count("SELECT count(*)::int AS n FROM couple_photos WHERE author_user_id = 'usr_yuki' AND delete_after IS NOT NULL"), 1);
+      assert.ok(store.objects.has(`couples/${zoeCouple}/photos/ph_yuki_1/full.jpg`));
+      assert.equal(await count("SELECT count(*)::int AS n FROM calendar_busy WHERE user_id = 'usr_yuki'"), 0, 'shared calendar mirror goes with the couple');
+      assert.equal(await count('SELECT count(*)::int AS n FROM couples WHERE id = $1 AND unpaired_at IS NOT NULL', [zoeCouple]), 1);
+
+      // Unpaired account without photos; a second call with a dead token is 401.
+      assert.equal((await call(meRoute.DELETE, 'solo', { method: 'DELETE' })).status, 204);
+      expectError(await call(meRoute.DELETE, 'solo', { method: 'DELETE' }), 401, 'unauthorized');
+      assert.equal(await lifecycle.deleteAccount(sql, 'usr_nobody', store), false);
+    });
+
     await t.test('date helpers', () => {
       assert.equal(couple.localDay('Asia/Tokyo', at('2026-10-19T15:00:00Z')), '2026-10-20');
       assert.equal(couple.localDay('America/Sao_Paulo', at('2026-10-20T02:59:59Z')), '2026-10-19');

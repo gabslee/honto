@@ -105,3 +105,10 @@ The calendar endpoints (`PUT /api/v1/calendar/busy`, `GET /api/v1/calendar`) nee
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Vercel system variable (optional) | Sent as `x-vercel-protection-bypass` on the server-side `/api/v1` calls, so protected Preview deployments can call themselves. |
 
 Existing names reused: `APPLE_CLIENT_ID` (shows "Continue with Apple" on the `/app` sign-in), `GOOGLE_CLIENT_ID`.
+
+## feat/app-review-demo-login (App Store Review demo accounts)
+
+| Name | Where | Notes |
+|---|---|---|
+| `HONTO_REVIEW_EMAILS` | Vercel (Production) | Comma-separated demo addresses for App Review. For these addresses `POST /api/v1/auth/email/start` sends no email and stores no token (same `202`), and `verify` with `{ email, code }` accepts `HONTO_REVIEW_CODE` instead of an emailed code. Max 10 code tries per address per hour, plus the per-IP limit. |
+| `HONTO_REVIEW_CODE` | Vercel (Production, sensitive) | Fixed 6-digit code for the addresses above. Both variables must be set, else the feature is off. Rotate or remove after review. |

@@ -22,7 +22,7 @@ test('email magic link: start, verify by link or code, single use, expiry, limit
     if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier) && !context.parentURL?.includes('/node_modules/')) return next(new URL(specifier + '.ts', context.parentURL).href, context);
     return next(specifier, context);
   } });
-  const keys = ['DATABASE_URL', 'VERCEL_ENV', 'RESEND_API_KEY', 'EMAIL_FROM', 'HONTO_ADMIN_EMAIL'];
+  const keys = ['DATABASE_URL', 'VERCEL_ENV', 'RESEND_API_KEY', 'EMAIL_FROM', 'HONTO_ADMIN_EMAIL', 'HONTO_REVIEW_EMAILS', 'HONTO_REVIEW_CODE'];
   const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   for (const key of keys) delete process.env[key];
   process.env.DATABASE_URL = 'postgres://isolated-test';
@@ -187,6 +187,51 @@ test('email magic link: start, verify by link or code, single use, expiry, limit
       await fillWindows('email_verify_ip', await ipSubject(), 30, 900);
       expectError(await post(verify.POST, { token: 'ml_guess_last', platform: 'ios' }), 429, 'rate_limited');
       ip = 3;
+    });
+
+    await t.test('App Review demo login: allowlisted address + fixed code, no email, limited tries', async () => {
+      ip = 120;
+      await db.query('DELETE FROM email_login_tokens');
+      const reviewer = 'review-a@hontogame.com';
+      // Off unless both variables are set (and the code is 6 digits).
+      assert.equal(email.reviewLogin(reviewer, { HONTO_REVIEW_EMAILS: reviewer }), null);
+      assert.equal(email.reviewLogin(reviewer, { HONTO_REVIEW_CODE: '424242' }), null);
+      assert.equal(email.reviewLogin(reviewer, { HONTO_REVIEW_EMAILS: reviewer, HONTO_REVIEW_CODE: '4242' }), null);
+      assert.equal(email.reviewLogin('ana@example.com', { HONTO_REVIEW_EMAILS: reviewer, HONTO_REVIEW_CODE: '424242' }), null);
+      assert.deepEqual(email.reviewLogin(reviewer, { HONTO_REVIEW_EMAILS: ` Review-A@hontogame.com , review-b@hontogame.com`, HONTO_REVIEW_CODE: '424242' }), { code: '424242' });
+      expectError(await post(verify.POST, { email: reviewer, code: '424242', platform: 'ios' }), 401, 'invalid_token');
+
+      process.env.HONTO_REVIEW_EMAILS = 'review-a@hontogame.com,review-b@hontogame.com';
+      process.env.HONTO_REVIEW_CODE = '424242';
+      try {
+        const before = logged.length;
+        const started = await post(start.POST, { email: 'Review-A@hontogame.com', platform: 'ios' });
+        assert.equal(started.status, 202);
+        assert.deepEqual(started.json, { sent: true, expiresInSeconds: 900, resendAfterSeconds: 60 });
+        assert.equal(logged.length, before, 'no email is sent for a review address');
+        assert.equal(await tokenRows(), 0, 'no token is stored for a review address');
+        expectError(await post(verify.POST, { email: reviewer, code: '111111', platform: 'ios' }), 401, 'invalid_token');
+        const ok = await post(verify.POST, { email: 'Review-A@hontogame.com', code: '424 242', platform: 'ios', name: 'Alex' });
+        assert.equal(ok.status, 201, JSON.stringify(ok.json));
+        assertContract('AuthSession', ok.json);
+        assert.deepEqual([ok.json.created, ok.json.user.email, ok.json.user.displayName], [true, reviewer, 'Alex']);
+        assert.match(ok.json.token, /^hm_u_/);
+        assert.match(ok.json.refreshToken, /^hm_r_/);
+        const again = await post(verify.POST, { email: reviewer, code: '424242', platform: 'ios' });
+        assert.deepEqual([again.status, again.json.user.id], [200, ok.json.user.id], 'the code is reusable for the review account');
+        // The fixed code never works for anyone else.
+        expectError(await post(verify.POST, { email: 'ana@example.com', code: '424242', platform: 'ios' }), 401, 'invalid_token');
+        // 10 tries per address per hour.
+        await fillWindows('review_code', await saltedHash('email', reviewer), 10, 3600);
+        expectError(await post(verify.POST, { email: reviewer, code: '424242', platform: 'ios' }), 429, 'rate_limited');
+        // Normal addresses still get a real email.
+        assert.equal((await post(start.POST, { email: 'mia@example.com', platform: 'ios' })).status, 202);
+        assert.match(lastLog().line, /mia@example\.com/);
+      } finally {
+        delete process.env.HONTO_REVIEW_EMAILS;
+        delete process.env.HONTO_REVIEW_CODE;
+        ip = 5;
+      }
     });
 
     let firstSession;

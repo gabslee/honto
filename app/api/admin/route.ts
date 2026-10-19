@@ -1,3 +1,4 @@
+import { ensureEntitlementsSchema, PREMIUM_ENTITLEMENT } from "../../entitlements";
 import { adminCookie, clearAdminCookie, createAdminSession, database, ensureIdentitySchema, getAdminUser, getCurrentUser, hasAdminBootstrapToken } from "../../server-auth";
 
 export const dynamic = "force-dynamic";
@@ -6,7 +7,7 @@ export const revalidate = 0;
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) => Response.json(body, { status, headers: { "Cache-Control": "no-store", ...headers } });
 
 export async function POST(request: Request) {
-  let body: { action?: string; token?: string; userId?: string; role?: string; plan?: string; subscriptionStatus?: string; subscriptionExpiresAt?: string | null } = {};
+  let body: { action?: string; token?: string; userId?: string; role?: string; plan?: string; subscriptionStatus?: string; subscriptionExpiresAt?: string | null; expiresAt?: string | null; revoke?: boolean } = {};
   try { body = await request.json(); } catch { /* invalid body */ }
   if (body.action === "logout") return json({ ok: true }, 200, { "Set-Cookie": clearAdminCookie() });
   if (body.action === "updateUser") {
@@ -18,6 +19,26 @@ export async function POST(request: Request) {
     await ensureIdentitySchema();
     await sql`UPDATE users SET role = ${update.role}, plan = ${update.plan}, subscription_status = ${update.subscriptionStatus}, subscription_expires_at = ${update.subscriptionExpiresAt || null}, updated_at = now() WHERE id = ${update.userId}`;
     return json({ ok: true });
+  }
+  if (body.action === "grantPremium") {
+    // Complimentary Premium (App Review demo couple, support goodwill): an `entitlements` row with source
+    // 'admin', counted by isCouplePremium / resolveEntitlement like any other source. No Stripe or store
+    // purchase is created. `expiresAt` null = no expiry; `revoke: true` deletes the grant.
+    const admin = await getAdminUser(request) ?? await getCurrentUser(request);
+    if (!admin || admin.role !== "admin") return json({ error: "Admin authentication required." }, 401);
+    const expiresAt = body.expiresAt ?? null;
+    if (!body.userId || (expiresAt !== null && (typeof expiresAt !== "string" || Number.isNaN(Date.parse(expiresAt))))) return json({ error: "Send userId and an ISO expiresAt (or null)." }, 400);
+    const sql = database(); if (!sql) return json({ error: "DATABASE_URL is not configured." }, 503);
+    await ensureEntitlementsSchema(sql);
+    if (body.revoke) {
+      await sql`DELETE FROM entitlements WHERE user_id = ${body.userId} AND source = 'admin' AND entitlement = ${PREMIUM_ENTITLEMENT}`;
+      return json({ ok: true, revoked: true });
+    }
+    const rows = await sql`INSERT INTO entitlements (user_id, source, entitlement, period_type, expires_at, will_renew, updated_at)
+      SELECT id, 'admin', ${PREMIUM_ENTITLEMENT}, 'normal', ${expiresAt}::timestamptz, false, now() FROM users WHERE id = ${body.userId}
+      ON CONFLICT (user_id, source, entitlement) DO UPDATE SET expires_at = EXCLUDED.expires_at, period_type = 'normal', will_renew = false, updated_at = now() RETURNING user_id`;
+    if (!rows[0]) return json({ error: "User not found." }, 404);
+    return json({ ok: true, userId: body.userId, expiresAt });
   }
   if (body.action !== "login" || !hasAdminBootstrapToken(String(body.token ?? ""))) return json({ error: "Invalid admin credentials." }, 401);
   try {
