@@ -113,6 +113,42 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
+  /api/v1/auth/link/{provider}:
+    post:
+      tags: [auth]
+      operationId: linkProviderIdentity
+      summary: Add a Google or Apple sign-in to the signed-in account.
+      description: |
+        Validates the native ID token like `POST /api/v1/auth/{provider}` and links its subject to the caller, so a
+        user who signed in with Apple "Hide My Email" can also sign in with Google (or the reverse) and land on
+        the same account. Identities are never moved: `409 identity_in_use` when the subject already belongs to
+        another account. 201 linked now, 200 already linked to me (idempotent).
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/LinkProvider' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProviderLinkRequest' }
+      responses:
+        '200':
+          description: Already linked to this account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProviderLinkResult' }
+        '201':
+          description: Linked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProviderLinkResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
   /api/v1/auth/email/start:
     post:
       tags: [auth]
@@ -879,6 +915,7 @@ components:
         - upload_size_mismatch
         - email_required
         - email_unavailable
+        - identity_in_use
         - export_unavailable
         - missing_config
         - internal
@@ -915,6 +952,25 @@ components:
         user: { $ref: '#/components/schemas/User' }
         refreshToken: { type: [string, 'null'], description: '`hm_r_…`, single use (see `POST /api/v1/auth/refresh`). Null or absent for `platform: web` and for sign-ins that do not issue one yet.' }
         refreshExpiresInDays: { type: [integer, 'null'], description: 'Lifetime of `refreshToken`; every refresh issues a new one.' }
+        isNewUser: { type: boolean, description: 'Google / Apple sign-in: the account was created now (same as `created`). Suggest linking another sign-in.' }
+        usedPrivateRelayEmail: { type: boolean, description: 'Google / Apple sign-in: the account email is an Apple "Hide My Email" address (`@privaterelay.appleid.com`), so it will not match the person''s real email later. Suggest linking Google.' }
+    LinkProvider:
+      type: string
+      enum: [apple, google]
+    ProviderLinkRequest:
+      type: object
+      required: [idToken]
+      properties:
+        idToken: { type: string }
+        nonce: { type: string, description: 'Raw nonce, when the app sent one to the provider.' }
+    ProviderLinkResult:
+      type: object
+      required: [provider, alreadyLinked, email, usedPrivateRelayEmail]
+      properties:
+        provider: { $ref: '#/components/schemas/LinkProvider' }
+        alreadyLinked: { type: boolean }
+        email: { type: [string, 'null'], description: 'Email in the provider token, if any (the account email is not changed).' }
+        usedPrivateRelayEmail: { type: boolean }
     RefreshRequest:
       type: object
       required: [refreshToken, platform]

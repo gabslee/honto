@@ -12,6 +12,9 @@ abstract class HontoApi {
   /// `POST /api/v1/auth/apple`: Native Sign in with Apple; returns an hm_u_ token.
   Future<AuthSession> signInWithApple(AppleSignInRequest body);
 
+  /// `POST /api/v1/auth/link/{provider}`: Add a Google or Apple sign-in to the signed-in account.
+  Future<ProviderLinkResult> linkProviderIdentity(String provider, ProviderLinkRequest body);
+
   /// `POST /api/v1/auth/email/start`: Send a magic link plus a 6-digit fallback code.
   Future<EmailStartResponse> startEmailSignIn(EmailStartRequest body);
 
@@ -131,6 +134,12 @@ class HttpHontoApi implements HontoApi {
   Future<AuthSession> signInWithApple(AppleSignInRequest body) async {
     final json = await transport.send('POST', '/api/v1/auth/apple', body: body.toJson());
     return AuthSession.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<ProviderLinkResult> linkProviderIdentity(String provider, ProviderLinkRequest body) async {
+    final json = await transport.send('POST', '/api/v1/auth/link/${Uri.encodeComponent(provider)}', body: body.toJson());
+    return ProviderLinkResult.fromJson(json as Map<String, dynamic>);
   }
 
   @override

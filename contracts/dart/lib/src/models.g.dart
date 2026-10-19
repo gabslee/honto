@@ -31,6 +31,7 @@ enum ErrorCode {
   uploadSizeMismatch('upload_size_mismatch'),
   emailRequired('email_required'),
   emailUnavailable('email_unavailable'),
+  identityInUse('identity_in_use'),
   exportUnavailable('export_unavailable'),
   missingConfig('missing_config'),
   internal('internal'),
@@ -125,7 +126,7 @@ class User {
 }
 
 class AuthSession {
-  const AuthSession({required this.token, required this.tokenType, required this.expiresInDays, required this.created, required this.user, this.refreshToken, this.refreshExpiresInDays});
+  const AuthSession({required this.token, required this.tokenType, required this.expiresInDays, required this.created, required this.user, this.refreshToken, this.refreshExpiresInDays, this.isNewUser, this.usedPrivateRelayEmail});
 
   /// `hm_u_…`; null for `platform: web` (cookie set instead).
   final String? token;
@@ -139,6 +140,10 @@ class AuthSession {
   final String? refreshToken;
   /// Lifetime of `refreshToken`; every refresh issues a new one.
   final int? refreshExpiresInDays;
+  /// Google / Apple sign-in: the account was created now (same as `created`). Suggest linking another sign-in.
+  final bool? isNewUser;
+  /// Google / Apple sign-in: the account email is an Apple "Hide My Email" address (`@privaterelay.appleid.com`), so it will not match the person's real email later. Suggest linking Google.
+  final bool? usedPrivateRelayEmail;
 
   factory AuthSession.fromJson(Map<String, dynamic> json) => AuthSession(
         token: json['token'] == null ? null : json['token'] as String,
@@ -148,6 +153,8 @@ class AuthSession {
         user: User.fromJson(json['user'] as Map<String, dynamic>),
         refreshToken: json['refreshToken'] == null ? null : json['refreshToken'] as String,
         refreshExpiresInDays: json['refreshExpiresInDays'] == null ? null : (json['refreshExpiresInDays'] as num).toInt(),
+        isNewUser: json['isNewUser'] == null ? null : json['isNewUser'] as bool,
+        usedPrivateRelayEmail: json['usedPrivateRelayEmail'] == null ? null : json['usedPrivateRelayEmail'] as bool,
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -158,10 +165,73 @@ class AuthSession {
         'user': user.toJson(),
         if (refreshToken != null) 'refreshToken': refreshToken!,
         if (refreshExpiresInDays != null) 'refreshExpiresInDays': refreshExpiresInDays!,
+        if (isNewUser != null) 'isNewUser': isNewUser!,
+        if (usedPrivateRelayEmail != null) 'usedPrivateRelayEmail': usedPrivateRelayEmail!,
       };
 
   @override
   String toString() => 'AuthSession(${toJson()})';
+}
+
+enum LinkProvider {
+  apple('apple'),
+  google('google'),
+  /// A value added to the API after this client was built.
+  unrecognized('');
+
+  const LinkProvider(this.wire);
+  final String wire;
+
+  static LinkProvider fromJson(String value) => values.firstWhere((e) => e.wire == value && e != unrecognized, orElse: () => unrecognized);
+  String toJson() => wire;
+}
+
+class ProviderLinkRequest {
+  const ProviderLinkRequest({required this.idToken, this.nonce});
+
+  final String idToken;
+  /// Raw nonce, when the app sent one to the provider.
+  final String? nonce;
+
+  factory ProviderLinkRequest.fromJson(Map<String, dynamic> json) => ProviderLinkRequest(
+        idToken: json['idToken'] as String,
+        nonce: json['nonce'] == null ? null : json['nonce'] as String,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'idToken': idToken,
+        if (nonce != null) 'nonce': nonce!,
+      };
+
+  @override
+  String toString() => 'ProviderLinkRequest(${toJson()})';
+}
+
+class ProviderLinkResult {
+  const ProviderLinkResult({required this.provider, required this.alreadyLinked, required this.email, required this.usedPrivateRelayEmail});
+
+  final LinkProvider provider;
+  final bool alreadyLinked;
+  /// Email in the provider token, if any (the account email is not changed).
+  final String? email;
+  final bool usedPrivateRelayEmail;
+
+  factory ProviderLinkResult.fromJson(Map<String, dynamic> json) => ProviderLinkResult(
+        provider: LinkProvider.fromJson(json['provider'] as String),
+        alreadyLinked: json['alreadyLinked'] as bool,
+        email: json['email'] == null ? null : json['email'] as String,
+        usedPrivateRelayEmail: json['usedPrivateRelayEmail'] as bool,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'provider': provider.toJson(),
+        'alreadyLinked': alreadyLinked,
+        'email': email,
+        'usedPrivateRelayEmail': usedPrivateRelayEmail,
+      };
+
+  @override
+  String toString() => 'ProviderLinkResult(${toJson()})';
 }
 
 class RefreshRequest {
@@ -2229,6 +2299,8 @@ final Map<String, Object Function(Map<String, dynamic>)> hontoModelDecoders = <S
   'ApiError': ApiError.fromJson,
   'User': User.fromJson,
   'AuthSession': AuthSession.fromJson,
+  'ProviderLinkRequest': ProviderLinkRequest.fromJson,
+  'ProviderLinkResult': ProviderLinkResult.fromJson,
   'RefreshRequest': RefreshRequest.fromJson,
   'GoogleSignInRequest': GoogleSignInRequest.fromJson,
   'AppleSignInRequest': AppleSignInRequest.fromJson,

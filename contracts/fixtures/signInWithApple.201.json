@@ -5,9 +5,13 @@
   "created": true,
   "user": {
     "id": "usr_ana",
-    "email": "ana@example.com",
+    "email": "x7k2m9q4@privaterelay.appleid.com",
     "displayName": "Ana",
     "timeZone": "America/Sao_Paulo",
     "createdAt": "2026-10-01T13:20:00Z"
-  }
+  },
+  "refreshToken": "hm_r_fixture000000000000000000000000000000000",
+  "refreshExpiresInDays": 365,
+  "isNewUser": true,
+  "usedPrivateRelayEmail": true
 }

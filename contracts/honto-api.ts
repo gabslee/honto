@@ -12,7 +12,7 @@ export type YearMonth = string;
 /** IANA time zone id. */
 export type TimeZoneId = string;
 
-export const ErrorCodeValues = ["bad_request", "unauthorized", "invalid_token", "forbidden", "not_found", "not_paired", "already_paired", "invalid_code", "code_expired", "own_invite", "premium_required", "rate_limited", "too_large", "unsupported_media_type", "invalid_local_day", "upload_missing", "upload_size_mismatch", "email_required", "email_unavailable", "export_unavailable", "missing_config", "internal"] as const;
+export const ErrorCodeValues = ["bad_request", "unauthorized", "invalid_token", "forbidden", "not_found", "not_paired", "already_paired", "invalid_code", "code_expired", "own_invite", "premium_required", "rate_limited", "too_large", "unsupported_media_type", "invalid_local_day", "upload_missing", "upload_size_mismatch", "email_required", "email_unavailable", "identity_in_use", "export_unavailable", "missing_config", "internal"] as const;
 export type ErrorCode = (typeof ErrorCodeValues)[number];
 
 export interface ApiError {
@@ -49,6 +49,27 @@ export interface AuthSession {
   refreshToken?: string | null;
   /** Lifetime of `refreshToken`; every refresh issues a new one. */
   refreshExpiresInDays?: number | null;
+  /** Google / Apple sign-in: the account was created now (same as `created`). Suggest linking another sign-in. */
+  isNewUser?: boolean;
+  /** Google / Apple sign-in: the account email is an Apple "Hide My Email" address (`@privaterelay.appleid.com`), so it will not match the person's real email later. Suggest linking Google. */
+  usedPrivateRelayEmail?: boolean;
+}
+
+export const LinkProviderValues = ["apple", "google"] as const;
+export type LinkProvider = (typeof LinkProviderValues)[number];
+
+export interface ProviderLinkRequest {
+  idToken: string;
+  /** Raw nonce, when the app sent one to the provider. */
+  nonce?: string;
+}
+
+export interface ProviderLinkResult {
+  provider: LinkProvider;
+  alreadyLinked: boolean;
+  /** Email in the provider token, if any (the account email is not changed). */
+  email: string | null;
+  usedPrivateRelayEmail: boolean;
 }
 
 export interface RefreshRequest {
@@ -705,6 +726,8 @@ export interface Operations {
   signInWithGoogle: { method: "POST"; path: "/api/v1/auth/google"; pathParams: never; query: never; body: GoogleSignInRequest; responses: { 200: AuthSession; 201: AuthSession; 400: ApiError; 401: ApiError; 503: ApiError } };
   /** POST /api/v1/auth/apple: Native Sign in with Apple; returns an hm_u_ token. */
   signInWithApple: { method: "POST"; path: "/api/v1/auth/apple"; pathParams: never; query: never; body: AppleSignInRequest; responses: { 200: AuthSession; 201: AuthSession; 400: ApiError; 401: ApiError; 503: ApiError } };
+  /** POST /api/v1/auth/link/{provider}: Add a Google or Apple sign-in to the signed-in account. */
+  linkProviderIdentity: { method: "POST"; path: "/api/v1/auth/link/{provider}"; pathParams: { provider: string }; query: never; body: ProviderLinkRequest; responses: { 200: ProviderLinkResult; 201: ProviderLinkResult; 400: ApiError; 401: ApiError; 404: ApiError; 409: ApiError; 503: ApiError } };
   /** POST /api/v1/auth/email/start: Send a magic link plus a 6-digit fallback code. */
   startEmailSignIn: { method: "POST"; path: "/api/v1/auth/email/start"; pathParams: never; query: never; body: EmailStartRequest; responses: { 202: EmailStartResponse; 400: ApiError; 429: ApiError; 503: ApiError } };
   /** POST /api/v1/auth/email/verify: Exchange the magic-link token (or email + code) for a session. */
@@ -789,6 +812,7 @@ export type SuccessBody<Op extends OperationId> = { [S in keyof Operations[Op]["
 export const operations = {
   signInWithGoogle: { method: "POST", path: "/api/v1/auth/google", auth: [] },
   signInWithApple: { method: "POST", path: "/api/v1/auth/apple", auth: [] },
+  linkProviderIdentity: { method: "POST", path: "/api/v1/auth/link/{provider}", auth: ["bearerAuth","cookieAuth"] },
   startEmailSignIn: { method: "POST", path: "/api/v1/auth/email/start", auth: [] },
   verifyEmailSignIn: { method: "POST", path: "/api/v1/auth/email/verify", auth: [] },
   refreshSession: { method: "POST", path: "/api/v1/auth/refresh", auth: [] },
