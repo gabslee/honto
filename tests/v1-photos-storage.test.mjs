@@ -66,7 +66,7 @@ test('storageConfig: null until the bucket keys exist; helpers throw StorageNotC
   assert.equal(storage.storageConfig({ ...env, S3_ACCESS_KEY_ID: 'k' }), null);
   assert.equal(storage.storageConfig({ ...env, S3_ACCESS_KEY_ID: 'k', S3_SECRET_ACCESS_KEY: 's', S3_ENDPOINT: 'not a url' }), null);
   assert.deepEqual(storage.storageConfig({ ...env, S3_ACCESS_KEY_ID: ' k ', S3_SECRET_ACCESS_KEY: 's', S3_REGION: '' }), { endpoint: 'https://t3.storageapi.dev', region: 'auto', bucket: 'honto-photos-kwrqb3lgl-pn', accessKeyId: 'k', secretAccessKey: 's' });
-  for (const call of [() => storage.presignGet('k', { config: null }), () => storage.presignPut('k', { contentType: 'image/jpeg', bytes: 1 }, { config: null }), () => storage.headObject('k', { config: null }), () => storage.deleteObjects(['k'], { config: null }), () => storage.listPrefix('k', { config: null })]) {
+  for (const call of [() => storage.getObject('k', { config: null }), () => storage.putObject('k', new Uint8Array(1), 'application/zip', { config: null }), () => storage.presignGet('k', { config: null }), () => storage.presignPut('k', { contentType: 'image/jpeg', bytes: 1 }, { config: null }), () => storage.headObject('k', { config: null }), () => storage.deleteObjects(['k'], { config: null }), () => storage.listPrefix('k', { config: null })]) {
     await assert.rejects(call, storage.StorageNotConfiguredError);
   }
 });
@@ -111,6 +111,15 @@ test('headObject, deleteObjects and listPrefix against an in-memory S3', async (
       const esc = (s) => s.replace(/&/g, '&amp;');
       return new Response(`<ListBucketResult><IsTruncated>${more}</IsTruncated>${page.map((k) => `<Contents><Key>${esc(k)}</Key><LastModified>2026-10-19T12:00:00.000Z</LastModified><Size>${objects.get(k).size}</Size></Contents>`).join('')}${more ? `<NextContinuationToken>${start + 2}</NextContinuationToken>` : ''}</ListBucketResult>`);
     }
+    if (request.method === 'GET') {
+      const found = objects.get(key);
+      return found ? new Response(found.data ?? new Uint8Array(found.size), { headers: { 'content-type': found.type } }) : new Response(null, { status: 404 });
+    }
+    if (request.method === 'PUT') {
+      const data = new Uint8Array(await request.arrayBuffer());
+      objects.set(key, { size: data.length, type: request.headers.get('content-type'), data });
+      return new Response(null, { status: 200 });
+    }
     return new Response(null, { status: 400 });
   };
   try {
@@ -128,6 +137,13 @@ test('headObject, deleteObjects and listPrefix against an in-memory S3', async (
     const result = await storage.deleteObjects(['couples/c1/photos/p1/full.jpg', 'couples/c1/photos/p1/thumb.jpg', 'couples/c1/photos/p1/full.jpg', 'exports/u1/x & y.zip', 'couples/c2/locked.jpg', ''], { config });
     assert.deepEqual(result, { deleted: 3, errors: [{ key: 'couples/c2/locked.jpg', code: 'AccessDenied' }] });
     assert.deepEqual([...objects.keys()].sort(), ['couples/c1/photos/p2/full.webp', 'couples/c2/locked.jpg', 'couples/c2/photos/p9/full.jpg']);
+
+    await storage.putObject('exports/u1/e1.zip', new Uint8Array([0x50, 0x4b, 3, 4]), 'application/zip', { config });
+    assert.deepEqual(objects.get('exports/u1/e1.zip'), { size: 4, type: 'application/zip', data: new Uint8Array([0x50, 0x4b, 3, 4]) });
+    assert.deepEqual([...(await storage.getObject('exports/u1/e1.zip', { config }))], [0x50, 0x4b, 3, 4]);
+    assert.equal(await storage.getObject('exports/u1/nope.zip', { config }), null);
+    assert.ok(calls.includes('PUT /exports/u1/e1.zip') && calls.includes('GET /exports/u1/e1.zip'), 'signed server-side GET / PUT');
+    objects.delete('exports/u1/e1.zip');
 
     multiDelete = false;
     assert.deepEqual(await storage.deleteObjects(['couples/c1/photos/p2/full.webp'], { config }), { deleted: 1, errors: [] });

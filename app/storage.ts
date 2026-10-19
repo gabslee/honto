@@ -105,7 +105,23 @@ export async function headObject(key: string, options: StorageOptions = {}): Pro
   return { size: Number.isFinite(length) ? length : -1, contentType: response.headers.get("content-type"), etag: response.headers.get("etag") };
 }
 
-const xmlEscape = (value: string) => value.replace(/[<>&'"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[c] as string);
+/** Server-side read of a whole object (photo export only), or null when it does not exist. */
+export async function getObject(key: string, options: StorageOptions = {}): Promise<Uint8Array | null> {
+  const config = resolve(options);
+  const response = await client(config).fetch(objectUrl(config, key), { method: "GET" });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new StorageError("GET", response.status);
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+/** Server-side write of a generated object (the export ZIP). Photos are uploaded by the devices, never here. */
+export async function putObject(key: string, body: Uint8Array, contentType: string, options: StorageOptions = {}): Promise<void> {
+  const config = resolve(options);
+  const response = await client(config).fetch(objectUrl(config, key), { method: "PUT", body: body as Uint8Array<ArrayBuffer>, headers: { "Content-Type": contentType } });
+  if (!response.ok) throw new StorageError("PUT", response.status);
+}
+
+const xmlEscape =(value: string) => value.replace(/[<>&'"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[c] as string);
 const xmlUnescape = (value: string) => value.replace(/&(lt|gt|amp|apos|quot|#\d+|#x[0-9a-f]+);/gi, (_, e: string) => {
   const named: Record<string, string> = { lt: "<", gt: ">", amp: "&", apos: "'", quot: '"' };
   if (named[e.toLowerCase()]) return named[e.toLowerCase()];

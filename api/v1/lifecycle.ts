@@ -1,5 +1,6 @@
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 import type { CronRetentionResult, ExportStatus, UnpairResult, UnpairState } from "../../contracts/honto-api";
+import { deleteObjects, getObject, listPrefix, presignGet, putObject, storageConfig } from "../../app/storage";
 import { ensureFoundationSchema } from "./foundation-schema";
 
 type Sql = NeonQueryFunction<false, false>;
@@ -43,9 +44,10 @@ export function ensureLifecycleSchema(sql: Sql) {
 }
 
 // ---------------------------------------------------------------------------------------------------
-// Object storage seam. W2a owns app/storage.ts (private S3-compatible bucket); wire it with
-// setObjectStore(...) once it is on main. Until then nothing reaches the bucket: deletions stay queued in
-// storage_deletions, exports answer 503 missing_config and photo URLs are null.
+// Object storage seam. By default it is the private S3-compatible bucket of app/storage.ts (W2a), as long
+// as its S3_* settings are complete; without them nothing reaches the bucket: deletions stay queued in
+// storage_deletions, exports answer 503 missing_config and photo URLs are null. setObjectStore() overrides
+// the default (tests; null = no storage).
 // ---------------------------------------------------------------------------------------------------
 export type StoredObject = { key: string; lastModified: Date | string | null };
 export type ObjectStore = {
@@ -55,9 +57,25 @@ export type ObjectStore = {
   listPrefix(prefix: string): Promise<StoredObject[]>;
   deleteObjects(keys: string[]): Promise<void>;
 };
-let objectStore: ObjectStore | null = null;
-export function setObjectStore(store: ObjectStore | null) { objectStore = store; }
-export function getObjectStore() { return objectStore; }
+let objectStore: ObjectStore | null | undefined;
+export function setObjectStore(store: ObjectStore | null | undefined) { objectStore = store; }
+export function getObjectStore() { return objectStore === undefined ? s3ObjectStore() : objectStore; }
+
+/** app/storage.ts as an ObjectStore, or null while the S3_* settings are incomplete. */
+export function s3ObjectStore(): ObjectStore | null {
+  if (!storageConfig()) return null;
+  return {
+    presignGet: async (key, expiresInSeconds) => (await presignGet(key, { expiresIn: expiresInSeconds })).url,
+    getObject: (key) => getObject(key),
+    putObject: (key, body, contentType) => putObject(key, body, contentType),
+    listPrefix: async (prefix) => (await listPrefix(prefix)).map((object) => ({ key: object.key, lastModified: object.lastModified })),
+    // A partial failure throws so the whole batch stays queued; deleting a missing key again is harmless.
+    deleteObjects: async (keys) => {
+      const { errors } = await deleteObjects(keys);
+      if (errors.length) throw new Error(`Object storage could not delete ${errors.length} of ${keys.length} keys (${errors[0].code}).`);
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------------------------------
 // Tables owned by other workstreams, read only when present (W2a photos, W3 calendar/entitlements,

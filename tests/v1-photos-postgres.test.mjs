@@ -39,7 +39,7 @@ function s3(method, rawUrl, headers, body) {
     if (method === 'PUT') {
       assert.equal(url.searchParams.get('X-Amz-SignedHeaders'), 'content-length;content-type;host');
       if (Number(header('content-length')) !== body.length) return new Response('<Error><Code>SignatureDoesNotMatch</Code></Error>', { status: 403 });
-      bucket.set(key, { size: body.length, type: header('content-type') });
+      bucket.set(key, { size: body.length, type: header('content-type'), data: new Uint8Array(body) });
       return new Response(null, { status: 200 });
     }
     return new Response(null, { status: 405 });
@@ -50,6 +50,19 @@ function s3(method, rawUrl, headers, body) {
     const found = bucket.get(key);
     return found ? new Response(null, { headers: { 'content-length': String(found.size), 'content-type': found.type } }) : new Response(null, { status: 404 });
   }
+  if (method === 'GET' && url.searchParams.get('list-type') === '2') {
+    const keys = [...bucket.keys()].filter((k) => k.startsWith(url.searchParams.get('prefix'))).sort();
+    return new Response(`<ListBucketResult><IsTruncated>false</IsTruncated>${keys.map((k) => `<Contents><Key>${k}</Key><LastModified>${bucket.get(k).lastModified ?? new Date().toISOString()}</LastModified><Size>${bucket.get(k).size}</Size></Contents>`).join('')}</ListBucketResult>`);
+  }
+  if (method === 'GET') {
+    const found = bucket.get(key);
+    return found ? new Response(found.data ?? new Uint8Array(found.size), { headers: { 'content-type': found.type } }) : new Response(null, { status: 404 });
+  }
+  if (method === 'PUT') {
+    const data = new Uint8Array(body);
+    bucket.set(key, { size: data.length, type: header('content-type'), data });
+    return new Response(null, { status: 200 });
+  }
   if (method === 'POST' && url.searchParams.has('delete')) {
     for (const [, k] of String(body).matchAll(/<Key>(.*?)<\/Key>/g)) bucket.delete(k);
     return new Response('<DeleteResult></DeleteResult>');
@@ -58,7 +71,7 @@ function s3(method, rawUrl, headers, body) {
 }
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (input, init = {}) => {
-  if (input instanceof Request) return s3(input.method, input.url, input.headers, input.method === 'POST' ? await input.text() : null);
+  if (input instanceof Request) return s3(input.method, input.url, input.headers, input.method === 'POST' ? await input.text() : input.method === 'PUT' ? await input.arrayBuffer() : null);
   return s3(init.method ?? 'GET', String(input), new Headers(init.headers), init.body ?? null);
 };
 /** What the app does: PUT the bytes straight to the bucket with exactly the returned headers. */
@@ -461,6 +474,62 @@ test('photos, memories and devices', async (t) => {
       expectError(await remove(widget.json.id, null), 401, 'unauthorized');
       const active = (await db.query("SELECT kind, token FROM push_devices WHERE revoked_at IS NULL ORDER BY user_id, kind, token")).rows.map((r) => `${r.kind}:${r.token.slice(0, 8)}`);
       assert.deepEqual(active, ['apns_alert:bbbbbbbb', 'fcm:dGVzdC1m', 'fcm:seed-fcm', 'apns_alert:zoe-toke'], 'Ana moved her last token to Kenji and removed the widget one');
+    });
+
+    await t.test('W1b object-store seam is app/storage.ts: Today photo URLs, export ZIP and retention', async () => {
+      const lifecycle = await import('../api/v1/lifecycle.ts');
+      const couple = await import('../api/v1/couple.ts');
+      assert.ok(lifecycle.getObjectStore(), 'wired by default when S3_* is complete');
+      setEnv({ S3_SECRET_ACCESS_KEY: '' });
+      assert.equal(lifecycle.getObjectStore(), null, 'no keys, no store (W1b keeps its 503 missing_config / null URLs)');
+      setEnv(s3Env);
+      lifecycle.setObjectStore(null);
+      assert.equal(lifecycle.getObjectStore(), null, 'an explicit null still means no storage');
+      lifecycle.setObjectStore(undefined);
+      assert.ok(lifecycle.getObjectStore());
+
+      // GET /api/v1/today signs Ana's daily photo (the promoted "Second one") on the bucket.
+      const today = await couple.todayResponse(new Request('https://hontogame.com/api/v1/today', { headers: { authorization: `Bearer ${ana}` } }));
+      assert.equal(today.status, 200);
+      const body = await today.json();
+      assertContract('Today', body);
+      const daily = body.me.dailyPhoto;
+      assert.equal(daily.phrase, 'Second one');
+      for (const [url, file] of [[daily.urls.full, 'full.jpg'], [daily.urls.thumb, 'thumb.jpg']]) {
+        assert.equal(new URL(url).host, BUCKET_HOST);
+        assert.equal(new URL(url).pathname, `/couples/cpl_01/photos/${daily.id}/${file}`);
+        assert.equal(new URL(url).searchParams.get('X-Amz-Expires'), '86400');
+      }
+
+      // POST /api/v1/me/export: reads my photos from the bucket and writes the ZIP back to exports/.
+      const sql = auth.database();
+      const requested = await lifecycle.requestExport(sql, 'usr_ana');
+      assert.equal(requested.status, 202, JSON.stringify(requested));
+      await requested.build();
+      const status = await lifecycle.exportStatus(sql, 'usr_ana');
+      assertContract('ExportStatus', status);
+      assert.equal(status.status, 'ready');
+      const zipUrl = new URL(status.url);
+      assert.equal(zipUrl.host, BUCKET_HOST);
+      assert.match(zipUrl.pathname, /^\/exports\/usr_ana\/exp_[a-z0-9]{20}\.zip$/);
+      const zip = bucket.get(decodeURIComponent(zipUrl.pathname.slice(1)));
+      assert.equal(zip.type, 'application/zip');
+      assert.deepEqual([...zip.data.slice(0, 4)], [0x50, 0x4b, 0x03, 0x04], 'a ZIP was written');
+      const uploaded = (await db.query("SELECT id FROM couple_photos WHERE author_user_id = 'usr_ana' AND status = 'ready' AND storage = 's3'")).rows.map((r) => r.id).filter((id) => bucket.has(`couples/cpl_01/photos/${id}/full.jpg`));
+      assert.ok(uploaded.length >= 2);
+      assert.equal(status.photoCount, uploaded.length, 'every photo whose object exists is in the ZIP');
+      const names = new TextDecoder().decode(zip.data);
+      for (const id of uploaded) assert.ok(names.includes(`_${id}.jpg`) || names.includes(`_${id}.webp`), id);
+
+      // GET /api/cron/retention drains the deletion queue through deleteObjects.
+      bucket.set('couples/cpl_01/photos/ph_gone/full.jpg', { size: 1, type: 'image/jpeg' });
+      await db.query("INSERT INTO storage_deletions (object_key, reason) VALUES ('couples/cpl_01/photos/ph_gone/full.jpg', 'photo')");
+      const retention = await lifecycle.runRetention(sql);
+      assertContract('CronRetentionResult', retention);
+      assert.equal(retention.objectsDeleted, 1);
+      assert.equal(retention.objectsPending, 0);
+      assert.ok(!bucket.has('couples/cpl_01/photos/ph_gone/full.jpg'));
+      assert.ok(bucket.has(decodeURIComponent(zipUrl.pathname.slice(1))), 'a fresh export is kept');
     });
   } finally {
     console.info = originalInfo;
