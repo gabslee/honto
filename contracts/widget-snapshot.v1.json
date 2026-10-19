@@ -66,6 +66,17 @@
     },
     "nudges": {
       "$ref": "#/$defs/NudgeState"
+    },
+    "streak": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WidgetSnapshotStreak"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Couple streak from `/today` (optional; absent in older snapshots)."
     }
   },
   "$defs": {
@@ -171,6 +182,48 @@
         "America/Sao_Paulo"
       ]
     },
+    "WeatherCondition": {
+      "type": "string",
+      "enum": [
+        "clear",
+        "partly_cloudy",
+        "cloudy",
+        "fog",
+        "drizzle",
+        "rain",
+        "snow",
+        "thunderstorm"
+      ]
+    },
+    "WeatherSummary": {
+      "type": "object",
+      "required": [
+        "condition",
+        "temperatureC",
+        "isDay",
+        "observedAt"
+      ],
+      "description": "Coarse current weather where a person is. No place name and no coordinates are ever stored.",
+      "properties": {
+        "condition": {
+          "$ref": "#/$defs/WeatherCondition"
+        },
+        "temperatureC": {
+          "type": "integer",
+          "minimum": -90,
+          "maximum": 60,
+          "description": "Rounded air temperature in Celsius."
+        },
+        "isDay": {
+          "type": "boolean"
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the device read it (at most 6 h in the past)."
+        }
+      }
+    },
     "WidgetSnapshotMe": {
       "type": "object",
       "required": [
@@ -183,6 +236,17 @@
         },
         "postedToday": {
           "type": "boolean"
+        },
+        "weather": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WeatherSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional; absent in older snapshots."
         }
       }
     },
@@ -227,6 +291,17 @@
               "type": "null"
             }
           ]
+        },
+        "weather": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WeatherSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional; absent in older snapshots."
         }
       }
     },
@@ -278,6 +353,27 @@
             "string",
             "null"
           ]
+        }
+      }
+    },
+    "WidgetSnapshotStreak": {
+      "type": "object",
+      "required": [
+        "current",
+        "best",
+        "todayComplete"
+      ],
+      "properties": {
+        "current": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "best": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "todayComplete": {
+          "type": "boolean"
         }
       }
     }

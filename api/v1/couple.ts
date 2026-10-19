@@ -4,6 +4,7 @@ import { database } from "../../app/server-auth";
 import { apiError, isCouplePremium, noStore, normalizeTimeZone, requireCouple, requireUser, toApiUser, type V1Couple, type V1Partner, type V1User } from "./context";
 import { ensureLifecycleSchema, getObjectStore, hitRateLimit, latestUnpair, optionalTables, randomId, type ObjectStore, type OptionalTables } from "./lifecycle";
 import { todayMilestones } from "./milestones";
+import { weatherFor } from "./weather";
 
 type Sql = NeonQueryFunction<false, false>;
 type Row = Record<string, unknown>;
@@ -425,13 +426,15 @@ export async function buildToday(sql: Sql, { user, couple, partner }: Paired, no
   const latest = await optional("photos", tables.photos, () => latestPhoto(sql, couple.id, partner.id), null);
   const photo = (row: Row | null | undefined) => row ? toApiPhoto(row, user.id, store, now) : Promise.resolve(null);
   const { streak, unseenMilestones } = await todayMilestones(sql, { user, couple, partner }, now);
+  const weather = await optional("weather", true, () => weatherFor(sql, [user.id, partner.id], now), new Map());
   return {
     generatedAt: toIso(now),
-    me: { displayName: user.displayName, localDay: myDay, timeZone: myZone, dailyPhoto: await photo(mine[0]), photoCount: mine.length },
+    me: { displayName: user.displayName, localDay: myDay, timeZone: myZone, dailyPhoto: await photo(mine[0]), photoCount: mine.length, weather: weather.get(user.id) ?? null },
     partner: {
       userId: partner.id, displayName: partner.displayName, timeZone: partner.timeZone, utcOffsetMinutes: partner.timeZone ? utcOffsetMinutes(partner.timeZone, now) : null, localDay: partnerDay,
       dailyPhoto: await photo(theirs[0]), latestPhoto: await photo(latest), photoCount: theirs.length,
       status: await optional("calendar", tables.calendar && entitlement.premium, () => partnerStatus(sql, partner.id, now), null),
+      weather: weather.get(partner.id) ?? null,
     },
     startedOn: couple.startedOn,
     daysTogether: daysTogether(couple, user.timeZone, now),

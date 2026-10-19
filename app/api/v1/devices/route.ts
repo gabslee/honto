@@ -36,11 +36,22 @@ export async function POST(request: Request) {
   await ensurePhotosSchema(sql);
   const userId = auth.user.id;
   const pushEnv = kind === "fcm" ? null : env as string;
-  await sql`UPDATE push_devices SET revoked_at = now() WHERE user_id = ${userId} AND installation_id = ${installationId} AND kind = ${kind} AND token <> ${token} AND revoked_at IS NULL`;
-  const rows = await sql`INSERT INTO push_devices (id, user_id, installation_id, platform, kind, token, env, app_version, os_version, locale)
+  const upsert = async () => {
+    await sql`UPDATE push_devices SET revoked_at = now() WHERE user_id = ${userId} AND installation_id = ${installationId} AND kind = ${kind} AND token <> ${token} AND revoked_at IS NULL`;
+    return await sql`INSERT INTO push_devices (id, user_id, installation_id, platform, kind, token, env, app_version, os_version, locale)
     VALUES (${`dev_${randomBytes(10).toString("hex")}`}, ${userId}, ${installationId}, ${platform}, ${kind}, ${token}, ${pushEnv}, ${appVersion}, ${osVersion ?? null}, ${locale ?? null})
     ON CONFLICT (kind, token) DO UPDATE SET user_id = EXCLUDED.user_id, installation_id = EXCLUDED.installation_id, platform = EXCLUDED.platform, env = EXCLUDED.env, app_version = EXCLUDED.app_version, os_version = EXCLUDED.os_version, locale = EXCLUDED.locale, last_seen_at = now(), revoked_at = NULL
     RETURNING id, kind, platform, env, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt", to_char(last_seen_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "lastSeenAt"`;
+  };
+  let rows;
+  try {
+    rows = await upsert();
+  } catch (error) {
+    // Two registrations of the same installation racing (app launch + foreground) can trip the partial
+    // unique index idx_push_devices_install: the loser revokes again and retries once.
+    if ((error as { code?: string })?.code !== "23505") throw error;
+    rows = await upsert();
+  }
   const device = rows[0] as Device;
   return Response.json(device, { status: 201, headers: noStore });
 }

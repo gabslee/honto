@@ -36,6 +36,12 @@ abstract class HontoApi {
   /// `PUT /api/v1/me/timezone`: Report the device IANA time zone (sent on every app open/foreground).
   Future<TimeZoneResult> updateTimeZone(TimeZoneUpdate body);
 
+  /// `PUT /api/v1/me/weather`: Report the weather where I am now (coarse summary only, never coordinates).
+  Future<WeatherSummary> reportWeather(WeatherSummary body);
+
+  /// `DELETE /api/v1/me/weather`: Forget my weather summary (location turned off).
+  Future<void> clearWeather();
+
   /// `GET /api/v1/me/export`: Status of the export of my own photos (ZIP).
   Future<ExportStatus> getExport();
 
@@ -187,6 +193,17 @@ class HttpHontoApi implements HontoApi {
   Future<TimeZoneResult> updateTimeZone(TimeZoneUpdate body) async {
     final json = await transport.send('PUT', '/api/v1/me/timezone', body: body.toJson());
     return TimeZoneResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<WeatherSummary> reportWeather(WeatherSummary body) async {
+    final json = await transport.send('PUT', '/api/v1/me/weather', body: body.toJson());
+    return WeatherSummary.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> clearWeather() async {
+    await transport.send('DELETE', '/api/v1/me/weather');
   }
 
   @override

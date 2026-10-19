@@ -1,0 +1,4 @@
+{
+  "error": "condition must be one of clear, partly_cloudy, cloudy, fog, drizzle, rain, snow, thunderstorm.",
+  "code": "bad_request"
+}

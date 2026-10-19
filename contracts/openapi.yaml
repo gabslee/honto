@@ -273,6 +273,35 @@ paths:
               schema: { $ref: '#/components/schemas/TimeZoneResult' }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+  /api/v1/me/weather:
+    put:
+      tags: [me]
+      operationId: reportWeather
+      summary: Report the weather where I am now (coarse summary only, never coordinates).
+      description: |
+        The app reads a coarse location on the device, asks Apple WeatherKit on the device and
+        sends only this summary, so the partner sees "It's raining over there today". The
+        server stores no location at all. Summaries older than 12 h are not returned in `/today`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WeatherSummary' }
+      responses:
+        '200':
+          description: Stored.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WeatherSummary' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [me]
+      operationId: clearWeather
+      summary: Forget my weather summary (location turned off).
+      responses:
+        '204': { description: Cleared. }
+        '401': { $ref: '#/components/responses/Error' }
   /api/v1/me/export:
     get:
       tags: [me]
@@ -1321,6 +1350,7 @@ components:
         timeZone: { $ref: '#/components/schemas/TimeZoneId' }
         dailyPhoto: { anyOf: [{ $ref: '#/components/schemas/Photo' }, { type: 'null' }] }
         photoCount: { type: integer, description: 'Ready photos I took on my local day.' }
+        weather: { anyOf: [{ $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' }], description: 'My last reported weather (null when older than 12 h or never reported). Optional: absent on older servers.' }
     TodayPartner:
       type: object
       required: [userId, displayName, timeZone, utcOffsetMinutes, localDay, dailyPhoto, latestPhoto, photoCount, status]
@@ -1334,6 +1364,19 @@ components:
         latestPhoto: { anyOf: [{ $ref: '#/components/schemas/Photo' }, { type: 'null' }], description: 'Most recent ready photo (for the widget).' }
         photoCount: { type: integer }
         status: { anyOf: [{ $ref: '#/components/schemas/PartnerStatus' }, { type: 'null' }], description: 'Null when not Premium or never synced.' }
+        weather: { anyOf: [{ $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' }], description: 'Partner''s last reported weather (null when older than 12 h or never reported). Optional: absent on older servers.' }
+    WeatherCondition:
+      type: string
+      enum: [clear, partly_cloudy, cloudy, fog, drizzle, rain, snow, thunderstorm]
+    WeatherSummary:
+      type: object
+      required: [condition, temperatureC, isDay, observedAt]
+      description: Coarse current weather where a person is. No place name and no coordinates are ever stored.
+      properties:
+        condition: { $ref: '#/components/schemas/WeatherCondition' }
+        temperatureC: { type: integer, minimum: -90, maximum: 60, description: 'Rounded air temperature in Celsius.' }
+        isDay: { type: boolean }
+        observedAt: { type: string, format: date-time, description: 'When the device read it (at most 6 h in the past).' }
     Today:
       type: object
       required: [generatedAt, me, partner, startedOn, daysTogether, reunion, activeTrip, nudges, entitlement]
@@ -1738,6 +1781,15 @@ components:
         startedOn: { anyOf: [{ $ref: '#/components/schemas/LocalDay' }, { type: 'null' }] }
         reunion: { anyOf: [{ $ref: '#/components/schemas/WidgetSnapshotReunion' }, { type: 'null' }] }
         nudges: { $ref: '#/components/schemas/NudgeState' }
+        streak: { anyOf: [{ $ref: '#/components/schemas/WidgetSnapshotStreak' }, { type: 'null' }], description: 'Couple streak from `/today` (optional; absent in older snapshots).' }
+    WidgetSnapshotStreak:
+      type: object
+      x-contract: widget
+      required: [current, best, todayComplete]
+      properties:
+        current: { type: integer, minimum: 0 }
+        best: { type: integer, minimum: 0 }
+        todayComplete: { type: boolean }
     WidgetSnapshotMe:
       type: object
       x-contract: widget
@@ -1745,6 +1797,7 @@ components:
       properties:
         displayName: { type: string }
         postedToday: { type: boolean }
+        weather: { anyOf: [{ $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' }], description: 'Optional; absent in older snapshots.' }
     WidgetSnapshotPartner:
       type: object
       x-contract: widget
@@ -1754,6 +1807,7 @@ components:
         timeZone: { anyOf: [{ $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' }] }
         photo: { anyOf: [{ $ref: '#/components/schemas/WidgetSnapshotPhoto' }, { type: 'null' }] }
         status: { anyOf: [{ $ref: '#/components/schemas/PartnerStatus' }, { type: 'null' }] }
+        weather: { anyOf: [{ $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' }], description: 'Optional; absent in older snapshots.' }
     WidgetSnapshotReunion:
       type: object
       x-contract: widget

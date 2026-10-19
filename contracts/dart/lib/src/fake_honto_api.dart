@@ -163,6 +163,17 @@ class FakeHontoApi implements HontoApi {
   Future<TimeZoneResult> updateTimeZone(TimeZoneUpdate body) =>
       _run('updateTimeZone', () => TimeZoneResult(timeZone: body.timeZone, updatedAt: _clock()));
 
+  /// Last weather reported through [reportWeather] (null after [clearWeather]).
+  WeatherSummary? reportedWeather;
+
+  @override
+  Future<WeatherSummary> reportWeather(WeatherSummary body) => _run('reportWeather', () => reportedWeather = body);
+
+  @override
+  Future<void> clearWeather() => _run('clearWeather', () {
+        reportedWeather = null;
+      });
+
   @override
   Future<ExportStatus> getExport() => _run('getExport',
       () => ExportStatus.fromJson(_json(scenario == FakeScenario.pendingUnpair ? 'getExport.200.ready' : 'getExport.200')));

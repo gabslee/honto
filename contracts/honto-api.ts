@@ -342,6 +342,8 @@ export interface TodaySelf {
   dailyPhoto: Photo | null;
   /** Ready photos I took on my local day. */
   photoCount: number;
+  /** My last reported weather (null when older than 12 h or never reported). Optional: absent on older servers. */
+  weather?: WeatherSummary | null;
 }
 
 export interface TodayPartner {
@@ -357,6 +359,21 @@ export interface TodayPartner {
   photoCount: number;
   /** Null when not Premium or never synced. */
   status: PartnerStatus | null;
+  /** Partner's last reported weather (null when older than 12 h or never reported). Optional: absent on older servers. */
+  weather?: WeatherSummary | null;
+}
+
+export const WeatherConditionValues = ["clear", "partly_cloudy", "cloudy", "fog", "drizzle", "rain", "snow", "thunderstorm"] as const;
+export type WeatherCondition = (typeof WeatherConditionValues)[number];
+
+/** Coarse current weather where a person is. No place name and no coordinates are ever stored. */
+export interface WeatherSummary {
+  condition: WeatherCondition;
+  /** Rounded air temperature in Celsius. */
+  temperatureC: number;
+  isDay: boolean;
+  /** When the device read it (at most 6 h in the past). */
+  observedAt: IsoDateTime;
 }
 
 export interface Today {
@@ -742,11 +759,21 @@ export interface WidgetSnapshot {
   startedOn: LocalDay | null;
   reunion: WidgetSnapshotReunion | null;
   nudges: NudgeState;
+  /** Couple streak from `/today` (optional; absent in older snapshots). */
+  streak?: WidgetSnapshotStreak | null;
+}
+
+export interface WidgetSnapshotStreak {
+  current: number;
+  best: number;
+  todayComplete: boolean;
 }
 
 export interface WidgetSnapshotMe {
   displayName: string;
   postedToday: boolean;
+  /** Optional; absent in older snapshots. */
+  weather?: WeatherSummary | null;
 }
 
 export interface WidgetSnapshotPartner {
@@ -754,6 +781,8 @@ export interface WidgetSnapshotPartner {
   timeZone: TimeZoneId | null;
   photo: WidgetSnapshotPhoto | null;
   status: PartnerStatus | null;
+  /** Optional; absent in older snapshots. */
+  weather?: WeatherSummary | null;
 }
 
 export interface WidgetSnapshotReunion {
@@ -783,6 +812,10 @@ export interface Operations {
   deleteMe: { method: "DELETE"; path: "/api/v1/me"; pathParams: never; query: never; body: never; responses: { 204: void; 401: ApiError } };
   /** PUT /api/v1/me/timezone: Report the device IANA time zone (sent on every app open/foreground). */
   updateTimeZone: { method: "PUT"; path: "/api/v1/me/timezone"; pathParams: never; query: never; body: TimeZoneUpdate; responses: { 200: TimeZoneResult; 400: ApiError; 401: ApiError } };
+  /** PUT /api/v1/me/weather: Report the weather where I am now (coarse summary only, never coordinates). */
+  reportWeather: { method: "PUT"; path: "/api/v1/me/weather"; pathParams: never; query: never; body: WeatherSummary; responses: { 200: WeatherSummary; 400: ApiError; 401: ApiError } };
+  /** DELETE /api/v1/me/weather: Forget my weather summary (location turned off). */
+  clearWeather: { method: "DELETE"; path: "/api/v1/me/weather"; pathParams: never; query: never; body: never; responses: { 204: void; 401: ApiError } };
   /** GET /api/v1/me/export: Status of the export of my own photos (ZIP). */
   getExport: { method: "GET"; path: "/api/v1/me/export"; pathParams: never; query: never; body: never; responses: { 200: ExportStatus; 401: ApiError } };
   /** POST /api/v1/me/export: Build a ZIP with my own photos. */
@@ -865,6 +898,8 @@ export const operations = {
   getMe: { method: "GET", path: "/api/v1/me", auth: ["bearerAuth","cookieAuth"] },
   deleteMe: { method: "DELETE", path: "/api/v1/me", auth: ["bearerAuth","cookieAuth"] },
   updateTimeZone: { method: "PUT", path: "/api/v1/me/timezone", auth: ["bearerAuth","cookieAuth"] },
+  reportWeather: { method: "PUT", path: "/api/v1/me/weather", auth: ["bearerAuth","cookieAuth"] },
+  clearWeather: { method: "DELETE", path: "/api/v1/me/weather", auth: ["bearerAuth","cookieAuth"] },
   getExport: { method: "GET", path: "/api/v1/me/export", auth: ["bearerAuth","cookieAuth"] },
   requestExport: { method: "POST", path: "/api/v1/me/export", auth: ["bearerAuth","cookieAuth"] },
   getInvite: { method: "GET", path: "/api/v1/couple/invite", auth: ["bearerAuth","cookieAuth"] },
