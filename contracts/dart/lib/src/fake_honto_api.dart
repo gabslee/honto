@@ -10,6 +10,8 @@ import 'models.g.dart';
 enum FakeScenario {
   /// Ana (São Paulo) paired with Kenji (Tokyo), Premium trial, photos today.
   pairedPremium,
+  pairedRenewing,
+  pairedPartnerPremium,
 
   /// Paired, Free, no photo yet today (Memories locked after 7 days, calendar 402).
   pairedFree,
@@ -24,14 +26,20 @@ enum FakeScenario {
 class FakeHontoApi implements HontoApi {
   FakeHontoApi({this.scenario = FakeScenario.pairedPremium, DateTime Function()? clock, this.latency = Duration.zero})
       : _clock = clock ?? DateTime.now {
-    _paired = scenario == FakeScenario.pairedPremium || scenario == FakeScenario.pairedFree;
-    _premium = scenario == FakeScenario.pairedPremium;
+    _paired = ![FakeScenario.unpaired, FakeScenario.pendingUnpair].contains(scenario);
+    _premium = [FakeScenario.pairedPremium, FakeScenario.pairedRenewing, FakeScenario.pairedPartnerPremium].contains(scenario);
     _today = _json(_premium ? 'getToday.200' : 'getToday.200.free_no_photos');
     final seen = (_json('listMilestones.200')['milestones'] as List<dynamic>).cast<Map<String, dynamic>>();
     final unseen = ((_today['unseenMilestones'] as List<dynamic>?) ?? const []).cast<Map<String, dynamic>>();
     // Premium: first photo + 7-day streak, both seen. Free: first photo seen, 7-day streak not seen yet.
     _milestones.addAll(_premium ? seen : [seen.first, ...unseen]);
   }
+
+  // App compatibility adapter for the account migration UI and its fault injection.
+  final linkedProviders = <LinkProvider>[];
+
+  Future<void> linkProvider(LinkProvider provider, String idToken) =>
+      _run('linkProvider', () { linkedProviders.add(provider); });
 
   final FakeScenario scenario;
   final Duration latency;
@@ -40,6 +48,7 @@ class FakeHontoApi implements HontoApi {
   late bool _paired;
   late bool _premium;
   late Map<String, dynamic> _today;
+  ProfileCity? _city;
   DateTime? _lastNudge;
   final Map<String, Map<String, dynamic>> _pendingPhotos = {};
   final List<Map<String, dynamic>> _milestones = [];
@@ -81,9 +90,13 @@ class FakeHontoApi implements HontoApi {
 
   /// Records a milestone (unseen) like the server would, e.g. to preview the CelebrationSheet from a debug
   /// menu. Same `type` + `value` twice is a no-op (milestones are recorded once per couple).
-  Milestone simulateMilestone(MilestoneType type, {int? value, String? localDay}) {
+  Milestone simulateMilestone(MilestoneType type, {int? value, String? localDay, bool preview = false}) {
     final existing = _milestones.where((m) => m['type'] == type.wire && m['value'] == value);
-    if (existing.isNotEmpty) return Milestone.fromJson(existing.first);
+    if (existing.isNotEmpty) {
+      // App-only gallery preview: seeded milestones can be made unseen explicitly.
+      if (preview) existing.first['seenAt'] = null;
+      return Milestone.fromJson(existing.first);
+    }
     final now = _clock();
     final json = <String, dynamic>{
       'id': 'ms_fake_${type.wire}_${value ?? 0}',
@@ -102,7 +115,16 @@ class FakeHontoApi implements HontoApi {
       FakeScenario.pendingUnpair => 'getMe.200.pending_unpair',
       _ => 'getMe.200',
     });
-    if (!_paired) me['couple'] = null;
+    me['couple'] = _paired ? _coupleJson() : null;
+    if (scenario == FakeScenario.pairedRenewing || scenario == FakeScenario.pairedPartnerPremium) {
+      (me['entitlement'] as Map<String, dynamic>)
+        ..['periodType'] = 'normal'
+        ..['grantedBy'] = scenario == FakeScenario.pairedPartnerPremium ? 'partner' : 'me';
+    }
+    (me['user'] as Map<String, dynamic>)
+      ..['displayName'] = _displayName ?? (me['user'] as Map<String, dynamic>)['displayName']
+      ..['avatar'] = _avatar?.toJson()
+      ..['city'] = _city?.toJson();
     if (!_premium) me['entitlement'] = _json('getMe.200.unpaired')['entitlement'];
     return me;
   }
@@ -152,7 +174,56 @@ class FakeHontoApi implements HontoApi {
 
   // ---- me ------------------------------------------------------------------------------------
   @override
-  Future<Me> getMe() => _run('getMe', () => Me.fromJson(_paired ? _meJson() : _json(scenario == FakeScenario.pendingUnpair ? 'getMe.200.pending_unpair' : 'getMe.200.unpaired')));
+  Future<Me> getMe() => _run('getMe', () => Me.fromJson(_meJson()));
+
+  String? _displayName;
+  Avatar? _avatar;
+  final _avatarUploads = <String, Avatar>{};
+  final _avatarReservations = <DateTime>[];
+
+  @override
+  Future<User> updateProfile(ProfilePatch body) => _run('updateProfile', () {
+    final name = body.displayName.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (name.isEmpty || name.runes.length > 80) {
+      throw HontoApiException(400, const ApiError(error: 'Use 1–80 characters.', code: ErrorCode.badRequest));
+    }
+    _displayName = name;
+    return User.fromJson(_meJson()['user'] as Map<String, dynamic>);
+  });
+
+  @override
+  Future<AvatarUploadResponse> createAvatarUpload(AvatarUploadRequest body) => _run('createAvatarUpload', () {
+    if (body.bytes < 1 || body.bytes > 1048576 || body.thumbBytes < 1 || body.thumbBytes > 131072 ||
+        body.width < 1 || body.width > 2048 || body.height < 1 || body.height > 2048) {
+      throw HontoApiException(400, const ApiError(error: 'Photo exceeds limits.', code: ErrorCode.badRequest));
+    }
+    _avatarReservations.removeWhere((at) => _clock().difference(at) >= const Duration(hours: 1));
+    if (_avatarReservations.length >= 20) {
+      throw HontoApiException(429, const ApiError(error: 'Try again later.', code: ErrorCode.rateLimited));
+    }
+    _avatarReservations.add(_clock());
+    final id = 'av_fake_${_avatarReservations.length}_${_clock().microsecondsSinceEpoch}';
+    final result = AvatarUploadResponse.fromJson(_json('createAvatarUpload.201')..['avatarId'] = id);
+    _avatarUploads[id] = Avatar.fromJson(_json('completeAvatar.200')..['id'] = id);
+    return result;
+  });
+
+  @override
+  Future<Avatar> completeAvatar(AvatarCompleteRequest body) => _run('completeAvatar', () {
+    final avatar = _avatarUploads[body.avatarId];
+    if (avatar == null) {
+      throw HontoApiException(404, const ApiError(error: 'Photo not found.', code: ErrorCode.notFound));
+    }
+    _avatar = avatar;
+    (_today['me'] as Map<String, dynamic>)['avatar'] = avatar.toJson();
+    return avatar;
+  });
+
+  @override
+  Future<void> deleteAvatar() => _run('deleteAvatar', () {
+    _avatar = null;
+    (_today['me'] as Map<String, dynamic>)['avatar'] = null;
+  });
 
   @override
   Future<void> deleteMe() => _run('deleteMe', () {
@@ -414,5 +485,87 @@ class FakeHontoApi implements HontoApi {
           ..['lastSentAt'] = _iso(now)
           ..['nextAllowedAt'] = _iso(next);
         return NudgeResult(id: 'ndg_${now.millisecondsSinceEpoch}', createdAt: now, nextAllowedAt: next);
+      }, needsCouple: true);
+  @override
+  Future<ProfileCity> updateProfileCity(ProfileCity body) =>
+      _run('updateProfileCity', () => _city = body);
+  @override
+  Future<void> deleteProfileCity() => _run('deleteProfileCity', () {
+    _city = null;
+  });
+  final _media = <String, PrivateMediaItem>{};
+  final _mediaRequests = <String, PrivateMediaUploadRequest>{};
+  void _requirePrivatePremium() {
+    if (!_premium) {
+      throw _premiumRequired('Premium is required.', statusCode: 402);
+    }
+  }
+
+  @override
+  Future<PrivateMediaFeed> getPrivateMedia() => _run('getPrivateMedia', () {
+    _requirePrivatePremium();
+    final videos = _media.values
+        .where((m) => m.kind == PrivateMediaKind.dailyVideo)
+        .toList();
+    return PrivateMediaFeed(
+      meVideo: videos.isEmpty ? null : videos.last,
+      partnerVideo: null,
+      inbox: const [],
+    );
+  }, needsCouple: true);
+  @override
+  Future<PrivateMediaUpload> createPrivateMediaUpload(
+    PrivateMediaUploadRequest body,
+  ) => _run('createPrivateMediaUpload', () {
+    _requirePrivatePremium();
+    _mediaRequests[body.clientId] = body;
+    return PrivateMediaUpload.fromJson(
+      _json('createPrivateMediaUpload.201')..['id'] = body.clientId,
+    );
+  }, needsCouple: true);
+  @override
+  Future<PrivateMediaItem> completePrivateMedia(String mediaId) =>
+      _run('completePrivateMedia', () {
+        _requirePrivatePremium();
+        final request = _mediaRequests[mediaId]!;
+        final now = _clock();
+        final item = PrivateMediaItem(
+          id: mediaId,
+          kind: request.kind,
+          author: PhotoAuthor.me,
+          localDay: now.toIso8601String().substring(0, 10),
+          createdAt: now,
+          expiresAt: request.kind == PrivateMediaKind.viewOnce
+              ? now.add(const Duration(hours: 24))
+              : null,
+          durationMs: request.durationMs,
+        );
+        if (item.kind == PrivateMediaKind.dailyVideo) {
+          _media.removeWhere(
+            (_, old) => old.kind == item.kind && old.localDay == item.localDay,
+          );
+        }
+        _media[mediaId] = item;
+        return item;
+      }, needsCouple: true);
+  @override
+  Future<PrivateMediaPlayback> getPrivateMediaPlayback(String mediaId) =>
+      _run('getPrivateMediaPlayback', () {
+        _requirePrivatePremium();
+        return PrivateMediaPlayback.fromJson(
+          _json('getPrivateMediaPlayback.200'),
+        );
+      }, needsCouple: true);
+  @override
+  Future<PrivatePhotoOpened> openPrivatePhoto(String mediaId) =>
+      _run('openPrivatePhoto', () {
+        _requirePrivatePremium();
+        throw HontoApiException(
+          410,
+          ApiError(
+            error: 'This photo is no longer available.',
+            code: ErrorCode.mediaUnavailable,
+          ),
+        );
       }, needsCouple: true);
 }

@@ -36,6 +36,7 @@ enum ErrorCode {
   missingConfig('missing_config'),
   storageNotConfigured('storage_not_configured'),
   internal('internal'),
+  mediaUnavailable('media_unavailable'),
   /// A value added to the API after this client was built.
   unrecognized('');
 
@@ -98,7 +99,7 @@ enum AuthPlatform {
 }
 
 class User {
-  const User({required this.id, required this.email, required this.displayName, required this.timeZone, required this.createdAt, this.avatar});
+  const User({required this.id, required this.email, required this.displayName, required this.timeZone, required this.createdAt, this.avatar, this.city});
 
   final String id;
   final String email;
@@ -107,6 +108,7 @@ class User {
   final DateTime createdAt;
   /// My profile photo (null when none). Set on `GET /api/v1/me` and `PATCH /api/v1/me`; absent on sign-in responses and older servers.
   final Avatar? avatar;
+  final ProfileCity? city;
 
   factory User.fromJson(Map<String, dynamic> json) => User(
         id: json['id'] as String,
@@ -115,6 +117,7 @@ class User {
         timeZone: json['timeZone'] == null ? null : json['timeZone'] as String,
         createdAt: DateTime.parse(json['createdAt'] as String),
         avatar: json['avatar'] == null ? null : Avatar.fromJson(json['avatar'] as Map<String, dynamic>),
+        city: json['city'] == null ? null : ProfileCity.fromJson(json['city'] as Map<String, dynamic>),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -124,6 +127,7 @@ class User {
         'timeZone': timeZone,
         'createdAt': createdAt.toUtc().toIso8601String(),
         if (avatar != null) 'avatar': avatar!.toJson(),
+        if (city != null) 'city': city!.toJson(),
       };
 
   @override
@@ -1437,7 +1441,7 @@ class WeatherSummary {
 }
 
 class Today {
-  const Today({required this.generatedAt, required this.me, required this.partner, required this.startedOn, required this.daysTogether, required this.reunion, required this.activeTrip, required this.nudges, required this.entitlement, this.streak, this.unseenMilestones});
+  const Today({required this.generatedAt, required this.me, required this.partner, required this.startedOn, required this.daysTogether, required this.reunion, required this.activeTrip, required this.nudges, required this.entitlement, this.streak, this.unseenMilestones, this.distanceKm});
 
   final DateTime generatedAt;
   final TodaySelf me;
@@ -1452,6 +1456,8 @@ class Today {
   final CoupleStreak? streak;
   /// Milestones I have not seen yet (oldest first), so the app can show the CelebrationSheet without another call. Usually empty.
   final List<Milestone>? unseenMilestones;
+  /// Rounded city-centre distance, no device GPS; null until both cities are set.
+  final int? distanceKm;
 
   factory Today.fromJson(Map<String, dynamic> json) => Today(
         generatedAt: DateTime.parse(json['generatedAt'] as String),
@@ -1465,6 +1471,7 @@ class Today {
         entitlement: Entitlement.fromJson(json['entitlement'] as Map<String, dynamic>),
         streak: json['streak'] == null ? null : CoupleStreak.fromJson(json['streak'] as Map<String, dynamic>),
         unseenMilestones: json['unseenMilestones'] == null ? null : (json['unseenMilestones'] as List<dynamic>).map((e) => Milestone.fromJson(e as Map<String, dynamic>)).toList(),
+        distanceKm: json['distanceKm'] == null ? null : (json['distanceKm'] as num).toInt(),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -1479,6 +1486,7 @@ class Today {
         'entitlement': entitlement.toJson(),
         if (streak != null) 'streak': streak!.toJson(),
         if (unseenMilestones != null) 'unseenMilestones': unseenMilestones!.map((e) => e.toJson()).toList(),
+        if (distanceKm != null) 'distanceKm': distanceKm!,
       };
 
   @override
@@ -2352,6 +2360,7 @@ enum PushEventType {
   tripStart('trip.start'),
   tripUpdate('trip.update'),
   tripEnd('trip.end'),
+  privatePhotoNew('private_photo.new'),
   /// A value added to the API after this client was built.
   unrecognized('');
 
@@ -2366,7 +2375,7 @@ enum PushEventType {
 /// APNs alert: top-level key `honto` next to `aps` (with `mutable-content: 1` for photo.new / nudge.new
 /// so the NSE refreshes the App Group snapshot). APNs widget push (iOS 26): `{"aps":{"content-changed":true}}` only.
 class PushData {
-  const PushData({required this.type, required this.coupleId, required this.sentAt, this.photoId, this.thumbUrl, this.nudgeId, this.createdAt, this.tripId, this.fromName, this.reason});
+  const PushData({required this.type, required this.coupleId, required this.sentAt, this.photoId, this.thumbUrl, this.nudgeId, this.createdAt, this.tripId, this.fromName, this.reason, this.mediaId});
 
   final PushEventType type;
   final String coupleId;
@@ -2381,6 +2390,7 @@ class PushData {
   final String? fromName;
   /// couple.unpaired only.
   final UnpairReason? reason;
+  final String? mediaId;
 
   factory PushData.fromJson(Map<String, dynamic> json) => PushData(
         type: PushEventType.fromJson(json['type'] as String),
@@ -2393,6 +2403,7 @@ class PushData {
         tripId: json['tripId'] == null ? null : json['tripId'] as String,
         fromName: json['fromName'] == null ? null : json['fromName'] as String,
         reason: json['reason'] == null ? null : UnpairReason.fromJson(json['reason'] as String),
+        mediaId: json['mediaId'] == null ? null : json['mediaId'] as String,
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -2406,6 +2417,7 @@ class PushData {
         if (tripId != null) 'tripId': tripId!,
         if (fromName != null) 'fromName': fromName!,
         if (reason != null) 'reason': reason!.toJson(),
+        if (mediaId != null) 'mediaId': mediaId!,
       };
 
   @override
@@ -2518,7 +2530,7 @@ class WidgetSnapshotPhoto {
 /// Written by Flutter (Pigeon `WidgetsHostApi`), the NSE and the Android FCM service; read by the widgets
 /// and the nudge App Intent. Derived from `GET /api/v1/today`. Breaking change = new version + new file name.
 class WidgetSnapshot {
-  const WidgetSnapshot({required this.version, required this.generatedAt, required this.paired, required this.premium, required this.me, required this.partner, required this.startedOn, required this.reunion, required this.nudges, this.streak});
+  const WidgetSnapshot({required this.version, required this.generatedAt, required this.paired, required this.premium, required this.me, required this.partner, required this.startedOn, required this.reunion, required this.nudges, this.streak, this.distanceKm});
 
   /// Always 1 for this file.
   final int version;
@@ -2532,6 +2544,8 @@ class WidgetSnapshot {
   final NudgeState nudges;
   /// Couple streak from `/today` (optional; absent in older snapshots).
   final WidgetSnapshotStreak? streak;
+  /// Rounded city-centre distance, no device GPS; null until both cities are set.
+  final int? distanceKm;
 
   factory WidgetSnapshot.fromJson(Map<String, dynamic> json) => WidgetSnapshot(
         version: (json['version'] as num).toInt(),
@@ -2544,6 +2558,7 @@ class WidgetSnapshot {
         reunion: json['reunion'] == null ? null : WidgetSnapshotReunion.fromJson(json['reunion'] as Map<String, dynamic>),
         nudges: NudgeState.fromJson(json['nudges'] as Map<String, dynamic>),
         streak: json['streak'] == null ? null : WidgetSnapshotStreak.fromJson(json['streak'] as Map<String, dynamic>),
+        distanceKm: json['distanceKm'] == null ? null : (json['distanceKm'] as num).toInt(),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -2557,6 +2572,7 @@ class WidgetSnapshot {
         'reunion': reunion == null ? null : reunion!.toJson(),
         'nudges': nudges.toJson(),
         if (streak != null) 'streak': streak!.toJson(),
+        if (distanceKm != null) 'distanceKm': distanceKm!,
       };
 
   @override
@@ -2660,6 +2676,218 @@ class WidgetSnapshotReunion {
   String toString() => 'WidgetSnapshotReunion(${toJson()})';
 }
 
+class ProfileCity {
+  const ProfileCity({required this.name, required this.country, required this.latitude, required this.longitude, required this.timeZone});
+
+  final String name;
+  final String? country;
+  final double latitude;
+  final double longitude;
+  final String? timeZone;
+
+  factory ProfileCity.fromJson(Map<String, dynamic> json) => ProfileCity(
+        name: json['name'] as String,
+        country: json['country'] == null ? null : json['country'] as String,
+        latitude: (json['latitude'] as num).toDouble(),
+        longitude: (json['longitude'] as num).toDouble(),
+        timeZone: json['timeZone'] == null ? null : json['timeZone'] as String,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'name': name,
+        'country': country,
+        'latitude': latitude,
+        'longitude': longitude,
+        'timeZone': timeZone,
+      };
+
+  @override
+  String toString() => 'ProfileCity(${toJson()})';
+}
+
+enum PrivateMediaKind {
+  dailyVideo('daily_video'),
+  viewOnce('view_once'),
+  /// A value added to the API after this client was built.
+  unrecognized('');
+
+  const PrivateMediaKind(this.wire);
+  final String wire;
+
+  static PrivateMediaKind fromJson(String value) => values.firstWhere((e) => e.wire == value && e != unrecognized, orElse: () => unrecognized);
+  String toJson() => wire;
+}
+
+class PrivateMediaItem {
+  const PrivateMediaItem({required this.id, required this.kind, required this.author, required this.localDay, required this.createdAt, required this.expiresAt, required this.durationMs});
+
+  final String id;
+  final PrivateMediaKind kind;
+  final PhotoAuthor author;
+  final LocalDay localDay;
+  final DateTime createdAt;
+  final DateTime? expiresAt;
+  final int? durationMs;
+
+  factory PrivateMediaItem.fromJson(Map<String, dynamic> json) => PrivateMediaItem(
+        id: json['id'] as String,
+        kind: PrivateMediaKind.fromJson(json['kind'] as String),
+        author: PhotoAuthor.fromJson(json['author'] as String),
+        localDay: json['localDay'] as String,
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        expiresAt: json['expiresAt'] == null ? null : DateTime.parse(json['expiresAt'] as String),
+        durationMs: json['durationMs'] == null ? null : (json['durationMs'] as num).toInt(),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'kind': kind.toJson(),
+        'author': author.toJson(),
+        'localDay': localDay,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'expiresAt': expiresAt == null ? null : expiresAt!.toUtc().toIso8601String(),
+        'durationMs': durationMs,
+      };
+
+  @override
+  String toString() => 'PrivateMediaItem(${toJson()})';
+}
+
+class PrivateMediaFeed {
+  const PrivateMediaFeed({required this.meVideo, required this.partnerVideo, required this.inbox});
+
+  final PrivateMediaItem? meVideo;
+  final PrivateMediaItem? partnerVideo;
+  final List<PrivateMediaItem> inbox;
+
+  factory PrivateMediaFeed.fromJson(Map<String, dynamic> json) => PrivateMediaFeed(
+        meVideo: json['meVideo'] == null ? null : PrivateMediaItem.fromJson(json['meVideo'] as Map<String, dynamic>),
+        partnerVideo: json['partnerVideo'] == null ? null : PrivateMediaItem.fromJson(json['partnerVideo'] as Map<String, dynamic>),
+        inbox: (json['inbox'] as List<dynamic>).map((e) => PrivateMediaItem.fromJson(e as Map<String, dynamic>)).toList(),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'meVideo': meVideo == null ? null : meVideo!.toJson(),
+        'partnerVideo': partnerVideo == null ? null : partnerVideo!.toJson(),
+        'inbox': inbox.map((e) => e.toJson()).toList(),
+      };
+
+  @override
+  String toString() => 'PrivateMediaFeed(${toJson()})';
+}
+
+class PrivateMediaUploadRequest {
+  const PrivateMediaUploadRequest({required this.clientId, required this.kind, required this.contentType, required this.bytes, required this.width, required this.height, this.durationMs, required this.timeZone});
+
+  final String clientId;
+  final PrivateMediaKind kind;
+  final PrivateMediaContentType contentType;
+  final int bytes;
+  final int width;
+  final int height;
+  final int? durationMs;
+  final TimeZoneId timeZone;
+
+  factory PrivateMediaUploadRequest.fromJson(Map<String, dynamic> json) => PrivateMediaUploadRequest(
+        clientId: json['clientId'] as String,
+        kind: PrivateMediaKind.fromJson(json['kind'] as String),
+        contentType: PrivateMediaContentType.fromJson(json['contentType'] as String),
+        bytes: (json['bytes'] as num).toInt(),
+        width: (json['width'] as num).toInt(),
+        height: (json['height'] as num).toInt(),
+        durationMs: json['durationMs'] == null ? null : (json['durationMs'] as num).toInt(),
+        timeZone: json['timeZone'] as String,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'clientId': clientId,
+        'kind': kind.toJson(),
+        'contentType': contentType.toJson(),
+        'bytes': bytes,
+        'width': width,
+        'height': height,
+        if (durationMs != null) 'durationMs': durationMs!,
+        'timeZone': timeZone,
+      };
+
+  @override
+  String toString() => 'PrivateMediaUploadRequest(${toJson()})';
+}
+
+class PrivateMediaUpload {
+  const PrivateMediaUpload({required this.id, required this.upload});
+
+  final String id;
+  final PresignedUpload upload;
+
+  factory PrivateMediaUpload.fromJson(Map<String, dynamic> json) => PrivateMediaUpload(
+        id: json['id'] as String,
+        upload: PresignedUpload.fromJson(json['upload'] as Map<String, dynamic>),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'upload': upload.toJson(),
+      };
+
+  @override
+  String toString() => 'PrivateMediaUpload(${toJson()})';
+}
+
+class PrivateMediaPlayback {
+  const PrivateMediaPlayback({required this.url, required this.expiresAt});
+
+  final String url;
+  final DateTime expiresAt;
+
+  factory PrivateMediaPlayback.fromJson(Map<String, dynamic> json) => PrivateMediaPlayback(
+        url: json['url'] as String,
+        expiresAt: DateTime.parse(json['expiresAt'] as String),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'url': url,
+        'expiresAt': expiresAt.toUtc().toIso8601String(),
+      };
+
+  @override
+  String toString() => 'PrivateMediaPlayback(${toJson()})';
+}
+
+class PrivatePhotoOpened {
+  const PrivatePhotoOpened({required this.contentType, required this.base64});
+
+  final String contentType;
+  /// Opened once, held in memory only. Never cache or persist.
+  final String base64;
+
+  factory PrivatePhotoOpened.fromJson(Map<String, dynamic> json) => PrivatePhotoOpened(
+        contentType: json['contentType'] as String,
+        base64: json['base64'] as String,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'contentType': contentType,
+        'base64': base64,
+      };
+
+  @override
+  String toString() => 'PrivatePhotoOpened(${toJson()})';
+}
+
+enum PrivateMediaContentType {
+  videoMp4('video/mp4'),
+  imageJpeg('image/jpeg'),
+  /// A value added to the API after this client was built.
+  unrecognized('');
+
+  const PrivateMediaContentType(this.wire);
+  final String wire;
+
+  static PrivateMediaContentType fromJson(String value) => values.firstWhere((e) => e.wire == value && e != unrecognized, orElse: () => unrecognized);
+  String toJson() => wire;
+}
+
 /// Decoders for every object model, keyed by Dart type name (used by fakes and fixture tests).
 final Map<String, Object Function(Map<String, dynamic>)> hontoModelDecoders = <String, Object Function(Map<String, dynamic>)>{
   'ApiError': ApiError.fromJson,
@@ -2743,4 +2971,11 @@ final Map<String, Object Function(Map<String, dynamic>)> hontoModelDecoders = <S
   'WidgetSnapshotMe': WidgetSnapshotMe.fromJson,
   'WidgetSnapshotPartner': WidgetSnapshotPartner.fromJson,
   'WidgetSnapshotReunion': WidgetSnapshotReunion.fromJson,
+  'ProfileCity': ProfileCity.fromJson,
+  'PrivateMediaItem': PrivateMediaItem.fromJson,
+  'PrivateMediaFeed': PrivateMediaFeed.fromJson,
+  'PrivateMediaUploadRequest': PrivateMediaUploadRequest.fromJson,
+  'PrivateMediaUpload': PrivateMediaUpload.fromJson,
+  'PrivateMediaPlayback': PrivateMediaPlayback.fromJson,
+  'PrivatePhotoOpened': PrivatePhotoOpened.fromJson,
 };

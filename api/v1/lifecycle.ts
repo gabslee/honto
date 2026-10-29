@@ -348,6 +348,14 @@ export async function deleteAccount(sql: Sql, userId: string, store = getObjectS
         INSERT INTO storage_deletions (object_key, reason) SELECT k.key, 'account' FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) WHERE k.key IS NOT NULL ON CONFLICT (object_key) DO NOTHING
       ) SELECT k.key FROM d CROSS JOIN LATERAL (VALUES (d.object_key), (d.thumb_key)) AS k(key) WHERE k.key IS NOT NULL`) - 1);
   }
+  // Private content must be queued before user/couple cascade deletion removes its keys.
+  if ((await sql`SELECT to_regclass('private_media') IS NOT NULL AS present`)[0]?.present) {
+    keyStatements.push(statements.push(sql`WITH d AS (
+        DELETE FROM private_media WHERE author_user_id=${userId} OR recipient_user_id=${userId} RETURNING object_key,upload_key
+      ), q AS (
+        INSERT INTO storage_deletions (object_key,reason) SELECT key,'private_media' FROM d CROSS JOIN LATERAL (VALUES(d.object_key),(d.upload_key)) AS k(key) ON CONFLICT DO NOTHING
+      ) SELECT key FROM d CROSS JOIN LATERAL (VALUES(d.object_key),(d.upload_key)) AS k(key)`) - 1);
+  }
   // Apple refresh tokens, read in the transaction (they cascade with the user) and revoked after the commit.
   const appleIndex = statements.push(sql`DELETE FROM apple_tokens WHERE user_id = ${userId} RETURNING client_id AS "clientId", refresh_token AS "refreshToken"`) - 1;
   statements.push(sql`DELETE FROM email_login_tokens WHERE email = (SELECT lower(email) FROM users WHERE id = ${userId})`);
@@ -576,6 +584,10 @@ export async function runRetention(sql: Sql, store = getObjectStore()): Promise<
   for (const statement of stale.length ? purgeStatements(sql, tables, stale) : []) await statement;
   const couplesPurged = count(await sql`WITH d AS (DELETE FROM couples WHERE legacy = false AND unpaired_at IS NOT NULL AND unpaired_at <= now() - make_interval(days => ${UNPAIR_GRACE_DAYS}::int) RETURNING id) SELECT count(*)::int AS n FROM d`);
 
+  if ((await sql`SELECT to_regclass('private_media') IS NOT NULL AS present`)[0]?.present) {
+    await sql`WITH d AS (DELETE FROM private_media WHERE (expires_at IS NOT NULL AND expires_at<=now()) OR (status='opening' AND opening_at<now()-interval '5 minutes') RETURNING object_key,upload_key)
+      INSERT INTO storage_deletions (object_key,reason) SELECT key,'private_media' FROM d CROSS JOIN LATERAL (VALUES(d.object_key),(d.upload_key)) AS k(key) ON CONFLICT DO NOTHING`;
+  }
   // Profile photos reserved but never completed (api/v1/profile.ts): keys queued like photos.
   if ((await sql`SELECT to_regclass('user_avatars') IS NOT NULL AS present`)[0]?.present) {
     await sql`WITH d AS (

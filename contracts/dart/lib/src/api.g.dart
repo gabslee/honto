@@ -141,6 +141,27 @@ abstract class HontoApi {
   /// `POST /api/v1/nudges`: "Thinking of you" (Free). Sends an alert + widget refresh to the partner.
   Future<NudgeResult> sendNudge(NudgeRequest body);
 
+  /// `PUT /api/v1/me/city`: updateProfileCity
+  Future<ProfileCity> updateProfileCity(ProfileCity body);
+
+  /// `DELETE /api/v1/me/city`: deleteProfileCity
+  Future<void> deleteProfileCity();
+
+  /// `GET /api/v1/private-media`: getPrivateMedia
+  Future<PrivateMediaFeed> getPrivateMedia();
+
+  /// `POST /api/v1/private-media`: createPrivateMediaUpload
+  Future<PrivateMediaUpload> createPrivateMediaUpload(PrivateMediaUploadRequest body);
+
+  /// `POST /api/v1/private-media/{mediaId}/complete`: completePrivateMedia
+  Future<PrivateMediaItem> completePrivateMedia(String mediaId);
+
+  /// `GET /api/v1/private-media/{mediaId}/playback`: getPrivateMediaPlayback
+  Future<PrivateMediaPlayback> getPrivateMediaPlayback(String mediaId);
+
+  /// `POST /api/v1/private-media/{mediaId}/open`: openPrivatePhoto
+  Future<PrivatePhotoOpened> openPrivatePhoto(String mediaId);
+
 }
 
 /// Real implementation over [HontoTransport] (bearer token, JSON, error mapping).
@@ -409,6 +430,47 @@ class HttpHontoApi implements HontoApi {
   Future<NudgeResult> sendNudge(NudgeRequest body) async {
     final json = await transport.send('POST', '/api/v1/nudges', body: body.toJson());
     return NudgeResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<ProfileCity> updateProfileCity(ProfileCity body) async {
+    final json = await transport.send('PUT', '/api/v1/me/city', body: body.toJson());
+    return ProfileCity.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> deleteProfileCity() async {
+    await transport.send('DELETE', '/api/v1/me/city');
+  }
+
+  @override
+  Future<PrivateMediaFeed> getPrivateMedia() async {
+    final json = await transport.send('GET', '/api/v1/private-media');
+    return PrivateMediaFeed.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<PrivateMediaUpload> createPrivateMediaUpload(PrivateMediaUploadRequest body) async {
+    final json = await transport.send('POST', '/api/v1/private-media', body: body.toJson());
+    return PrivateMediaUpload.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<PrivateMediaItem> completePrivateMedia(String mediaId) async {
+    final json = await transport.send('POST', '/api/v1/private-media/${Uri.encodeComponent(mediaId)}/complete');
+    return PrivateMediaItem.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<PrivateMediaPlayback> getPrivateMediaPlayback(String mediaId) async {
+    final json = await transport.send('GET', '/api/v1/private-media/${Uri.encodeComponent(mediaId)}/playback');
+    return PrivateMediaPlayback.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<PrivatePhotoOpened> openPrivatePhoto(String mediaId) async {
+    final json = await transport.send('POST', '/api/v1/private-media/${Uri.encodeComponent(mediaId)}/open');
+    return PrivatePhotoOpened.fromJson(json as Map<String, dynamic>);
   }
 
 }

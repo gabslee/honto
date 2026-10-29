@@ -1,3 +1,4 @@
+import { authorized } from '../../../../api/v1/cron-auth';
 import { apiError, noStore } from "../../../../api/v1/context";
 import { runRetention } from "../../../../api/v1/lifecycle";
 import { database } from "../../../server-auth";
@@ -5,15 +6,6 @@ import { database } from "../../../server-auth";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-/** Constant-time comparison of the `Authorization: Bearer <CRON_SECRET>` header. */
-async function authorized(request: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  const header = request.headers.get("authorization") ?? "";
-  if (!secret || !header.toLowerCase().startsWith("bearer ")) return false;
-  const digest = async (value: string) => new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
-  const [a, b] = await Promise.all([digest(header.slice(7).trim()), digest(secret)]);
-  return a.reduce((diff, byte, i) => diff | (byte ^ b[i]), 0) === 0;
-}
 
 /**
  * GET /api/cron/retention, daily from the Cloudflare Worker (`Bearer CRON_SECRET`). Deletes unpaired data

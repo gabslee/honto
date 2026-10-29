@@ -1,3 +1,4 @@
+import { citiesFor, cityDistanceKm } from './city';
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 import type { Avatar, Couple, Entitlement, EntitlementSource, Features, Invite, Me, NudgeState, PartnerInfo, PartnerStatus, PeriodType, Photo, Reunion, Today, Trip } from "../../contracts/honto-api";
 import { database } from "../../app/server-auth";
@@ -69,11 +70,11 @@ type Grant = { userId: string; source: EntitlementSource; productId: string | nu
  * active Stripe premium, running Stripe trial). My own grant wins over my partner's; RevenueCat over Stripe
  * over admin. `trialEligible` is false once either member had a trial.
  */
-export async function resolveEntitlement(sql: Sql, userId: string, partnerId: string | null, tables?: OptionalTables): Promise<Entitlement> {
+export async function resolveEntitlement(sql: Sql, userId: string, partnerId: string | null, tables?: OptionalTables, now = new Date()): Promise<Entitlement> {
   const ids = [userId, partnerId ?? userId];
   const grants: Grant[] = [];
   let hadTrial = false;
-  const users = await sql`SELECT id, role, (plan = 'premium' AND subscription_status = 'active' AND (subscription_expires_at IS NULL OR subscription_expires_at > now())) AS "stripeActive", to_char(subscription_expires_at AT TIME ZONE 'UTC', ${ISO}) AS "subscriptionExpiresAt", (trial_ends_at > now()) AS "trialActive", to_char(trial_ends_at AT TIME ZONE 'UTC', ${ISO}) AS "trialEndsAt", (trial_started_at IS NOT NULL OR trial_ends_at IS NOT NULL) AS "hadTrial" FROM users WHERE id IN (${ids[0]}, ${ids[1]})`;
+  const users = await sql`SELECT id, role, (plan = 'premium' AND subscription_status = 'active' AND (subscription_expires_at IS NULL OR subscription_expires_at > ${now.toISOString()}::timestamptz)) AS "stripeActive", to_char(subscription_expires_at AT TIME ZONE 'UTC', ${ISO}) AS "subscriptionExpiresAt", (trial_ends_at > ${now.toISOString()}::timestamptz) AS "trialActive", to_char(trial_ends_at AT TIME ZONE 'UTC', ${ISO}) AS "trialEndsAt", (trial_started_at IS NOT NULL OR trial_ends_at IS NOT NULL) AS "hadTrial" FROM users WHERE id IN (${ids[0]}, ${ids[1]})`;
   for (const user of users) {
     const id = String(user.id);
     if (user.hadTrial) hadTrial = true;
@@ -83,7 +84,7 @@ export async function resolveEntitlement(sql: Sql, userId: string, partnerId: st
   }
   if ((tables ?? await optionalTables(sql)).entitlements) {
     try {
-      const rows = await sql`SELECT user_id AS "userId", source, product_id AS "productId", period_type AS "periodType", to_char(expires_at AT TIME ZONE 'UTC', ${ISO}) AS "expiresAt", will_renew AS "willRenew", had_trial AS "hadTrial", (expires_at IS NULL OR expires_at > now()) AS active FROM entitlements WHERE entitlement = 'premium' AND user_id IN (${ids[0]}, ${ids[1]})`;
+      const rows = await sql`SELECT user_id AS "userId", source, product_id AS "productId", period_type AS "periodType", to_char(expires_at AT TIME ZONE 'UTC', ${ISO}) AS "expiresAt", will_renew AS "willRenew", had_trial AS "hadTrial", (expires_at IS NULL OR expires_at > ${now.toISOString()}::timestamptz) AS active FROM entitlements WHERE entitlement = 'premium' AND user_id IN (${ids[0]}, ${ids[1]})`;
       for (const row of rows) {
         if (row.hadTrial || row.periodType === "trial") hadTrial = true;
         if (!row.active) continue;
@@ -331,10 +332,10 @@ export async function meResponse(request: Request, now = new Date()) {
   const partnerId = paired instanceof Response ? null : paired.partner.id;
   // Not paired: a half-ended couple (partner deleted outside deleteAccount) is closed now, so pendingUnpair shows it.
   if (paired instanceof Response) await repairHalfCouples(sql, auth.user.id);
-  const entitlement = await resolveEntitlement(sql, auth.user.id, partnerId);
+  const entitlement = await resolveEntitlement(sql, auth.user.id, partnerId, undefined, now);
   const avatars = await avatarsFor(sql, partnerId ? [auth.user.id, partnerId] : [auth.user.id], now);
   const body: Me = {
-    user: { ...toApiUser(auth.user), avatar: avatars.get(auth.user.id) ?? null },
+    user: { ...toApiUser(auth.user), avatar: avatars.get(auth.user.id) ?? null, city: (await citiesFor(sql,[auth.user.id])).get(auth.user.id) ?? null },
     couple: paired instanceof Response ? null : coupleView(paired, entitlement.premium, now, avatars),
     entitlement,
     pendingUnpair: paired instanceof Response ? await latestUnpair(sql, auth.user.id) : null,
@@ -429,7 +430,7 @@ async function optional<T>(label: string, enabled: boolean, read: () => Promise<
 export async function buildToday(sql: Sql, { user, couple, partner }: Paired, now: Date, store = getObjectStore()): Promise<Today> {
   await ensureLifecycleSchema(sql);
   const tables = await optionalTables(sql);
-  const entitlement = await resolveEntitlement(sql, user.id, partner.id, tables);
+  const entitlement = await resolveEntitlement(sql, user.id, partner.id, tables, now);
   const myZone = user.timeZone ?? "UTC";
   const myDay = localDay(myZone, now);
   const partnerDay = partner.timeZone ? localDay(partner.timeZone, now) : null;
@@ -440,7 +441,10 @@ export async function buildToday(sql: Sql, { user, couple, partner }: Paired, no
   const { streak, unseenMilestones } = await todayMilestones(sql, { user, couple, partner }, now);
   const weather = await optional("weather", true, () => weatherFor(sql, [user.id, partner.id], now), new Map());
   const avatars = await avatarsFor(sql, [user.id, partner.id], now, store);
+  const cities = await citiesFor(sql,[user.id,partner.id]);
+  const myCity=cities.get(user.id), partnerCity=cities.get(partner.id);
   return {
+    distanceKm: myCity && partnerCity ? cityDistanceKm(myCity,partnerCity) : null,
     generatedAt: toIso(now),
     me: { displayName: user.displayName, localDay: myDay, timeZone: myZone, dailyPhoto: await photo(mine[0]), photoCount: mine.length, weather: weather.get(user.id) ?? null, avatar: avatars.get(user.id) ?? null },
     partner: {

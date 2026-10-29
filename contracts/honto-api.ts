@@ -12,7 +12,7 @@ export type YearMonth = string;
 /** IANA time zone id. */
 export type TimeZoneId = string;
 
-export const ErrorCodeValues = ["bad_request", "unauthorized", "invalid_token", "forbidden", "not_found", "not_paired", "already_paired", "invalid_code", "code_expired", "own_invite", "premium_required", "rate_limited", "too_large", "unsupported_media_type", "invalid_local_day", "upload_missing", "upload_size_mismatch", "email_required", "email_unavailable", "identity_in_use", "export_unavailable", "missing_config", "storage_not_configured", "internal"] as const;
+export const ErrorCodeValues = ["bad_request", "unauthorized", "invalid_token", "forbidden", "not_found", "not_paired", "already_paired", "invalid_code", "code_expired", "own_invite", "premium_required", "rate_limited", "too_large", "unsupported_media_type", "invalid_local_day", "upload_missing", "upload_size_mismatch", "email_required", "email_unavailable", "identity_in_use", "export_unavailable", "missing_config", "storage_not_configured", "internal", "media_unavailable"] as const;
 export type ErrorCode = (typeof ErrorCodeValues)[number];
 
 export interface ApiError {
@@ -36,6 +36,7 @@ export interface User {
   createdAt: IsoDateTime;
   /** My profile photo (null when none). Set on `GET /api/v1/me` and `PATCH /api/v1/me`; absent on sign-in responses and older servers. */
   avatar?: Avatar | null;
+  city?: ProfileCity | null;
 }
 
 export interface AuthSession {
@@ -437,6 +438,8 @@ export interface Today {
   streak?: CoupleStreak;
   /** Milestones I have not seen yet (oldest first), so the app can show the CelebrationSheet without another call. Usually empty. */
   unseenMilestones?: Array<Milestone>;
+  /** Rounded city-centre distance, no device GPS; null until both cities are set. */
+  distanceKm?: number | null;
 }
 
 /** Couple streak (Free): consecutive days on which both partners have a ready photo on that local day */
@@ -746,7 +749,7 @@ export interface CronRetentionResult {
   objectsPending: number;
 }
 
-export const PushEventTypeValues = ["photo.new", "nudge.new", "couple.joined", "couple.unpaired", "reunion.changed", "trip.start", "trip.update", "trip.end"] as const;
+export const PushEventTypeValues = ["photo.new", "nudge.new", "couple.joined", "couple.unpaired", "reunion.changed", "trip.start", "trip.update", "trip.end", "private_photo.new"] as const;
 export type PushEventType = (typeof PushEventTypeValues)[number];
 
 /** Custom data carried by every push. FCM: sent as `data` (all values strings; nulls omitted). */
@@ -766,6 +769,7 @@ export interface PushData {
   fromName?: string;
   /** couple.unpaired only. */
   reason?: UnpairReason;
+  mediaId?: string;
 }
 
 export const TripActivityPhaseValues = ["before", "inTransit", "landed"] as const;
@@ -814,6 +818,8 @@ export interface WidgetSnapshot {
   nudges: NudgeState;
   /** Couple streak from `/today` (optional; absent in older snapshots). */
   streak?: WidgetSnapshotStreak | null;
+  /** Rounded city-centre distance, no device GPS; null until both cities are set. */
+  distanceKm?: number | null;
 }
 
 export interface WidgetSnapshotStreak {
@@ -842,6 +848,63 @@ export interface WidgetSnapshotReunion {
   at: IsoDateTime;
   city: string | null;
 }
+
+export interface ProfileCity {
+  name: string;
+  country: string | null;
+  latitude: number;
+  longitude: number;
+  timeZone: string | null;
+}
+
+export const PrivateMediaKindValues = ["daily_video", "view_once"] as const;
+export type PrivateMediaKind = (typeof PrivateMediaKindValues)[number];
+
+export interface PrivateMediaItem {
+  id: string;
+  kind: PrivateMediaKind;
+  author: PhotoAuthor;
+  localDay: LocalDay;
+  createdAt: IsoDateTime;
+  expiresAt: IsoDateTime | null;
+  durationMs: number | null;
+}
+
+export interface PrivateMediaFeed {
+  meVideo: PrivateMediaItem | null;
+  partnerVideo: PrivateMediaItem | null;
+  inbox: Array<PrivateMediaItem>;
+}
+
+export interface PrivateMediaUploadRequest {
+  clientId: string;
+  kind: PrivateMediaKind;
+  contentType: PrivateMediaContentType;
+  bytes: number;
+  width: number;
+  height: number;
+  durationMs?: number;
+  timeZone: TimeZoneId;
+}
+
+export interface PrivateMediaUpload {
+  id: string;
+  upload: PresignedUpload;
+}
+
+export interface PrivateMediaPlayback {
+  url: string;
+  expiresAt: IsoDateTime;
+}
+
+export interface PrivatePhotoOpened {
+  contentType: string;
+  /** Opened once, held in memory only. Never cache or persist. */
+  base64: string;
+}
+
+export const PrivateMediaContentTypeValues = ["video/mp4", "image/jpeg"] as const;
+export type PrivateMediaContentType = (typeof PrivateMediaContentTypeValues)[number];
 
 /** Every operation of the API, keyed by operationId. */
 export interface Operations {
@@ -941,6 +1004,20 @@ export interface Operations {
   cronTrips: { method: "GET"; path: "/api/cron/trips"; pathParams: never; query: never; body: never; responses: { 200: CronTripsResult; 401: ApiError } };
   /** GET /api/cron/retention: Daily from the Cloudflare Worker. Purges unpaired photos after 30 days, expired exports, old calendar blocks and dead tokens. */
   cronRetention: { method: "GET"; path: "/api/cron/retention"; pathParams: never; query: never; body: never; responses: { 200: CronRetentionResult; 401: ApiError } };
+  /** PUT /api/v1/me/city: updateProfileCity */
+  updateProfileCity: { method: "PUT"; path: "/api/v1/me/city"; pathParams: never; query: never; body: ProfileCity; responses: { 200: ProfileCity; 400: ApiError; 401: ApiError; 402: ApiError; 409: ApiError; 410: ApiError; 422: ApiError; 503: ApiError } };
+  /** DELETE /api/v1/me/city: deleteProfileCity */
+  deleteProfileCity: { method: "DELETE"; path: "/api/v1/me/city"; pathParams: never; query: never; body: never; responses: { 204: void; 400: ApiError; 401: ApiError; 402: ApiError; 409: ApiError; 410: ApiError; 422: ApiError; 503: ApiError } };
+  /** GET /api/v1/private-media: getPrivateMedia */
+  getPrivateMedia: { method: "GET"; path: "/api/v1/private-media"; pathParams: never; query: never; body: never; responses: { 200: PrivateMediaFeed; 400: ApiError; 401: ApiError; 402: ApiError; 409: ApiError; 410: ApiError; 422: ApiError; 503: ApiError } };
+  /** POST /api/v1/private-media: createPrivateMediaUpload */
+  createPrivateMediaUpload: { method: "POST"; path: "/api/v1/private-media"; pathParams: never; query: never; body: PrivateMediaUploadRequest; responses: { 201: PrivateMediaUpload; 400: ApiError; 401: ApiError; 402: ApiError; 409: ApiError; 410: ApiError; 422: ApiError; 503: ApiError } };
+  /** POST /api/v1/private-media/{mediaId}/complete: completePrivateMedia */
+  completePrivateMedia: { method: "POST"; path: "/api/v1/private-media/{mediaId}/complete"; pathParams: { mediaId: string }; query: never; body: never; responses: { 200: PrivateMediaItem; 400: ApiError; 401: ApiError; 402: ApiError; 409: ApiError; 410: ApiError; 422: ApiError; 503: ApiError } };
+  /** GET /api/v1/private-media/{mediaId}/playback: getPrivateMediaPlayback */
+  getPrivateMediaPlayback: { method: "GET"; path: "/api/v1/private-media/{mediaId}/playback"; pathParams: { mediaId: string }; query: never; body: never; responses: { 200: PrivateMediaPlayback; 400: ApiError; 401: ApiError; 402: ApiError; 409: ApiError; 410: ApiError; 422: ApiError; 503: ApiError } };
+  /** POST /api/v1/private-media/{mediaId}/open: openPrivatePhoto */
+  openPrivatePhoto: { method: "POST"; path: "/api/v1/private-media/{mediaId}/open"; pathParams: { mediaId: string }; query: never; body: never; responses: { 200: PrivatePhotoOpened; 400: ApiError; 401: ApiError; 402: ApiError; 409: ApiError; 410: ApiError; 422: ApiError; 503: ApiError } };
 }
 
 export type OperationId = keyof Operations;
@@ -997,4 +1074,11 @@ export const operations = {
   revenueCatWebhook: { method: "POST", path: "/api/v1/billing/revenuecat", auth: ["revenueCatAuth"] },
   cronTrips: { method: "GET", path: "/api/cron/trips", auth: ["cronAuth"] },
   cronRetention: { method: "GET", path: "/api/cron/retention", auth: ["cronAuth"] },
+  updateProfileCity: { method: "PUT", path: "/api/v1/me/city", auth: ["bearerAuth","cookieAuth"] },
+  deleteProfileCity: { method: "DELETE", path: "/api/v1/me/city", auth: ["bearerAuth","cookieAuth"] },
+  getPrivateMedia: { method: "GET", path: "/api/v1/private-media", auth: ["bearerAuth","cookieAuth"] },
+  createPrivateMediaUpload: { method: "POST", path: "/api/v1/private-media", auth: ["bearerAuth","cookieAuth"] },
+  completePrivateMedia: { method: "POST", path: "/api/v1/private-media/{mediaId}/complete", auth: ["bearerAuth","cookieAuth"] },
+  getPrivateMediaPlayback: { method: "GET", path: "/api/v1/private-media/{mediaId}/playback", auth: ["bearerAuth","cookieAuth"] },
+  openPrivatePhoto: { method: "POST", path: "/api/v1/private-media/{mediaId}/open", auth: ["bearerAuth","cookieAuth"] },
 } as const satisfies Record<OperationId, { method: string; path: string; auth: readonly string[] }>;

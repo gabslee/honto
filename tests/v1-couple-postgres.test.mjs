@@ -295,7 +295,7 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
       const ana = await body(await couple.meResponse(req('ana'), NOW));
       assert.equal(ana.status, 200);
       assertContract('Me', ana.json);
-      assert.deepEqual(ana.json.user, { ...fixture('getMe.200').user, id: 'usr_ana' });
+      assert.deepEqual(ana.json.user, { ...fixture('getMe.200').user, id: 'usr_ana', city: null });
       assert.deepEqual({ ...ana.json.couple, id: 'cpl_01', pairedAt: fixture('getMe.200').couple.pairedAt }, { ...fixture('getMe.200').couple, premium: false });
       assert.deepEqual(ana.json.entitlement, fixture('getMe.200.unpaired').entitlement, 'free couple');
       assert.deepEqual([ana.json.pendingUnpair, ana.json.hasPendingInvite], [null, false]);
@@ -419,7 +419,10 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
       assert.equal(free.json.nudges.nextAllowedAt, null);
       assert.equal((await body(await couple.todayResponse(req('ana'), at('2026-10-20T06:00:00Z')))).json.activeTrip.phase, 'inTransit');
       const stale = await body(await couple.todayResponse(req('ana'), at('2026-11-02T00:00:00Z')));
-      assert.equal(stale.json.partner.status.state, 'unknown', 'uploaded window no longer covers now');
+      assert.equal(stale.json.partner.status, null, 'expired trial no longer exposes partner calendar');
+      await db.query("UPDATE entitlements SET expires_at='2026-12-01T00:00:00Z' WHERE user_id='usr_ana'");
+      const stalePremium = await body(await couple.todayResponse(req('ana'), at('2026-11-02T00:00:00Z')));
+      assert.equal(stalePremium.json.partner.status.state, 'unknown', 'uploaded window no longer covers now');
       // Kenji sees the couple as Premium through Ana.
       assert.equal((await body(await couple.todayResponse(req('kenji'), t0))).json.entitlement.grantedBy, 'partner');
       assert.equal((await body(await couple.meResponse(req('ana'), t0))).json.entitlement.trialEligible, false);

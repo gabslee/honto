@@ -1,0 +1,9 @@
+{
+  "id": "pm_test",
+  "kind": "daily_video",
+  "author": "me",
+  "localDay": "2026-10-28",
+  "createdAt": "2026-10-28T12:00:00Z",
+  "expiresAt": null,
+  "durationMs": 15000
+}

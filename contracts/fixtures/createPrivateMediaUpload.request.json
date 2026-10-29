@@ -1,0 +1,10 @@
+{
+  "clientId": "a1111111-1111-4111-8111-111111111111",
+  "kind": "daily_video",
+  "contentType": "video/mp4",
+  "bytes": 1024,
+  "width": 1280,
+  "height": 720,
+  "durationMs": 15000,
+  "timeZone": "America/Sao_Paulo"
+}

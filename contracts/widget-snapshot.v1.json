@@ -77,6 +77,14 @@
         }
       ],
       "description": "Couple streak from `/today` (optional; absent in older snapshots)."
+    },
+    "distanceKm": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Rounded city-centre distance, no device GPS; null until both cities are set."
     }
   },
   "$defs": {

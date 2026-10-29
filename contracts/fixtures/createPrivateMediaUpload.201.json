@@ -1,0 +1,12 @@
+{
+  "id": "pm_test",
+  "upload": {
+    "method": "PUT",
+    "url": "https://media.test/upload",
+    "headers": {
+      "Content-Type": "video/mp4",
+      "Content-Length": "1024"
+    },
+    "expiresAt": "2026-10-28T14:00:00Z"
+  }
+}

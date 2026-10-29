@@ -12,6 +12,7 @@ type Sql = NeonQueryFunction<false, false>;
 
 /** Events W2a sends (plus `nudge.new`, feedback r1). `reunion.changed` is a widget refresh only (no visible alert). */
 export type PushEvent =
+  | { type: "private_photo.new"; mediaId: string; fromName?: string | null }
   | { type: "photo.new"; photoId: string; thumbUrl?: string | null; fromName?: string | null }
   | { type: "nudge.new"; nudgeId: string; createdAt?: string | null; fromName?: string | null }
   | { type: "couple.joined"; fromName?: string | null }
@@ -28,6 +29,7 @@ const rfc3339 = (date: Date) => date.toISOString().replace(/\.\d{3}Z$/, "Z");
 /** Contract `PushData` for an event (unset optional fields are omitted). */
 export function pushData(coupleId: string, event: PushEvent, now = new Date()): PushData {
   const data: PushData = { type: event.type, coupleId, sentAt: rfc3339(now) };
+  if (event.type === "private_photo.new") data.mediaId = event.mediaId;
   if (event.type === "photo.new") {
     data.photoId = event.photoId;
     if (event.thumbUrl) data.thumbUrl = event.thumbUrl;
@@ -44,6 +46,8 @@ export function pushData(coupleId: string, event: PushEvent, now = new Date()): 
 /** APNs alert body: the visible text (English, no emoji) plus `honto` = PushData. Null for widget-only events. */
 export function apnsAlertPayload(data: PushData) {
   const from = data.fromName || "Your partner";
+  // Private photos never carry a URL, attachment, or mutable-content NSE request.
+  if (data.type === "private_photo.new") return { aps: { alert: { title: "Honto", body: `Nova foto do ${from}` }, sound: "default", "thread-id": data.coupleId }, honto: data };
   if (data.type === "photo.new") return { aps: { alert: { title: from, body: "Sent you a photo" }, sound: "default", "mutable-content": 1, "thread-id": data.coupleId }, honto: data };
   // "Thinking of you": short and silent (no sound); the NSE refreshes the widget snapshot and records the sender.
   if (data.type === "nudge.new") return { aps: { alert: { title: "Honto", body: `${from} is thinking of you` }, "mutable-content": 1, "thread-id": data.coupleId }, honto: data };

@@ -68,7 +68,7 @@ tags:
 paths:
   /api/v1/auth/google:
     post:
-      tags: [auth]
+      tags: [ auth ]
       operationId: signInWithGoogle
       summary: Native Google Sign-In; returns an hm_u_ token.
       description: |
@@ -93,7 +93,7 @@ paths:
         '503': { $ref: '#/components/responses/Error' }
   /api/v1/auth/apple:
     post:
-      tags: [auth]
+      tags: [ auth ]
       operationId: signInWithApple
       summary: Native Sign in with Apple; returns an hm_u_ token.
       description: |
@@ -118,7 +118,7 @@ paths:
         '503': { $ref: '#/components/responses/Error' }
   /api/v1/auth/link/{provider}:
     post:
-      tags: [auth]
+      tags: [ auth ]
       operationId: linkProviderIdentity
       summary: Add a Google or Apple sign-in to the signed-in account.
       description: |
@@ -154,7 +154,7 @@ paths:
         '503': { $ref: '#/components/responses/Error' }
   /api/v1/auth/email/start:
     post:
-      tags: [auth]
+      tags: [ auth ]
       operationId: startEmailSignIn
       summary: Send a magic link plus a 6-digit fallback code.
       description: |
@@ -179,7 +179,7 @@ paths:
         '503': { $ref: '#/components/responses/Error' }
   /api/v1/auth/email/verify:
     post:
-      tags: [auth]
+      tags: [ auth ]
       operationId: verifyEmailSignIn
       summary: Exchange the magic-link token (or email + code) for a session.
       description: |
@@ -199,7 +199,7 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
   /api/v1/auth/refresh:
     post:
-      tags: [auth]
+      tags: [ auth ]
       operationId: refreshSession
       summary: Rotate a refresh token for a new hm_u_ access token (instead of sending the user back to sign-in).
       description: |
@@ -222,7 +222,7 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
   /api/v1/auth/logout:
     post:
-      tags: [auth]
+      tags: [ auth ]
       operationId: logout
       summary: Revoke the bearer token (or clear the web cookie).
       description: With a bearer `hm_u_`, also revokes the refresh-token chain issued with it. With the cookie, deletes the web session.
@@ -235,7 +235,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /api/v1/me:
     get:
-      tags: [me]
+      tags: [ me ]
       operationId: getMe
       summary: Current user, couple (or null), entitlement and pending-unpair state.
       responses:
@@ -246,7 +246,7 @@ paths:
               schema: { $ref: '#/components/schemas/Me' }
         '401': { $ref: '#/components/responses/Error' }
     delete:
-      tags: [me]
+      tags: [ me ]
       operationId: deleteMe
       summary: Delete the account (App Store 5.1.1(v)).
       description: |
@@ -259,7 +259,7 @@ paths:
         '204': { description: Deleted. }
         '401': { $ref: '#/components/responses/Error' }
     patch:
-      tags: [me]
+      tags: [ me ]
       operationId: updateProfile
       summary: Edit my profile (display name).
       description: |
@@ -281,7 +281,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /api/v1/me/avatar:
     delete:
-      tags: [me]
+      tags: [ me ]
       operationId: deleteAvatar
       summary: Remove my profile photo (the objects are deleted from storage).
       responses:
@@ -289,7 +289,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /api/v1/me/avatar/upload:
     post:
-      tags: [me]
+      tags: [ me ]
       operationId: createAvatarUpload
       summary: Reserve a profile photo and get presigned PUT URLs (full + thumb), like `POST /api/v1/photos`.
       description: |
@@ -316,7 +316,7 @@ paths:
         '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/me/avatar/complete:
     post:
-      tags: [me]
+      tags: [ me ]
       operationId: completeAvatar
       summary: Confirm both uploads; the photo becomes my profile photo and the previous one is deleted.
       description: |
@@ -340,7 +340,7 @@ paths:
         '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/me/timezone:
     put:
-      tags: [me]
+      tags: [ me ]
       operationId: updateTimeZone
       summary: Report the device IANA time zone (sent on every app open/foreground).
       requestBody:
@@ -358,7 +358,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /api/v1/me/weather:
     put:
-      tags: [me]
+      tags: [ me ]
       operationId: reportWeather
       summary: Report the weather where I am now (coarse summary only, never coordinates).
       description: |
@@ -379,7 +379,7 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
     delete:
-      tags: [me]
+      tags: [ me ]
       operationId: clearWeather
       summary: Forget my weather summary (location turned off).
       responses:
@@ -387,7 +387,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /api/v1/me/export:
     get:
-      tags: [me]
+      tags: [ me ]
       operationId: getExport
       summary: Status of the export of my own photos (ZIP).
       responses:
@@ -398,7 +398,7 @@ paths:
               schema: { $ref: '#/components/schemas/ExportStatus' }
         '401': { $ref: '#/components/responses/Error' }
     post:
-      tags: [me]
+      tags: [ me ]
       operationId: requestExport
       summary: Build a ZIP with my own photos.
       description: |
@@ -418,7 +418,7 @@ paths:
         '503': { $ref: '#/components/responses/Error' }
   /api/v1/couple/invite:
     get:
-      tags: [couple]
+      tags: [ couple ]
       operationId: getInvite
       summary: My current unexpired invite, if any.
       responses:
@@ -431,7 +431,7 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
     post:
-      tags: [couple]
+      tags: [ couple ]
       operationId: createInvite
       summary: Create a pairing code (replaces my previous unused code).
       description: Codes are 6 characters (Crockford base32, no 0/O/1/I/L/U), valid 48h, single use. One active code per user.
@@ -446,7 +446,7 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
   /api/v1/couple/join:
     post:
-      tags: [couple]
+      tags: [ couple ]
       operationId: joinCouple
       summary: Pair with the account that created the code.
       description: |
@@ -471,7 +471,7 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
   /api/v1/couple:
     get:
-      tags: [couple]
+      tags: [ couple ]
       operationId: getCouple
       summary: Partner (name, time zone), start date, next reunion and derived counters.
       responses:
@@ -483,7 +483,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
     patch:
-      tags: [couple]
+      tags: [ couple ]
       operationId: updateCouple
       summary: Set the relationship start date and/or the next reunion. `null` clears.
       description: Changing the reunion sends `reunion.changed` (widget push only) to the partner.
@@ -502,7 +502,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
     delete:
-      tags: [couple]
+      tags: [ couple ]
       operationId: unpairCouple
       summary: Unpair.
       description: |
@@ -521,7 +521,7 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
   /api/v1/today:
     get:
-      tags: [today]
+      tags: [ today ]
       operationId: getToday
       summary: One call for the Today screen and for the widgets (timeline fetch, NSE, Android service).
       description: |
@@ -544,7 +544,7 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
   /api/v1/photos:
     post:
-      tags: [photos]
+      tags: [ photos ]
       operationId: createPhoto
       summary: Reserve a photo and get presigned PUT URLs (full + thumb) in the private object storage bucket.
       description: |
@@ -574,7 +574,7 @@ paths:
         '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/photos/{photoId}/complete:
     post:
-      tags: [photos]
+      tags: [ photos ]
       operationId: completePhoto
       summary: Confirm both uploads; the photo becomes `ready` and the partner gets `photo.new`.
       description: |
@@ -595,7 +595,7 @@ paths:
         '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/photos/{photoId}:
     delete:
-      tags: [photos]
+      tags: [ photos ]
       operationId: deletePhoto
       summary: Delete one of my photos (author only). If it was the daily photo, the next one is promoted.
       parameters:
@@ -608,7 +608,7 @@ paths:
         '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/memories:
     get:
-      tags: [memories]
+      tags: [ memories ]
       operationId: getMemoriesMonth
       summary: Month grid with both daily thumbnails per day.
       description: |
@@ -631,7 +631,7 @@ paths:
         '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/memories/{day}:
     get:
-      tags: [memories]
+      tags: [ memories ]
       operationId: getMemoryDay
       summary: All ready photos of both partners for a local day (daily first, then gallery by time).
       description: '`403 premium_required` for a locked day on Free.'
@@ -653,7 +653,7 @@ paths:
         '503': { $ref: '#/components/responses/StorageNotConfigured' }
   /api/v1/devices:
     post:
-      tags: [devices]
+      tags: [ devices ]
       operationId: registerDevice
       summary: Register or refresh a push token (upsert by token).
       description: |
@@ -675,7 +675,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /api/v1/devices/{deviceId}:
     delete:
-      tags: [devices]
+      tags: [ devices ]
       operationId: unregisterDevice
       summary: Revoke a push token (logout, notifications disabled).
       parameters:
@@ -689,7 +689,7 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
   /api/v1/live-activity/tokens:
     post:
-      tags: [devices]
+      tags: [ devices ]
       operationId: registerLiveActivityToken
       summary: Register an iOS Live Activity token (push-to-start, iOS 17.2+, or per-activity update).
       requestBody:
@@ -707,7 +707,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /api/v1/live-activity/tokens/{tokenId}:
     delete:
-      tags: [devices]
+      tags: [ devices ]
       operationId: revokeLiveActivityToken
       summary: Revoke a Live Activity token (activity ended or dismissed locally).
       parameters:
@@ -721,7 +721,7 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
   /api/v1/calendar/busy:
     put:
-      tags: [calendar]
+      tags: [ calendar ]
       operationId: uploadCalendarBusy
       summary: Atomically replace my busy blocks for a window (max 14 days ahead).
       description: |
@@ -747,7 +747,7 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
   /api/v1/calendar:
     get:
-      tags: [calendar]
+      tags: [ calendar ]
       operationId: getCalendar
       summary: My blocks and my partner's, plus the partner's current status. Premium.
       description: A couple without Premium gets 402 `premium_required` (uploading stays allowed on Free).
@@ -773,7 +773,7 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
   /api/v1/calendar/shares:
     get:
-      tags: [calendar]
+      tags: [ calendar ]
       operationId: getCalendarShares
       summary: My per-calendar title opt-ins.
       responses:
@@ -784,7 +784,7 @@ paths:
               schema: { $ref: '#/components/schemas/CalendarShares' }
         '401': { $ref: '#/components/responses/Error' }
     put:
-      tags: [calendar]
+      tags: [ calendar ]
       operationId: updateCalendarShares
       summary: Replace my per-calendar title opt-ins (default off). Turning one on requires Premium.
       description: Turning a calendar off deletes the titles already stored for it.
@@ -804,7 +804,7 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
   /api/v1/trips:
     get:
-      tags: [trips]
+      tags: [ trips ]
       operationId: listTrips
       summary: Upcoming and in-progress trips of the couple.
       responses:
@@ -816,7 +816,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
     post:
-      tags: [trips]
+      tags: [ trips ]
       operationId: createTrip
       summary: Add the reunion trip ("I'm traveling" / "They're traveling").
       description: |
@@ -838,7 +838,7 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
   /api/v1/trips/{tripId}:
     patch:
-      tags: [trips]
+      tags: [ trips ]
       operationId: updateTrip
       summary: Change a trip (sends `trip.update` if its Live Activity is running).
       parameters:
@@ -858,7 +858,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
     delete:
-      tags: [trips]
+      tags: [ trips ]
       operationId: deleteTrip
       summary: Cancel a trip (sends `trip.end` if its Live Activity is running).
       parameters:
@@ -869,7 +869,7 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
   /api/v1/milestones:
     get:
-      tags: [milestones]
+      tags: [ milestones ]
       operationId: listMilestones
       summary: Milestones the couple reached (Free), for Memories and the CelebrationSheet.
       description: |
@@ -885,7 +885,7 @@ paths:
         - name: unseen
           in: query
           required: false
-          schema: { type: string, enum: ['true', 'false'] }
+          schema: { type: string, enum: [ 'true', 'false' ] }
           description: '`true` = only milestones I have not seen yet.'
       responses:
         '200':
@@ -898,7 +898,7 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
   /api/v1/milestones/{milestoneId}/seen:
     post:
-      tags: [milestones]
+      tags: [ milestones ]
       operationId: markMilestoneSeen
       summary: Mark a milestone as seen by me (the CelebrationSheet was shown). Idempotent.
       description: The first `seenAt` is kept on repeats. My partner's `seenAt` is independent.
@@ -915,7 +915,7 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
   /api/v1/nudges:
     post:
-      tags: [nudges]
+      tags: [ nudges ]
       operationId: sendNudge
       summary: '"Thinking of you" (Free). Sends an alert + widget refresh to the partner.'
       description: Rate limit 1 per 60 s and 30 per day per user (`429 rate_limited` with `Retry-After`).
@@ -935,7 +935,7 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
   /api/v1/billing/revenuecat:
     post:
-      tags: [billing]
+      tags: [ billing ]
       operationId: revenueCatWebhook
       summary: RevenueCat webhook → entitlements.
       description: |
@@ -960,7 +960,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /api/cron/trips:
     get:
-      tags: [cron]
+      tags: [ cron ]
       operationId: cronTrips
       summary: Every 5 min from the Cloudflare Worker (Cron Trigger). Starts/updates/ends Live Activities and Live Updates.
       security:
@@ -974,7 +974,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /api/cron/retention:
     get:
-      tags: [cron]
+      tags: [ cron ]
       operationId: cronRetention
       summary: Daily from the Cloudflare Worker. Purges unpaired photos after 30 days, expired exports, old calendar blocks and dead tokens.
       security:
@@ -986,6 +986,205 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/CronRetentionResult' }
         '401': { $ref: '#/components/responses/Error' }
+  /api/v1/me/city:
+    put:
+      operationId: updateProfileCity
+      tags:
+        - me
+      summary: updateProfileCity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileCity"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileCity"
+        "400": &a1
+          $ref: "#/components/responses/Error"
+        "401": &a2
+          $ref: "#/components/responses/Error"
+        "402": &a3
+          $ref: "#/components/responses/Error"
+        "409": &a4
+          $ref: "#/components/responses/Error"
+        "410": &a5
+          $ref: "#/components/responses/Error"
+        "422": &a6
+          $ref: "#/components/responses/Error"
+        "503": &a7
+          $ref: "#/components/responses/StorageNotConfigured"
+    delete:
+      operationId: deleteProfileCity
+      tags:
+        - me
+      summary: deleteProfileCity
+      responses:
+        "204":
+          description: Deleted
+        "400": *a1
+        "401": *a2
+        "402": *a3
+        "409": *a4
+        "410": *a5
+        "422": *a6
+        "503": *a7
+  /api/v1/private-media:
+    get:
+      operationId: getPrivateMedia
+      tags:
+        - me
+      summary: getPrivateMedia
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivateMediaFeed"
+        "400": &a1
+          $ref: "#/components/responses/Error"
+        "401": &a2
+          $ref: "#/components/responses/Error"
+        "402": &a3
+          $ref: "#/components/responses/Error"
+        "409": &a4
+          $ref: "#/components/responses/Error"
+        "410": &a5
+          $ref: "#/components/responses/Error"
+        "422": &a6
+          $ref: "#/components/responses/Error"
+        "503": &a7
+          $ref: "#/components/responses/StorageNotConfigured"
+    post:
+      operationId: createPrivateMediaUpload
+      tags:
+        - me
+      summary: createPrivateMediaUpload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrivateMediaUploadRequest"
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivateMediaUpload"
+        "400": *a1
+        "401": *a2
+        "402": *a3
+        "409": *a4
+        "410": *a5
+        "422": *a6
+        "503": *a7
+  /api/v1/private-media/{mediaId}/complete:
+    parameters:
+      - name: mediaId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: completePrivateMedia
+      tags:
+        - me
+      summary: completePrivateMedia
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivateMediaItem"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "402":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "410":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/StorageNotConfigured"
+  /api/v1/private-media/{mediaId}/playback:
+    parameters:
+      - name: mediaId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getPrivateMediaPlayback
+      tags:
+        - me
+      summary: getPrivateMediaPlayback
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivateMediaPlayback"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "402":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "410":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/StorageNotConfigured"
+  /api/v1/private-media/{mediaId}/open:
+    parameters:
+      - name: mediaId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: openPrivatePhoto
+      tags:
+        - me
+      summary: openPrivatePhoto
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivatePhotoOpened"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "402":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "410":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/StorageNotConfigured"
 components:
   securitySchemes:
     bearerAuth:
@@ -1063,17 +1262,17 @@ components:
       format: date
       pattern: '^\d{4}-\d{2}-\d{2}$'
       description: A calendar day in some person's local time zone (never converted).
-      examples: ['2026-10-19']
+      examples: [ '2026-10-19' ]
     YearMonth:
       type: string
       pattern: '^\d{4}-(0[1-9]|1[0-2])$'
-      examples: ['2026-10']
+      examples: [ '2026-10' ]
     TimeZoneId:
       type: string
       minLength: 1
       maxLength: 64
       description: IANA time zone id.
-      examples: ['America/Sao_Paulo']
+      examples: [ 'America/Sao_Paulo' ]
     ErrorCode:
       type: string
       enum:
@@ -1101,98 +1300,125 @@ components:
         - missing_config
         - storage_not_configured
         - internal
+        - media_unavailable
     Error:
       type: object
-      required: [error, code]
+      required: [ error, code ]
       properties:
         error: { type: string, description: 'Human readable (English). Do not show raw to users.' }
         code: { $ref: '#/components/schemas/ErrorCode' }
-        retryAfterSeconds: { type: [integer, 'null'], minimum: 0 }
+        retryAfterSeconds: { type: [ integer, 'null' ], minimum: 0 }
     Platform:
       type: string
-      enum: [ios, android, web]
+      enum: [ ios, android, web ]
     AuthPlatform:
       type: string
-      enum: [ios, android]
+      enum: [ ios, android ]
     User:
       type: object
-      required: [id, email, displayName, timeZone, createdAt]
+      required: [ id, email, displayName, timeZone, createdAt ]
       properties:
         id: { type: string }
         email: { type: string, format: email }
         displayName: { type: string, maxLength: 80 }
-        timeZone: { anyOf: [{ $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' }] }
+        timeZone: { anyOf: [ { $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' } ] }
         createdAt: { type: string, format: date-time }
-        avatar: { anyOf: [{ $ref: '#/components/schemas/Avatar' }, { type: 'null' }], description: 'My profile photo (null when none). Set on `GET /api/v1/me` and `PATCH /api/v1/me`; absent on sign-in responses and older servers.' }
+        avatar:
+          {
+            anyOf: [ { $ref: '#/components/schemas/Avatar' }, { type: 'null' } ],
+            description: 'My profile photo (null when none). Set on `GET /api/v1/me` and `PATCH /api/v1/me`; absent on sign-in responses and older
+              servers.'
+          }
+        city:
+          anyOf:
+            - $ref: "#/components/schemas/ProfileCity"
+            - type: "null"
     AuthSession:
       type: object
-      required: [token, tokenType, expiresInDays, created, user]
+      required: [ token, tokenType, expiresInDays, created, user ]
       properties:
-        token: { type: [string, 'null'], description: '`hm_u_…`; null for `platform: web` (cookie set instead).' }
+        token: { type: [ string, 'null' ], description: '`hm_u_…`; null for `platform: web` (cookie set instead).' }
         tokenType: { type: string, description: 'Always `Bearer`.' }
         expiresInDays: { type: integer }
         created: { type: boolean, description: 'True when the account was created by this sign-in.' }
         user: { $ref: '#/components/schemas/User' }
-        refreshToken: { type: [string, 'null'], description: '`hm_r_…`, single use (see `POST /api/v1/auth/refresh`). Null or absent for `platform: web` and for sign-ins that do not issue one yet.' }
-        refreshExpiresInDays: { type: [integer, 'null'], description: 'Lifetime of `refreshToken`; every refresh issues a new one.' }
+        refreshToken:
+          {
+            type: [ string, 'null' ],
+            description: '`hm_r_…`, single use (see `POST /api/v1/auth/refresh`). Null or absent for `platform: web` and for sign-ins that do not issue
+              one yet.'
+          }
+        refreshExpiresInDays: { type: [ integer, 'null' ], description: 'Lifetime of `refreshToken`; every refresh issues a new one.' }
         isNewUser: { type: boolean, description: 'Google / Apple sign-in: the account was created now (same as `created`). Suggest linking another sign-in.' }
-        usedPrivateRelayEmail: { type: boolean, description: 'Google / Apple sign-in: the account email is an Apple "Hide My Email" address (`@privaterelay.appleid.com`), so it will not match the person''s real email later. Suggest linking Google.' }
+        usedPrivateRelayEmail:
+          {
+            type: boolean,
+            description: 'Google / Apple sign-in: the account email is an Apple "Hide My Email" address (`@privaterelay.appleid.com`), so it will not
+              match the person''s real email later. Suggest linking Google.'
+          }
     LinkProvider:
       type: string
-      enum: [apple, google]
+      enum: [ apple, google ]
     ProviderLinkRequest:
       type: object
-      required: [idToken]
+      required: [ idToken ]
       properties:
         idToken: { type: string }
         nonce: { type: string, description: 'Raw nonce, when the app sent one to the provider.' }
     ProviderLinkResult:
       type: object
-      required: [provider, alreadyLinked, email, usedPrivateRelayEmail]
+      required: [ provider, alreadyLinked, email, usedPrivateRelayEmail ]
       properties:
         provider: { $ref: '#/components/schemas/LinkProvider' }
         alreadyLinked: { type: boolean }
-        email: { type: [string, 'null'], description: 'Email in the provider token, if any (the account email is not changed).' }
+        email: { type: [ string, 'null' ], description: 'Email in the provider token, if any (the account email is not changed).' }
         usedPrivateRelayEmail: { type: boolean }
     RefreshRequest:
       type: object
-      required: [refreshToken, platform]
+      required: [ refreshToken, platform ]
       properties:
         refreshToken: { type: string, maxLength: 128 }
         platform: { $ref: '#/components/schemas/AuthPlatform' }
     GoogleSignInRequest:
       type: object
-      required: [idToken, platform]
+      required: [ idToken, platform ]
       properties:
         idToken: { type: string }
         nonce: { type: string, description: 'Raw nonce, optional.' }
         platform: { $ref: '#/components/schemas/AuthPlatform' }
     AppleSignInRequest:
       type: object
-      required: [idToken, platform]
+      required: [ idToken, platform ]
       properties:
         idToken: { type: string }
         nonce: { type: string }
         name: { type: string, maxLength: 80 }
         platform: { $ref: '#/components/schemas/AuthPlatform' }
-        authorizationCode: { type: string, maxLength: 1024, description: 'Optional `authorizationCode` of the Apple credential (single use, 5 minutes). The server exchanges it for an Apple refresh token so the account deletion can revoke the Sign in with Apple grant; sign-in still succeeds when it is missing or the exchange fails.' }
+        authorizationCode:
+          {
+            type: string,
+            maxLength: 1024,
+            description: 'Optional `authorizationCode` of the Apple credential (single use, 5 minutes). The server exchanges it for an Apple refresh
+              token so the account deletion can revoke the Sign in with Apple grant; sign-in still succeeds when it is missing or the
+              exchange fails.'
+          }
     EmailStartRequest:
       type: object
-      required: [email, platform]
+      required: [ email, platform ]
       properties:
         email: { type: string, format: email, maxLength: 254 }
         platform: { $ref: '#/components/schemas/Platform' }
         locale: { type: string, maxLength: 16 }
     EmailStartResponse:
       type: object
-      required: [sent, expiresInSeconds, resendAfterSeconds]
+      required: [ sent, expiresInSeconds, resendAfterSeconds ]
       properties:
         sent: { type: boolean }
         expiresInSeconds: { type: integer, description: '900' }
         resendAfterSeconds: { type: integer }
     EmailVerifyRequest:
       type: object
-      required: [platform]
+      required: [ platform ]
       description: Either `token`, or `email` + `code`.
       properties:
         token: { type: string }
@@ -1202,23 +1428,23 @@ components:
         platform: { $ref: '#/components/schemas/Platform' }
     LogoutResponse:
       type: object
-      required: [revoked]
+      required: [ revoked ]
       properties:
         revoked: { type: boolean }
     EntitlementSource:
       type: string
-      enum: [revenuecat, stripe, admin]
+      enum: [ revenuecat, stripe, admin ]
       description: '`stripe` = legacy web subscriber of the game (still honored); the web does not sell in the MVP.'
     PeriodType:
       type: string
-      enum: [trial, intro, normal]
+      enum: [ trial, intro, normal ]
     Grantee:
       type: string
-      enum: [me, partner]
+      enum: [ me, partner ]
     Features:
       type: object
       description: Resolved for the couple. Free always has pairing, daily photo, photo widget, countdown, partner time and nudge.
-      required: [fullHistory, calendar, eventTitles, liveActivity, countdownWidget, nudge]
+      required: [ fullHistory, calendar, eventTitles, liveActivity, countdownWidget, nudge ]
       properties:
         fullHistory: { type: boolean }
         calendar: { type: boolean }
@@ -1228,140 +1454,152 @@ components:
         nudge: { type: boolean }
     Entitlement:
       type: object
-      required: [premium, source, productId, periodType, expiresAt, willRenew, grantedBy, trialEligible, features]
+      required: [ premium, source, productId, periodType, expiresAt, willRenew, grantedBy, trialEligible, features ]
       properties:
         premium: { type: boolean }
-        source: { anyOf: [{ $ref: '#/components/schemas/EntitlementSource' }, { type: 'null' }] }
-        productId: { type: [string, 'null'], examples: ['honto_premium_annual'] }
-        periodType: { anyOf: [{ $ref: '#/components/schemas/PeriodType' }, { type: 'null' }] }
-        expiresAt: { type: [string, 'null'], format: date-time }
-        willRenew: { type: [boolean, 'null'] }
-        grantedBy: { anyOf: [{ $ref: '#/components/schemas/Grantee' }, { type: 'null' }], description: 'Which member pays.' }
+        source: { anyOf: [ { $ref: '#/components/schemas/EntitlementSource' }, { type: 'null' } ] }
+        productId: { type: [ string, 'null' ], examples: [ 'honto_premium_annual' ] }
+        periodType: { anyOf: [ { $ref: '#/components/schemas/PeriodType' }, { type: 'null' } ] }
+        expiresAt: { type: [ string, 'null' ], format: date-time }
+        willRenew: { type: [ boolean, 'null' ] }
+        grantedBy: { anyOf: [ { $ref: '#/components/schemas/Grantee' }, { type: 'null' } ], description: 'Which member pays.' }
         trialEligible: { type: boolean, description: 'Hint only; the store decides. False once either member had a trial.' }
         features: { $ref: '#/components/schemas/Features' }
     PartnerInfo:
       type: object
-      required: [userId, displayName, timeZone, utcOffsetMinutes, timeZoneUpdatedAt]
+      required: [ userId, displayName, timeZone, utcOffsetMinutes, timeZoneUpdatedAt ]
       properties:
         userId: { type: string }
         displayName: { type: string }
-        timeZone: { anyOf: [{ $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' }], description: 'Use with the device tz database for the partner''s local time.' }
-        utcOffsetMinutes: { type: [integer, 'null'], description: 'Offset at response time; hint for clients without tz data.' }
-        timeZoneUpdatedAt: { type: [string, 'null'], format: date-time }
-        avatar: { anyOf: [{ $ref: '#/components/schemas/Avatar' }, { type: 'null' }], description: 'Partner''s profile photo (null when none). Optional: absent on older servers.' }
+        timeZone:
+          {
+            anyOf: [ { $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' } ],
+            description: 'Use with the device tz database for the partner''s local time.'
+          }
+        utcOffsetMinutes: { type: [ integer, 'null' ], description: 'Offset at response time; hint for clients without tz data.' }
+        timeZoneUpdatedAt: { type: [ string, 'null' ], format: date-time }
+        avatar:
+          {
+            anyOf: [ { $ref: '#/components/schemas/Avatar' }, { type: 'null' } ],
+            description: 'Partner''s profile photo (null when none). Optional: absent on older servers.'
+          }
     Reunion:
       type: object
-      required: [at, city, timeZone, daysUntil]
+      required: [ at, city, timeZone, daysUntil ]
       properties:
         at: { type: string, format: date-time }
-        city: { type: [string, 'null'], maxLength: 80 }
-        timeZone: { anyOf: [{ $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' }], description: 'Zone of the meeting place, for display.' }
+        city: { type: [ string, 'null' ], maxLength: 80 }
+        timeZone: { anyOf: [ { $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' } ], description: 'Zone of the meeting place, for display.' }
         daysUntil: { type: integer, description: 'Calendar days from today (viewer tz) to `at`; 0 = today, negative = past.' }
     ReunionInput:
       type: object
-      required: [at]
+      required: [ at ]
       properties:
         at: { type: string, format: date-time }
-        city: { type: [string, 'null'], maxLength: 80 }
-        timeZone: { anyOf: [{ $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' }] }
+        city: { type: [ string, 'null' ], maxLength: 80 }
+        timeZone: { anyOf: [ { $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' } ] }
     Couple:
       type: object
-      required: [id, pairedAt, startedOn, daysTogether, partner, reunion, premium]
+      required: [ id, pairedAt, startedOn, daysTogether, partner, reunion, premium ]
       properties:
         id: { type: string }
         pairedAt: { type: string, format: date-time }
-        startedOn: { anyOf: [{ $ref: '#/components/schemas/LocalDay' }, { type: 'null' }] }
-        daysTogether: { type: [integer, 'null'], description: 'Days since `startedOn` in the viewer''s tz.' }
+        startedOn: { anyOf: [ { $ref: '#/components/schemas/LocalDay' }, { type: 'null' } ] }
+        daysTogether: { type: [ integer, 'null' ], description: 'Days since `startedOn` in the viewer''s tz.' }
         partner: { $ref: '#/components/schemas/PartnerInfo' }
-        reunion: { anyOf: [{ $ref: '#/components/schemas/Reunion' }, { type: 'null' }] }
+        reunion: { anyOf: [ { $ref: '#/components/schemas/Reunion' }, { type: 'null' } ] }
         premium: { type: boolean }
     CouplePatch:
       type: object
       x-patch: true
       description: Omit a key to keep it; send null to clear it.
       properties:
-        startedOn: { anyOf: [{ $ref: '#/components/schemas/LocalDay' }, { type: 'null' }] }
-        reunion: { anyOf: [{ $ref: '#/components/schemas/ReunionInput' }, { type: 'null' }] }
+        startedOn: { anyOf: [ { $ref: '#/components/schemas/LocalDay' }, { type: 'null' } ] }
+        reunion: { anyOf: [ { $ref: '#/components/schemas/ReunionInput' }, { type: 'null' } ] }
     Invite:
       type: object
-      required: [code, url, expiresAt]
+      required: [ code, url, expiresAt ]
       properties:
-        code: { type: string, pattern: '^[0-9A-HJKMNP-TV-Z]{6}$', examples: ['K7Q2XM'] }
-        url: { type: string, format: uri, examples: ['https://hontogame.com/j/K7Q2XM'] }
+        code: { type: string, pattern: '^[0-9A-HJKMNP-TV-Z]{6}$', examples: [ 'K7Q2XM' ] }
+        url: { type: string, format: uri, examples: [ 'https://hontogame.com/j/K7Q2XM' ] }
         expiresAt: { type: string, format: date-time }
     JoinRequest:
       type: object
-      required: [code]
+      required: [ code ]
       properties:
         code: { type: string, description: 'Case-insensitive; spaces and dashes ignored.' }
     UnpairResult:
       type: object
-      required: [unpairedAt, photosAvailableUntil]
+      required: [ unpairedAt, photosAvailableUntil ]
       properties:
         unpairedAt: { type: string, format: date-time }
         photosAvailableUntil: { type: string, format: date-time }
     ExportState:
       type: string
-      enum: [none, pending, ready, expired, unavailable]
+      enum: [ none, pending, ready, expired, unavailable ]
     ExportStatus:
       type: object
-      required: [status, url, expiresAt, photoCount, photosAvailableUntil]
+      required: [ status, url, expiresAt, photoCount, photosAvailableUntil ]
       properties:
         status: { $ref: '#/components/schemas/ExportState' }
-        url: { type: [string, 'null'], format: uri, description: 'Signed GET of the ZIP, valid 24h.' }
-        expiresAt: { type: [string, 'null'], format: date-time }
+        url: { type: [ string, 'null' ], format: uri, description: 'Signed GET of the ZIP, valid 24h.' }
+        expiresAt: { type: [ string, 'null' ], format: date-time }
         photoCount: { type: integer }
-        photosAvailableUntil: { type: [string, 'null'], format: date-time, description: 'Set after unpairing.' }
+        photosAvailableUntil: { type: [ string, 'null' ], format: date-time, description: 'Set after unpairing.' }
     UnpairReason:
       type: string
-      enum: [unpaired, partner_deleted]
+      enum: [ unpaired, partner_deleted ]
       description: '`unpaired` = one of us unpaired (DELETE /api/v1/couple); `partner_deleted` = my partner deleted their account.'
     UnpairState:
       type: object
-      required: [unpairedAt, photosAvailableUntil, reason]
+      required: [ unpairedAt, photosAvailableUntil, reason ]
       properties:
         unpairedAt: { type: string, format: date-time }
         photosAvailableUntil: { type: string, format: date-time }
         reason: { $ref: '#/components/schemas/UnpairReason' }
     Me:
       type: object
-      required: [user, couple, entitlement, pendingUnpair, hasPendingInvite]
+      required: [ user, couple, entitlement, pendingUnpair, hasPendingInvite ]
       properties:
         user: { $ref: '#/components/schemas/User' }
-        couple: { anyOf: [{ $ref: '#/components/schemas/Couple' }, { type: 'null' }] }
+        couple: { anyOf: [ { $ref: '#/components/schemas/Couple' }, { type: 'null' } ] }
         entitlement: { $ref: '#/components/schemas/Entitlement' }
-        pendingUnpair: { anyOf: [{ $ref: '#/components/schemas/UnpairState' }, { type: 'null' }], description: 'Set during the 30 days after an unpair while my photos are kept.' }
+        pendingUnpair:
+          {
+            anyOf: [ { $ref: '#/components/schemas/UnpairState' }, { type: 'null' } ],
+            description: 'Set during the 30 days after an unpair while my photos are kept.'
+          }
         hasPendingInvite: { type: boolean }
     TimeZoneUpdate:
       type: object
-      required: [timeZone]
+      required: [ timeZone ]
       properties:
         timeZone: { $ref: '#/components/schemas/TimeZoneId' }
     TimeZoneResult:
       type: object
-      required: [timeZone, updatedAt]
+      required: [ timeZone, updatedAt ]
       properties:
         timeZone: { $ref: '#/components/schemas/TimeZoneId' }
         updatedAt: { type: string, format: date-time }
     PhotoAuthor:
       type: string
-      enum: [me, partner]
+      enum: [ me, partner ]
     PhotoStatus:
       type: string
-      enum: [pending, ready]
+      enum: [ pending, ready ]
     PhotoContentType:
       type: string
-      enum: [image/jpeg, image/webp]
+      enum: [ image/jpeg, image/webp ]
     PhotoUrls:
       type: object
-      required: [full, thumb, expiresAt]
+      required: [ full, thumb, expiresAt ]
       properties:
         full: { type: string, format: uri, description: 'Presigned S3 GET (private bucket, virtual-host style URL), 24h. Cache by photo id, not URL.' }
         thumb: { type: string, format: uri }
         expiresAt: { type: string, format: date-time }
     Photo:
       type: object
-      required: [id, author, authorUserId, localDay, isDaily, status, phraseKey, phrase, width, height, createdAt, urls]
+      required: [ id, author, authorUserId, localDay, isDaily, status, phraseKey, phrase, width, height, createdAt, urls ]
       properties:
         id: { type: string }
         author: { $ref: '#/components/schemas/PhotoAuthor' }
@@ -1369,15 +1607,15 @@ components:
         localDay: { $ref: '#/components/schemas/LocalDay' }
         isDaily: { type: boolean }
         status: { $ref: '#/components/schemas/PhotoStatus' }
-        phraseKey: { type: [string, 'null'] }
-        phrase: { type: [string, 'null'], maxLength: 80 }
+        phraseKey: { type: [ string, 'null' ] }
+        phrase: { type: [ string, 'null' ], maxLength: 80 }
         width: { type: integer }
         height: { type: integer }
         createdAt: { type: string, format: date-time }
-        urls: { anyOf: [{ $ref: '#/components/schemas/PhotoUrls' }, { type: 'null' }], description: 'Null while pending.' }
+        urls: { anyOf: [ { $ref: '#/components/schemas/PhotoUrls' }, { type: 'null' } ], description: 'Null while pending.' }
     PhotoCreateRequest:
       type: object
-      required: [clientId, contentType, bytes, thumbContentType, thumbBytes, width, height, localDay, timeZone]
+      required: [ clientId, contentType, bytes, thumbContentType, thumbBytes, width, height, localDay, timeZone ]
       properties:
         clientId: { type: string, format: uuid, description: 'Idempotency key generated on the device.' }
         contentType: { $ref: '#/components/schemas/PhotoContentType' }
@@ -1392,7 +1630,7 @@ components:
         phrase: { type: string, maxLength: 80, description: 'Custom short phrase; ignored when phraseKey is set.' }
     PresignedUpload:
       type: object
-      required: [method, url, headers, expiresAt]
+      required: [ method, url, headers, expiresAt ]
       properties:
         method: { type: string, description: 'Always `PUT`.' }
         url: { type: string, format: uri }
@@ -1403,12 +1641,12 @@ components:
         expiresAt: { type: string, format: date-time }
     ProfilePatch:
       type: object
-      required: [displayName]
+      required: [ displayName ]
       properties:
         displayName: { type: string, minLength: 1, maxLength: 80, description: 'Trimmed; inner whitespace collapsed; control characters rejected.' }
     Avatar:
       type: object
-      required: [id, urls, updatedAt]
+      required: [ id, urls, updatedAt ]
       description: A profile photo. `urls` are presigned GETs of the private bucket (24 h), like photos; cache by `id`.
       properties:
         id: { type: string }
@@ -1416,7 +1654,7 @@ components:
         updatedAt: { type: string, format: date-time }
     AvatarUploadRequest:
       type: object
-      required: [contentType, bytes, thumbContentType, thumbBytes, width, height]
+      required: [ contentType, bytes, thumbContentType, thumbBytes, width, height ]
       properties:
         contentType: { $ref: '#/components/schemas/PhotoContentType' }
         bytes: { type: integer, minimum: 1, maximum: 1048576, description: 'Full image size (1 MB or less).' }
@@ -1426,79 +1664,99 @@ components:
         height: { type: integer, minimum: 1, maximum: 2048 }
     AvatarUploadResponse:
       type: object
-      required: [avatarId, upload]
+      required: [ avatarId, upload ]
       properties:
         avatarId: { type: string }
         upload: { $ref: '#/components/schemas/PhotoUploadTargets' }
     AvatarCompleteRequest:
       type: object
-      required: [avatarId]
+      required: [ avatarId ]
       properties:
         avatarId: { type: string }
     PhotoUploadTargets:
       type: object
-      required: [full, thumb]
+      required: [ full, thumb ]
       properties:
         full: { $ref: '#/components/schemas/PresignedUpload' }
         thumb: { $ref: '#/components/schemas/PresignedUpload' }
     PhotoCreateResponse:
       type: object
-      required: [photo, upload]
+      required: [ photo, upload ]
       properties:
         photo: { $ref: '#/components/schemas/Photo' }
         upload: { $ref: '#/components/schemas/PhotoUploadTargets' }
     PartnerState:
       type: string
-      enum: [busy, free, unknown]
+      enum: [ busy, free, unknown ]
     PartnerStatus:
       type: object
-      required: [state, busyUntil, freeUntil, title, syncedAt]
+      required: [ state, busyUntil, freeUntil, title, syncedAt ]
       description: '"Busy until 3 PM" is formatted on the client from `busyUntil` + the partner time zone.'
       properties:
         state: { $ref: '#/components/schemas/PartnerState' }
-        busyUntil: { type: [string, 'null'], format: date-time }
-        freeUntil: { type: [string, 'null'], format: date-time, description: 'Start of the next busy block within the window.' }
-        title: { type: [string, 'null'], description: 'Current event title, only if opted in and Premium.' }
-        syncedAt: { type: [string, 'null'], format: date-time }
+        busyUntil: { type: [ string, 'null' ], format: date-time }
+        freeUntil: { type: [ string, 'null' ], format: date-time, description: 'Start of the next busy block within the window.' }
+        title: { type: [ string, 'null' ], description: 'Current event title, only if opted in and Premium.' }
+        syncedAt: { type: [ string, 'null' ], format: date-time }
     NudgeState:
       type: object
-      required: [lastSentAt, lastReceivedAt, nextAllowedAt]
+      required: [ lastSentAt, lastReceivedAt, nextAllowedAt ]
       properties:
-        lastSentAt: { type: [string, 'null'], format: date-time }
-        lastReceivedAt: { type: [string, 'null'], format: date-time }
-        nextAllowedAt: { type: [string, 'null'], format: date-time }
+        lastSentAt: { type: [ string, 'null' ], format: date-time }
+        lastReceivedAt: { type: [ string, 'null' ], format: date-time }
+        nextAllowedAt: { type: [ string, 'null' ], format: date-time }
     TodaySelf:
       type: object
-      required: [displayName, localDay, timeZone, dailyPhoto, photoCount]
+      required: [ displayName, localDay, timeZone, dailyPhoto, photoCount ]
       properties:
         displayName: { type: string }
         localDay: { $ref: '#/components/schemas/LocalDay' }
         timeZone: { $ref: '#/components/schemas/TimeZoneId' }
-        dailyPhoto: { anyOf: [{ $ref: '#/components/schemas/Photo' }, { type: 'null' }] }
+        dailyPhoto: { anyOf: [ { $ref: '#/components/schemas/Photo' }, { type: 'null' } ] }
         photoCount: { type: integer, description: 'Ready photos I took on my local day.' }
-        weather: { anyOf: [{ $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' }], description: 'My last reported weather (null when older than 12 h or never reported). Optional: absent on older servers.' }
-        avatar: { anyOf: [{ $ref: '#/components/schemas/Avatar' }, { type: 'null' }], description: 'My profile photo (null when none). In-app only; widgets ignore it. Optional: absent on older servers.' }
+        weather:
+          {
+            anyOf: [ { $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' } ],
+            description: 'My last reported weather (null when older than 12 h or never reported). Optional: absent on older servers.'
+          }
+        avatar:
+          {
+            anyOf: [ { $ref: '#/components/schemas/Avatar' }, { type: 'null' } ],
+            description: 'My profile photo (null when none). In-app only; widgets ignore it. Optional: absent on older servers.'
+          }
     TodayPartner:
       type: object
-      required: [userId, displayName, timeZone, utcOffsetMinutes, localDay, dailyPhoto, latestPhoto, photoCount, status]
+      required: [ userId, displayName, timeZone, utcOffsetMinutes, localDay, dailyPhoto, latestPhoto, photoCount, status ]
       properties:
         userId: { type: string }
         displayName: { type: string }
-        timeZone: { anyOf: [{ $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' }] }
-        utcOffsetMinutes: { type: [integer, 'null'] }
-        localDay: { anyOf: [{ $ref: '#/components/schemas/LocalDay' }, { type: 'null' }], description: 'Partner''s current day (null until their tz is known).' }
-        dailyPhoto: { anyOf: [{ $ref: '#/components/schemas/Photo' }, { type: 'null' }] }
-        latestPhoto: { anyOf: [{ $ref: '#/components/schemas/Photo' }, { type: 'null' }], description: 'Most recent ready photo (for the widget).' }
+        timeZone: { anyOf: [ { $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' } ] }
+        utcOffsetMinutes: { type: [ integer, 'null' ] }
+        localDay:
+          {
+            anyOf: [ { $ref: '#/components/schemas/LocalDay' }, { type: 'null' } ],
+            description: 'Partner''s current day (null until their tz is known).'
+          }
+        dailyPhoto: { anyOf: [ { $ref: '#/components/schemas/Photo' }, { type: 'null' } ] }
+        latestPhoto: { anyOf: [ { $ref: '#/components/schemas/Photo' }, { type: 'null' } ], description: 'Most recent ready photo (for the widget).' }
         photoCount: { type: integer }
-        status: { anyOf: [{ $ref: '#/components/schemas/PartnerStatus' }, { type: 'null' }], description: 'Null when not Premium or never synced.' }
-        weather: { anyOf: [{ $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' }], description: 'Partner''s last reported weather (null when older than 12 h or never reported). Optional: absent on older servers.' }
-        avatar: { anyOf: [{ $ref: '#/components/schemas/Avatar' }, { type: 'null' }], description: 'Partner''s profile photo (null when none). In-app only; widgets ignore it. Optional: absent on older servers.' }
+        status: { anyOf: [ { $ref: '#/components/schemas/PartnerStatus' }, { type: 'null' } ], description: 'Null when not Premium or never synced.' }
+        weather:
+          {
+            anyOf: [ { $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' } ],
+            description: 'Partner''s last reported weather (null when older than 12 h or never reported). Optional: absent on older servers.'
+          }
+        avatar:
+          {
+            anyOf: [ { $ref: '#/components/schemas/Avatar' }, { type: 'null' } ],
+            description: 'Partner''s profile photo (null when none). In-app only; widgets ignore it. Optional: absent on older servers.'
+          }
     WeatherCondition:
       type: string
-      enum: [clear, partly_cloudy, cloudy, fog, drizzle, rain, snow, thunderstorm]
+      enum: [ clear, partly_cloudy, cloudy, fog, drizzle, rain, snow, thunderstorm ]
     WeatherSummary:
       type: object
-      required: [condition, temperatureC, isDay, observedAt]
+      required: [ condition, temperatureC, isDay, observedAt ]
       description: Coarse current weather where a person is. No place name and no coordinates are ever stored.
       properties:
         condition: { $ref: '#/components/schemas/WeatherCondition' }
@@ -1507,15 +1765,19 @@ components:
         observedAt: { type: string, format: date-time, description: 'When the device read it (at most 6 h in the past).' }
     Today:
       type: object
-      required: [generatedAt, me, partner, startedOn, daysTogether, reunion, activeTrip, nudges, entitlement]
+      required: [ generatedAt, me, partner, startedOn, daysTogether, reunion, activeTrip, nudges, entitlement ]
       properties:
         generatedAt: { type: string, format: date-time }
         me: { $ref: '#/components/schemas/TodaySelf' }
         partner: { $ref: '#/components/schemas/TodayPartner' }
-        startedOn: { anyOf: [{ $ref: '#/components/schemas/LocalDay' }, { type: 'null' }] }
-        daysTogether: { type: [integer, 'null'] }
-        reunion: { anyOf: [{ $ref: '#/components/schemas/Reunion' }, { type: 'null' }] }
-        activeTrip: { anyOf: [{ $ref: '#/components/schemas/Trip' }, { type: 'null' }], description: 'Next trip whose Live Activity window is open or opens within 24h.' }
+        startedOn: { anyOf: [ { $ref: '#/components/schemas/LocalDay' }, { type: 'null' } ] }
+        daysTogether: { type: [ integer, 'null' ] }
+        reunion: { anyOf: [ { $ref: '#/components/schemas/Reunion' }, { type: 'null' } ] }
+        activeTrip:
+          {
+            anyOf: [ { $ref: '#/components/schemas/Trip' }, { type: 'null' } ],
+            description: 'Next trip whose Live Activity window is open or opens within 24h.'
+          }
         nudges: { $ref: '#/components/schemas/NudgeState' }
         entitlement: { $ref: '#/components/schemas/Entitlement' }
         streak: { $ref: '#/components/schemas/CoupleStreak' }
@@ -1523,9 +1785,15 @@ components:
           type: array
           items: { $ref: '#/components/schemas/Milestone' }
           description: 'Milestones I have not seen yet (oldest first), so the app can show the CelebrationSheet without another call. Usually empty.'
+        distanceKm:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+          description: Rounded city-centre distance, no device GPS; null until both cities are set.
     CoupleStreak:
       type: object
-      required: [current, best, todayComplete, meDoneToday, partnerDoneToday, lastCompleteDay]
+      required: [ current, best, todayComplete, meDoneToday, partnerDoneToday, lastCompleteDay ]
       description: |
         Couple streak (Free): consecutive days on which both partners have a ready photo on that local day
         (each photo counts on its photographer's own local day, as in `me.localDay` / `partner.localDay`).
@@ -1537,63 +1805,63 @@ components:
         todayComplete: { type: boolean, description: '`meDoneToday && partnerDoneToday`.' }
         meDoneToday: { type: boolean, description: 'I have a ready photo on my local day (same day as `me.dailyPhoto`).' }
         partnerDoneToday: { type: boolean, description: 'My partner has a ready photo on their local day (false while their zone is unknown).' }
-        lastCompleteDay: { anyOf: [{ $ref: '#/components/schemas/LocalDay' }, { type: 'null' }], description: 'Most recent day with both photos.' }
+        lastCompleteDay: { anyOf: [ { $ref: '#/components/schemas/LocalDay' }, { type: 'null' } ], description: 'Most recent day with both photos.' }
     MilestoneType:
       type: string
-      enum: [first_photo, days_together, anniversary, reunion, streak]
+      enum: [ first_photo, days_together, anniversary, reunion, streak ]
     Milestone:
       type: object
-      required: [id, type, value, localDay, achievedAt, seenAt]
+      required: [ id, type, value, localDay, achievedAt, seenAt ]
       properties:
         id: { type: string }
         type: { $ref: '#/components/schemas/MilestoneType' }
-        value: { type: [integer, 'null'], description: '`days_together`: 100; `anniversary`: years; `streak`: 7, 30 or 100; otherwise null.' }
+        value: { type: [ integer, 'null' ], description: '`days_together`: 100; `anniversary`: years; `streak`: 7, 30 or 100; otherwise null.' }
         localDay: { $ref: '#/components/schemas/LocalDay' }
         achievedAt: { type: string, format: date-time, description: 'When the server recorded it.' }
-        seenAt: { type: [string, 'null'], format: date-time, description: 'When I marked it seen (per user).' }
+        seenAt: { type: [ string, 'null' ], format: date-time, description: 'When I marked it seen (per user).' }
     MilestoneList:
       type: object
-      required: [milestones]
+      required: [ milestones ]
       properties:
         milestones: { type: array, items: { $ref: '#/components/schemas/Milestone' } }
     PhotoThumb:
       type: object
-      required: [photoId, thumbUrl, expiresAt]
+      required: [ photoId, thumbUrl, expiresAt ]
       properties:
         photoId: { type: string }
         thumbUrl: { type: string, format: uri }
         expiresAt: { type: string, format: date-time }
     MemoryDaySummary:
       type: object
-      required: [day, locked, photoCount, me, partner]
+      required: [ day, locked, photoCount, me, partner ]
       properties:
         day: { $ref: '#/components/schemas/LocalDay' }
         locked: { type: boolean, description: 'True when outside the Free 7-day window.' }
         photoCount: { type: integer }
-        me: { anyOf: [{ $ref: '#/components/schemas/PhotoThumb' }, { type: 'null' }], description: 'My daily photo thumb (null if none or locked).' }
-        partner: { anyOf: [{ $ref: '#/components/schemas/PhotoThumb' }, { type: 'null' }] }
+        me: { anyOf: [ { $ref: '#/components/schemas/PhotoThumb' }, { type: 'null' } ], description: 'My daily photo thumb (null if none or locked).' }
+        partner: { anyOf: [ { $ref: '#/components/schemas/PhotoThumb' }, { type: 'null' } ] }
     MemoriesMonth:
       type: object
-      required: [month, historyLimitDays, days]
+      required: [ month, historyLimitDays, days ]
       properties:
         month: { $ref: '#/components/schemas/YearMonth' }
-        historyLimitDays: { type: [integer, 'null'], description: '7 on Free, null on Premium.' }
+        historyLimitDays: { type: [ integer, 'null' ], description: '7 on Free, null on Premium.' }
         days: { type: array, items: { $ref: '#/components/schemas/MemoryDaySummary' }, description: 'Only days with at least one photo, ascending.' }
     MemoryDay:
       type: object
-      required: [day, photos]
+      required: [ day, photos ]
       properties:
         day: { $ref: '#/components/schemas/LocalDay' }
         photos: { type: array, items: { $ref: '#/components/schemas/Photo' } }
     DeviceKind:
       type: string
-      enum: [fcm, apns_alert, apns_widget]
+      enum: [ fcm, apns_alert, apns_widget ]
     PushEnv:
       type: string
-      enum: [sandbox, production]
+      enum: [ sandbox, production ]
     DeviceRegistration:
       type: object
-      required: [installationId, kind, token, platform, appVersion]
+      required: [ installationId, kind, token, platform, appVersion ]
       properties:
         installationId: { type: string, maxLength: 64, description: 'Random id generated on first launch, kept in secure storage.' }
         kind: { $ref: '#/components/schemas/DeviceKind' }
@@ -1605,20 +1873,20 @@ components:
         locale: { type: string, maxLength: 16 }
     Device:
       type: object
-      required: [id, kind, platform, env, createdAt, lastSeenAt]
+      required: [ id, kind, platform, env, createdAt, lastSeenAt ]
       properties:
         id: { type: string }
         kind: { $ref: '#/components/schemas/DeviceKind' }
         platform: { $ref: '#/components/schemas/AuthPlatform' }
-        env: { anyOf: [{ $ref: '#/components/schemas/PushEnv' }, { type: 'null' }] }
+        env: { anyOf: [ { $ref: '#/components/schemas/PushEnv' }, { type: 'null' } ] }
         createdAt: { type: string, format: date-time }
         lastSeenAt: { type: string, format: date-time }
     LiveActivityTokenKind:
       type: string
-      enum: [push_to_start, update]
+      enum: [ push_to_start, update ]
     LiveActivityTokenRequest:
       type: object
-      required: [installationId, kind, token, env]
+      required: [ installationId, kind, token, env ]
       properties:
         installationId: { type: string, maxLength: 64 }
         kind: { $ref: '#/components/schemas/LiveActivityTokenKind' }
@@ -1628,16 +1896,16 @@ components:
         tripId: { type: string, description: 'Required for `update` (from the activity attributes).' }
     LiveActivityToken:
       type: object
-      required: [id, kind, activityId, tripId, createdAt]
+      required: [ id, kind, activityId, tripId, createdAt ]
       properties:
         id: { type: string }
         kind: { $ref: '#/components/schemas/LiveActivityTokenKind' }
-        activityId: { type: [string, 'null'] }
-        tripId: { type: [string, 'null'] }
+        activityId: { type: [ string, 'null' ] }
+        tripId: { type: [ string, 'null' ] }
         createdAt: { type: string, format: date-time }
     BusyBlockInput:
       type: object
-      required: [start, end]
+      required: [ start, end ]
       properties:
         start: { type: string, format: date-time }
         end: { type: string, format: date-time }
@@ -1647,7 +1915,7 @@ components:
         isPrivate: { type: boolean, description: 'OS-level private event; the title is never stored.' }
     CalendarBusyUpload:
       type: object
-      required: [from, to, timeZone, blocks]
+      required: [ from, to, timeZone, blocks ]
       properties:
         from: { type: string, format: date-time }
         to: { type: string, format: date-time, description: '≤ from + 14 days.' }
@@ -1655,7 +1923,7 @@ components:
         blocks: { type: array, maxItems: 500, items: { $ref: '#/components/schemas/BusyBlockInput' } }
     CalendarBusyResult:
       type: object
-      required: [syncedAt, stored, ignoredAllDay, droppedTitles]
+      required: [ syncedAt, stored, ignoredAllDay, droppedTitles ]
       properties:
         syncedAt: { type: string, format: date-time }
         stored: { type: integer }
@@ -1663,21 +1931,21 @@ components:
         droppedTitles: { type: integer }
     CalendarBlock:
       type: object
-      required: [start, end, title]
+      required: [ start, end, title ]
       properties:
         start: { type: string, format: date-time }
         end: { type: string, format: date-time }
-        title: { type: [string, 'null'] }
+        title: { type: [ string, 'null' ] }
     CalendarSide:
       type: object
-      required: [timeZone, syncedAt, blocks]
+      required: [ timeZone, syncedAt, blocks ]
       properties:
-        timeZone: { anyOf: [{ $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' }] }
-        syncedAt: { type: [string, 'null'], format: date-time, description: '"Updated 2h ago"; null = never synced.' }
+        timeZone: { anyOf: [ { $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' } ] }
+        syncedAt: { type: [ string, 'null' ], format: date-time, description: '"Updated 2h ago"; null = never synced.' }
         blocks: { type: array, items: { $ref: '#/components/schemas/CalendarBlock' } }
     CalendarView:
       type: object
-      required: [from, to, me, partner, partnerStatus]
+      required: [ from, to, me, partner, partnerStatus ]
       properties:
         from: { type: string, format: date-time }
         to: { type: string, format: date-time }
@@ -1686,59 +1954,59 @@ components:
         partnerStatus: { $ref: '#/components/schemas/PartnerStatus' }
     CalendarShare:
       type: object
-      required: [calendarRef, displayName, shareTitles]
+      required: [ calendarRef, displayName, shareTitles ]
       properties:
         calendarRef: { type: string, maxLength: 64 }
-        displayName: { type: [string, 'null'], maxLength: 80, description: 'Shown only to me (Settings).' }
+        displayName: { type: [ string, 'null' ], maxLength: 80, description: 'Shown only to me (Settings).' }
         shareTitles: { type: boolean }
     CalendarShareInput:
       type: object
-      required: [calendarRef, shareTitles]
+      required: [ calendarRef, shareTitles ]
       properties:
         calendarRef: { type: string, maxLength: 64 }
         displayName: { type: string, maxLength: 80 }
         shareTitles: { type: boolean }
     CalendarSharesUpdate:
       type: object
-      required: [calendars]
+      required: [ calendars ]
       properties:
         calendars: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/CalendarShareInput' } }
     CalendarShares:
       type: object
-      required: [calendars]
+      required: [ calendars ]
       properties:
         calendars: { type: array, items: { $ref: '#/components/schemas/CalendarShare' } }
     TripPhase:
       type: string
-      enum: [scheduled, before, inTransit, landed, ended]
+      enum: [ scheduled, before, inTransit, landed, ended ]
       description: '`scheduled` = Live Activity window not open yet; `before`/`inTransit`/`landed` mirror the activity content state.'
     TripLiveActivity:
       type: object
-      required: [eligible, startsAt, endsAt, startedAt, endedAt]
+      required: [ eligible, startsAt, endsAt, startedAt, endedAt ]
       properties:
         eligible: { type: boolean, description: 'Couple is Premium.' }
         startsAt: { type: string, format: date-time, description: 'max(departsAt, arrivesAt - 8h).' }
         endsAt: { type: string, format: date-time, description: 'arrivesAt + 1h.' }
-        startedAt: { type: [string, 'null'], format: date-time }
-        endedAt: { type: [string, 'null'], format: date-time }
+        startedAt: { type: [ string, 'null' ], format: date-time }
+        endedAt: { type: [ string, 'null' ], format: date-time }
     Trip:
       type: object
-      required: [id, traveler, travelerUserId, departsAt, arrivesAt, fromCity, toCity, phase, liveActivity, createdAt, updatedAt]
+      required: [ id, traveler, travelerUserId, departsAt, arrivesAt, fromCity, toCity, phase, liveActivity, createdAt, updatedAt ]
       properties:
         id: { type: string }
         traveler: { $ref: '#/components/schemas/Grantee' }
         travelerUserId: { type: string }
         departsAt: { type: string, format: date-time }
         arrivesAt: { type: string, format: date-time }
-        fromCity: { type: [string, 'null'], maxLength: 80 }
-        toCity: { type: [string, 'null'], maxLength: 80 }
+        fromCity: { type: [ string, 'null' ], maxLength: 80 }
+        toCity: { type: [ string, 'null' ], maxLength: 80 }
         phase: { $ref: '#/components/schemas/TripPhase' }
         liveActivity: { $ref: '#/components/schemas/TripLiveActivity' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     TripInput:
       type: object
-      required: [traveler, departsAt, arrivesAt]
+      required: [ traveler, departsAt, arrivesAt ]
       properties:
         traveler: { $ref: '#/components/schemas/Grantee' }
         departsAt: { type: string, format: date-time }
@@ -1752,25 +2020,25 @@ components:
       properties:
         departsAt: { type: string, format: date-time }
         arrivesAt: { type: string, format: date-time }
-        fromCity: { type: [string, 'null'], maxLength: 80 }
-        toCity: { type: [string, 'null'], maxLength: 80 }
+        fromCity: { type: [ string, 'null' ], maxLength: 80 }
+        toCity: { type: [ string, 'null' ], maxLength: 80 }
     TripList:
       type: object
-      required: [trips]
+      required: [ trips ]
       properties:
         trips: { type: array, items: { $ref: '#/components/schemas/Trip' } }
     NudgeSource:
       type: string
-      enum: [widget, app]
+      enum: [ widget, app ]
     NudgeRequest:
       type: object
-      required: [source]
+      required: [ source ]
       properties:
         source: { $ref: '#/components/schemas/NudgeSource' }
         clientId: { type: string, format: uuid, description: 'Idempotency key (widget retries).' }
     NudgeResult:
       type: object
-      required: [id, createdAt, nextAllowedAt]
+      required: [ id, createdAt, nextAllowedAt ]
       properties:
         id: { type: string }
         createdAt: { type: string, format: date-time }
@@ -1778,42 +2046,42 @@ components:
     RevenueCatEvent:
       type: object
       x-dart: false
-      required: [id, type]
+      required: [ id, type ]
       additionalProperties: true
       description: Subset used by Honto; see RevenueCat "Webhook event types and fields".
       properties:
         id: { type: string }
-        type: { type: string, examples: [INITIAL_PURCHASE] }
+        type: { type: string, examples: [ INITIAL_PURCHASE ] }
         app_user_id: { type: string, description: 'Required for every type except `TRANSFER`, which only has `transferred_from` / `transferred_to`.' }
         original_app_user_id: { type: string }
         aliases: { type: array, items: { type: string } }
         transferred_from: { type: array, items: { type: string } }
         transferred_to: { type: array, items: { type: string } }
         product_id: { type: string }
-        entitlement_ids: { type: [array, 'null'], items: { type: string } }
-        period_type: { type: string, examples: [TRIAL] }
+        entitlement_ids: { type: [ array, 'null' ], items: { type: string } }
+        period_type: { type: string, examples: [ TRIAL ] }
         purchased_at_ms: { type: integer }
-        expiration_at_ms: { type: [integer, 'null'] }
+        expiration_at_ms: { type: [ integer, 'null' ] }
         event_timestamp_ms: { type: integer }
-        environment: { type: string, examples: [SANDBOX] }
-        store: { type: string, examples: [APP_STORE] }
+        environment: { type: string, examples: [ SANDBOX ] }
+        store: { type: string, examples: [ APP_STORE ] }
     RevenueCatWebhook:
       type: object
       x-dart: false
-      required: [api_version, event]
+      required: [ api_version, event ]
       properties:
         api_version: { type: string }
         event: { $ref: '#/components/schemas/RevenueCatEvent' }
     WebhookAck:
       type: object
       x-dart: false
-      required: [ok]
+      required: [ ok ]
       properties:
         ok: { type: boolean }
     CronTripsResult:
       type: object
       x-dart: false
-      required: [ok, started, updated, ended, failed]
+      required: [ ok, started, updated, ended, failed ]
       properties:
         ok: { type: boolean }
         started: { type: integer }
@@ -1823,10 +2091,27 @@ components:
     CronRetentionResult:
       type: object
       x-dart: false
-      required: [ok, couplesRepaired, photosDeleted, couplesPurged, exportsDeleted, calendarBlocksDeleted, tokensRevoked, invitesDeleted, objectsDeleted, objectsPending]
+      required:
+        [
+          ok,
+          couplesRepaired,
+          photosDeleted,
+          couplesPurged,
+          exportsDeleted,
+          calendarBlocksDeleted,
+          tokensRevoked,
+          invitesDeleted,
+          objectsDeleted,
+          objectsPending
+        ]
       properties:
         ok: { type: boolean }
-        couplesRepaired: { type: integer, description: 'Couples not unpaired that had fewer than 2 active members (e.g. a member deleted outside the account deletion), unpaired in this run.' }
+        couplesRepaired:
+          {
+            type: integer,
+            description: 'Couples not unpaired that had fewer than 2 active members (e.g. a member deleted outside the account deletion), unpaired in
+              this run.'
+          }
         photosDeleted: { type: integer }
         couplesPurged: { type: integer }
         exportsDeleted: { type: integer }
@@ -1838,7 +2123,16 @@ components:
     # ---- Non-HTTP contracts (push payloads, Live Activity, widget snapshot). Not referenced by paths. ----
     PushEventType:
       type: string
-      enum: [photo.new, nudge.new, couple.joined, couple.unpaired, reunion.changed, trip.start, trip.update, trip.end]
+      enum:
+        - photo.new
+        - nudge.new
+        - couple.joined
+        - couple.unpaired
+        - reunion.changed
+        - trip.start
+        - trip.update
+        - trip.end
+        - private_photo.new
     PushData:
       type: object
       x-contract: push
@@ -1846,7 +2140,7 @@ components:
         Custom data carried by every push. FCM: sent as `data` (all values strings; nulls omitted).
         APNs alert: top-level key `honto` next to `aps` (with `mutable-content: 1` for photo.new / nudge.new
         so the NSE refreshes the App Group snapshot). APNs widget push (iOS 26): `{"aps":{"content-changed":true}}` only.
-      required: [type, coupleId, sentAt]
+      required: [ type, coupleId, sentAt ]
       properties:
         type: { $ref: '#/components/schemas/PushEventType' }
         coupleId: { type: string }
@@ -1858,27 +2152,29 @@ components:
         tripId: { type: string }
         fromName: { type: string }
         reason: { $ref: '#/components/schemas/UnpairReason', description: 'couple.unpaired only.' }
+        mediaId:
+          type: string
     TripActivityPhase:
       type: string
-      enum: [before, inTransit, landed]
+      enum: [ before, inTransit, landed ]
     TripActivityAttributes:
       type: object
       x-contract: live-activity
       description: Static attributes; JSON keys must equal the Swift `Codable` names (`attributes-type` = `TripActivityAttributes`).
-      required: [tripId, travelerName, waiterName, fromCity, toCity]
+      required: [ tripId, travelerName, waiterName, fromCity, toCity ]
       properties:
         tripId: { type: string }
         travelerName: { type: string }
         waiterName: { type: string }
-        fromCity: { type: [string, 'null'] }
-        toCity: { type: [string, 'null'] }
+        fromCity: { type: [ string, 'null' ] }
+        toCity: { type: [ string, 'null' ] }
     TripActivityContentState:
       type: object
       x-contract: live-activity
       description: |
         `content-state` of the APNs liveactivity push. Times are Unix epoch **seconds** (integers) because
         ActivityKit decodes with a default JSONDecoder, whose `Date` strategy is not ISO 8601.
-      required: [phase, departsAtEpoch, arrivesAtEpoch, partnerName]
+      required: [ phase, departsAtEpoch, arrivesAtEpoch, partnerName ]
       properties:
         phase: { $ref: '#/components/schemas/TripActivityPhase' }
         departsAtEpoch: { type: integer }
@@ -1887,13 +2183,13 @@ components:
     WidgetSnapshotPhoto:
       type: object
       x-contract: widget
-      required: [photoId, localDay, takenAt, thumbFile, phrase]
+      required: [ photoId, localDay, takenAt, thumbFile, phrase ]
       properties:
         photoId: { type: string }
         localDay: { $ref: '#/components/schemas/LocalDay' }
         takenAt: { type: string, format: date-time }
         thumbFile: { type: string, description: 'File name inside the App Group / Android filesDir `widget/` folder (e.g. `partner_thumb.jpg`).' }
-        phrase: { type: [string, 'null'] }
+        phrase: { type: [ string, 'null' ] }
     WidgetSnapshot:
       type: object
       x-contract: widget
@@ -1901,22 +2197,32 @@ components:
         `snapshot.v1.json` in the App Group (`group.com.hontogame.app`) / Android `filesDir/widget/`.
         Written by Flutter (Pigeon `WidgetsHostApi`), the NSE and the Android FCM service; read by the widgets
         and the nudge App Intent. Derived from `GET /api/v1/today`. Breaking change = new version + new file name.
-      required: [version, generatedAt, paired, premium, me, partner, startedOn, reunion, nudges]
+      required: [ version, generatedAt, paired, premium, me, partner, startedOn, reunion, nudges ]
       properties:
         version: { type: integer, description: 'Always 1 for this file.' }
         generatedAt: { type: string, format: date-time }
         paired: { type: boolean }
         premium: { type: boolean }
         me: { $ref: '#/components/schemas/WidgetSnapshotMe' }
-        partner: { anyOf: [{ $ref: '#/components/schemas/WidgetSnapshotPartner' }, { type: 'null' }] }
-        startedOn: { anyOf: [{ $ref: '#/components/schemas/LocalDay' }, { type: 'null' }] }
-        reunion: { anyOf: [{ $ref: '#/components/schemas/WidgetSnapshotReunion' }, { type: 'null' }] }
+        partner: { anyOf: [ { $ref: '#/components/schemas/WidgetSnapshotPartner' }, { type: 'null' } ] }
+        startedOn: { anyOf: [ { $ref: '#/components/schemas/LocalDay' }, { type: 'null' } ] }
+        reunion: { anyOf: [ { $ref: '#/components/schemas/WidgetSnapshotReunion' }, { type: 'null' } ] }
         nudges: { $ref: '#/components/schemas/NudgeState' }
-        streak: { anyOf: [{ $ref: '#/components/schemas/WidgetSnapshotStreak' }, { type: 'null' }], description: 'Couple streak from `/today` (optional; absent in older snapshots).' }
+        streak:
+          {
+            anyOf: [ { $ref: '#/components/schemas/WidgetSnapshotStreak' }, { type: 'null' } ],
+            description: 'Couple streak from `/today` (optional; absent in older snapshots).'
+          }
+        distanceKm:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+          description: Rounded city-centre distance, no device GPS; null until both cities are set.
     WidgetSnapshotStreak:
       type: object
       x-contract: widget
-      required: [current, best, todayComplete]
+      required: [ current, best, todayComplete ]
       properties:
         current: { type: integer, minimum: 0 }
         best: { type: integer, minimum: 0 }
@@ -1924,25 +2230,184 @@ components:
     WidgetSnapshotMe:
       type: object
       x-contract: widget
-      required: [displayName, postedToday]
+      required: [ displayName, postedToday ]
       properties:
         displayName: { type: string }
         postedToday: { type: boolean }
-        weather: { anyOf: [{ $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' }], description: 'Optional; absent in older snapshots.' }
+        weather: { anyOf: [ { $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' } ], description: 'Optional; absent in older snapshots.' }
     WidgetSnapshotPartner:
       type: object
       x-contract: widget
-      required: [displayName, timeZone, photo, status]
+      required: [ displayName, timeZone, photo, status ]
       properties:
         displayName: { type: string }
-        timeZone: { anyOf: [{ $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' }] }
-        photo: { anyOf: [{ $ref: '#/components/schemas/WidgetSnapshotPhoto' }, { type: 'null' }] }
-        status: { anyOf: [{ $ref: '#/components/schemas/PartnerStatus' }, { type: 'null' }] }
-        weather: { anyOf: [{ $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' }], description: 'Optional; absent in older snapshots.' }
+        timeZone: { anyOf: [ { $ref: '#/components/schemas/TimeZoneId' }, { type: 'null' } ] }
+        photo: { anyOf: [ { $ref: '#/components/schemas/WidgetSnapshotPhoto' }, { type: 'null' } ] }
+        status: { anyOf: [ { $ref: '#/components/schemas/PartnerStatus' }, { type: 'null' } ] }
+        weather: { anyOf: [ { $ref: '#/components/schemas/WeatherSummary' }, { type: 'null' } ], description: 'Optional; absent in older snapshots.' }
     WidgetSnapshotReunion:
       type: object
       x-contract: widget
-      required: [at, city]
+      required: [ at, city ]
       properties:
         at: { type: string, format: date-time }
-        city: { type: [string, 'null'] }
+        city: { type: [ string, 'null' ] }
+    ProfileCity:
+      type: object
+      required:
+        - name
+        - country
+        - latitude
+        - longitude
+        - timeZone
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        country:
+          type:
+            - string
+            - "null"
+          maxLength: 100
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+        timeZone:
+          type:
+            - string
+            - "null"
+    PrivateMediaKind:
+      type: string
+      enum:
+        - daily_video
+        - view_once
+    PrivateMediaItem:
+      type: object
+      required:
+        - id
+        - kind
+        - author
+        - localDay
+        - createdAt
+        - expiresAt
+        - durationMs
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/PrivateMediaKind"
+        author:
+          $ref: "#/components/schemas/PhotoAuthor"
+        localDay:
+          $ref: "#/components/schemas/LocalDay"
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        durationMs:
+          type:
+            - integer
+            - "null"
+    PrivateMediaFeed:
+      type: object
+      required:
+        - meVideo
+        - partnerVideo
+        - inbox
+      properties:
+        meVideo:
+          anyOf:
+            - $ref: "#/components/schemas/PrivateMediaItem"
+            - type: "null"
+        partnerVideo:
+          anyOf:
+            - $ref: "#/components/schemas/PrivateMediaItem"
+            - type: "null"
+        inbox:
+          type: array
+          items:
+            $ref: "#/components/schemas/PrivateMediaItem"
+    PrivateMediaUploadRequest:
+      type: object
+      required:
+        - clientId
+        - kind
+        - contentType
+        - bytes
+        - width
+        - height
+        - timeZone
+      properties:
+        clientId:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/PrivateMediaKind"
+        contentType:
+          $ref: "#/components/schemas/PrivateMediaContentType"
+        bytes:
+          type: integer
+          minimum: 1
+          maximum: 31457280
+        width:
+          type: integer
+          minimum: 1
+          maximum: 4096
+        height:
+          type: integer
+          minimum: 1
+          maximum: 4096
+        durationMs:
+          type: integer
+          minimum: 1
+          maximum: 15000
+        timeZone:
+          $ref: "#/components/schemas/TimeZoneId"
+    PrivateMediaUpload:
+      type: object
+      required:
+        - id
+        - upload
+      properties:
+        id:
+          type: string
+        upload:
+          $ref: "#/components/schemas/PresignedUpload"
+    PrivateMediaPlayback:
+      type: object
+      required:
+        - url
+        - expiresAt
+      properties:
+        url:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+    PrivatePhotoOpened:
+      type: object
+      required:
+        - contentType
+        - base64
+      properties:
+        contentType:
+          type: string
+        base64:
+          type: string
+          description: Opened once, held in memory only. Never cache or persist.
+    PrivateMediaContentType:
+      type: string
+      enum:
+        - video/mp4
+        - image/jpeg
