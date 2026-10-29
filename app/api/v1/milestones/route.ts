@@ -1,4 +1,4 @@
-import { listMilestonesResponse } from "../../../../api/v1/milestones";
+import { listMilestonesResponse } from "../../../../server/v1/milestones";
 
 export const dynamic = "force-dynamic";
 

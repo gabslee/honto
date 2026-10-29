@@ -1,5 +1,5 @@
-import gameHandler from "../../../../../api/game";
-import { ensureCoupleSchema } from "../../../../../api/couple";
+import gameHandler from "../../../../../server/game";
+import { ensureCoupleSchema } from "../../../../../server/couple";
 import { validPartnerKey } from "../../../../couple-identity.js";
 import { createMobileToken, database, getMobileToken } from "../../../../server-auth";
 

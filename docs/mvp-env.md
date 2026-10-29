@@ -48,7 +48,7 @@ App Store Connect / Play builds. Never commit values.
 
 ## claude/api-v1-foundation-b38rye (W1a foundation)
 
-No new variables. `api/v1/context.ts` (`requireUser`, `requireCouple`, `isCouplePremium`) and
+No new variables. `server/v1/context.ts` (`requireUser`, `requireCouple`, `isCouplePremium`) and
 `PUT /api/v1/me/timezone` only use the existing `DATABASE_URL` and `AUTH_SESSION_SALT` (token and cookie hashes).
 
 ## feat/api-v1-couple-auth (W1b: couple, pairing, me/today, magic link, refresh, unpair, export, retention)
@@ -83,8 +83,8 @@ No new variables for the refresh tokens or the AASA file (app ID `4AW8H42XNA.com
 
 While the APNs or FCM keys are empty, sending is a logged no-op (`[push] … not configured, skipped N device(s)`);
 device tokens are never logged. APNs host is per token (`env`: sandbox / production). Migration record:
-`drizzle/0009_photos_push.sql` (applied lazily by `ensurePhotosSchema()` in `api/v1/photos-schema.ts`).
-The same bucket backs W1b's object-store seam (`getObjectStore()` in `api/v1/lifecycle.ts` defaults to
+`drizzle/0009_photos_push.sql` (applied lazily by `ensurePhotosSchema()` in `server/v1/photos-schema.ts`).
+The same bucket backs W1b's object-store seam (`getObjectStore()` in `server/v1/lifecycle.ts` defaults to
 `app/storage.ts` once `S3_*` is complete): Today photo URLs, the export ZIP (`exports/`) and the retention cron.
 
 ## claude/api-v1-calendar-billing-37k6wl (W3 calendar + RevenueCat)

@@ -1,4 +1,4 @@
-import { refreshSessionResponse } from "../../../../../api/v1/refresh-tokens";
+import { refreshSessionResponse } from "../../../../../server/v1/refresh-tokens";
 
 export const dynamic = "force-dynamic";
 

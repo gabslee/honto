@@ -1,6 +1,6 @@
 import type { MemoryDay } from "../../../../../contracts/honto-api";
-import { apiError, isCouplePremium, noStore, requireCouple } from "../../../../../api/v1/context";
-import { ensurePhotosSchema } from "../../../../../api/v1/photos-schema";
+import { apiError, isCouplePremium, noStore, requireCouple } from "../../../../../server/v1/context";
+import { ensurePhotosSchema } from "../../../../../server/v1/photos-schema";
 import { database } from "../../../../server-auth";
 import { freeWindowStart, isLocalDay, readyPhotosBetween, storageUnavailable, toApiPhoto } from "../../photos/photo-rows";
 

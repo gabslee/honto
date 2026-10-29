@@ -1,4 +1,4 @@
-import { sendNudgeResponse } from "../../../../api/v1/nudges";
+import { sendNudgeResponse } from "../../../../server/v1/nudges";
 
 export const dynamic = "force-dynamic";
 // APNs uses node:http2.

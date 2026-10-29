@@ -49,8 +49,8 @@ test('requireUser, requireCouple, isCouplePremium and PUT /api/v1/me/timezone', 
   try {
     await db.exec(baseTables);
     const auth = await import('../app/server-auth.ts');
-    const { ensureFoundationSchema } = await import('../api/v1/foundation-schema.ts');
-    const { requireUser, requireCouple, isCouplePremium, toApiUser, normalizeTimeZone } = await import('../api/v1/context.ts');
+    const { ensureFoundationSchema } = await import('../server/v1/foundation-schema.ts');
+    const { requireUser, requireCouple, isCouplePremium, toApiUser, normalizeTimeZone } = await import('../server/v1/context.ts');
     const timezone = await import('../app/api/v1/me/timezone/route.ts');
     const sql = auth.database();
 

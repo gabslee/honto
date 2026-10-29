@@ -1,7 +1,7 @@
 import type { UnpairResult } from "../../../../contracts/honto-api";
-import { apiError, noStore, requireCouple } from "../../../../api/v1/context";
-import { getCoupleResponse, patchCoupleResponse } from "../../../../api/v1/couple";
-import { unpairCouple } from "../../../../api/v1/lifecycle";
+import { apiError, noStore, requireCouple } from "../../../../server/v1/context";
+import { getCoupleResponse, patchCoupleResponse } from "../../../../server/v1/couple";
+import { unpairCouple } from "../../../../server/v1/lifecycle";
 import { database } from "../../../server-auth";
 
 export const dynamic = "force-dynamic";

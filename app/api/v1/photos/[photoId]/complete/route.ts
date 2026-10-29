@@ -1,5 +1,5 @@
-import { apiError, noStore, requireCouple } from "../../../../../../api/v1/context";
-import { ensurePhotosSchema } from "../../../../../../api/v1/photos-schema";
+import { apiError, noStore, requireCouple } from "../../../../../../server/v1/context";
+import { ensurePhotosSchema } from "../../../../../../server/v1/photos-schema";
 import { notifyPartner } from "../../../../../push/index";
 import { database } from "../../../../../server-auth";
 import { headObject, StorageError } from "../../../../../storage";

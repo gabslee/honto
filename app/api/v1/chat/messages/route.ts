@@ -1,4 +1,4 @@
-import { listChatResponse, sendChatResponse } from "../../../../../api/v1/chat";
+import { listChatResponse, sendChatResponse } from "../../../../../server/v1/chat";
 
 export const dynamic = "force-dynamic";
 // APNs uses node:http2.

@@ -1,4 +1,4 @@
-import { createInviteResponse, getInviteResponse } from "../../../../../api/v1/couple";
+import { createInviteResponse, getInviteResponse } from "../../../../../server/v1/couple";
 
 export const dynamic = "force-dynamic";
 

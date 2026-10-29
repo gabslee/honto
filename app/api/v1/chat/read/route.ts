@@ -1,4 +1,4 @@
-import { markChatReadResponse } from "../../../../../api/v1/chat";
+import { markChatReadResponse } from "../../../../../server/v1/chat";
 
 export const dynamic = "force-dynamic";
 

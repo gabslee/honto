@@ -19,7 +19,7 @@ test("multiplayer mode is hidden from the UI", async () => {
 });
 
 test("cards are localized per viewer with English fallback, never the room locale", async () => {
-  const src = await read("api/game.ts");
+  const src = await read("server/game.ts");
   assert.match(src, /const deckLocale = locale === "ja" \? "ja" : "en";/);
   assert.match(src, /payload\.localized\?\.\[deckLocale\] \?\? payload\.localized\?\.en/);
   assert.doesNotMatch(src, /room\.locale === "ja" \? (PREFERENCE|ESTIMATE)/);

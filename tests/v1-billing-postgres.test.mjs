@@ -97,8 +97,8 @@ function sample(type, fields = {}) {
 test('POST /api/v1/billing/revenuecat and hasActiveEntitlement', async (t) => {
   await db.exec(baseTables);
   const auth = await import('../app/server-auth.ts');
-  const { ensureFoundationSchema } = await import('../api/v1/foundation-schema.ts');
-  const { isCouplePremium } = await import('../api/v1/context.ts');
+  const { ensureFoundationSchema } = await import('../server/v1/foundation-schema.ts');
+  const { isCouplePremium } = await import('../server/v1/context.ts');
   const { ensureEntitlementsSchema, hasActiveEntitlement, REVENUECAT_EVENT_TYPES } = await import('../app/entitlements.ts');
   const webhook = await import('../app/api/v1/billing/revenuecat/route.ts');
   const sql = auth.database();

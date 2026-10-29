@@ -25,7 +25,7 @@ test('multiplayer API PostgreSQL lifecycle, authorization and concurrent joins',
   const oldUrl = process.env.DATABASE_URL;
   process.env.DATABASE_URL = 'postgres://isolated-test';
   try {
-    const { default: handler } = await import('../api/game.ts');
+    const { default: handler } = await import('../server/game.ts');
     await db.query('CREATE TABLE users (id text PRIMARY KEY, display_name text)');
     await db.query("INSERT INTO users (id, display_name) VALUES ('premium-owner', 'Premium Host'), ('premium-intruder', 'Intruder'), ('premium-duo', 'Duo Host'), ('premium-late', 'Reconnected Host')");
     async function api(body, user = null, method = 'POST') {
@@ -126,7 +126,7 @@ test('multiplayer API PostgreSQL lifecycle, authorization and concurrent joins',
     assert.equal((await send('multiplayer', { groupAction: { type: 'leave' } })).status, 400);
     assert.equal((await api({ ...guests[0], action: 'removePlayer', playerId: started.meId })).status, 400);
     // A deterministic card fixture tests actual concurrent answer/spin persistence.
-    const { createMultiplayerState } = await import('../api/multiplayer.ts');
+    const { createMultiplayerState } = await import('../server/multiplayer.ts');
     const fixture = createMultiplayerState({ players: started.players, cards: [{ id: 'voting-fixture', type: 'who', prompt: 'Who brings the best snacks?' }] });
     await db.query('UPDATE rooms SET group_state = $1::jsonb, revision = revision + 1 WHERE code = $2', [JSON.stringify(fixture), host.code]);
     const current = { cardId: 'voting-fixture', round: 0 };

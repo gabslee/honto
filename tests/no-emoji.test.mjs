@@ -6,7 +6,7 @@ import { join } from "node:path";
 // Product rule: no emoji anywhere in the product. Use the inline SVG icons in app/icons.tsx.
 // Digits, #, * and (c)/(R)/TM carry the Emoji property but are ordinary text, so they are allowed.
 const EMOJI = /(?![0-9#*\u00A9\u00AE\u2122])\p{Emoji}|\u{FE0F}|\u{200D}/u;
-const ROOTS = ["app", "api", "data", "components"];
+const ROOTS = ["app", "server", "data", "components"];
 const TEXT = /\.(?:tsx?|jsx?|mjs|cjs|css|json|md|html|txt|svg)$/;
 
 async function* files(dir) {

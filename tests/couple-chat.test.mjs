@@ -25,11 +25,11 @@ test('couple chat over isolated PostgreSQL', async t => {
       CREATE TABLE users(id text PRIMARY KEY,email text UNIQUE NOT NULL,display_name text NOT NULL,role text NOT NULL DEFAULT 'user',created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());
       CREATE TABLE couples(id text PRIMARY KEY,host_user_id text,partner_key text,reunion_date text,adult_confirmed_at timestamptz,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());`);
     const auth = await import('../app/server-auth.ts');
-    const schema = await import('../api/v1/launch-schema.ts');
-    const chat = await import('../api/v1/chat.ts');
-    const media = await import('../api/v1/private-media.ts');
+    const schema = await import('../server/v1/launch-schema.ts');
+    const chat = await import('../server/v1/chat.ts');
+    const media = await import('../server/v1/private-media.ts');
     const push = await import('../app/push/index.ts');
-    const lifecycle = await import('../api/v1/lifecycle.ts');
+    const lifecycle = await import('../server/v1/lifecycle.ts');
     await schema.ensureLaunchSchema(sql);
     // The migrations are idempotent over the runtime schema.
     await db.exec(readFileSync(new URL('../drizzle/0018_launch_private_media.sql', import.meta.url), 'utf8'));

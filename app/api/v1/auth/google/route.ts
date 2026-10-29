@@ -1,4 +1,4 @@
-import { providerSignIn } from "../../../../../api/v1/provider-login";
+import { providerSignIn } from "../../../../../server/v1/provider-login";
 
 export const dynamic = "force-dynamic";
 

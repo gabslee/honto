@@ -1,7 +1,7 @@
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 import type { CalendarBlock, CalendarBusyResult, CalendarSide, CalendarView, PartnerStatus } from "../../../../contracts/honto-api";
-import { normalizeTimeZone } from "../../../../api/v1/context";
-import { ensureCalendarSchema } from "../../../../api/v1/calendar-schema";
+import { normalizeTimeZone } from "../../../../server/v1/context";
+import { ensureCalendarSchema } from "../../../../server/v1/calendar-schema";
 
 type Sql = NeonQueryFunction<false, false>;
 

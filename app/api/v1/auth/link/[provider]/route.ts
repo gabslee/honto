@@ -1,4 +1,4 @@
-import { linkProviderResponse } from "../../../../../../api/v1/provider-login";
+import { linkProviderResponse } from "../../../../../../server/v1/provider-login";
 
 export const dynamic = "force-dynamic";
 

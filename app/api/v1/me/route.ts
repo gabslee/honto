@@ -1,8 +1,8 @@
 import { clearUserCookie, database } from "../../../server-auth";
-import { apiError, noStore, requireUser } from "../../../../api/v1/context";
-import { meResponse } from "../../../../api/v1/couple";
-import { deleteAccount } from "../../../../api/v1/lifecycle";
-import { updateProfileResponse } from "../../../../api/v1/profile";
+import { apiError, noStore, requireUser } from "../../../../server/v1/context";
+import { meResponse } from "../../../../server/v1/couple";
+import { deleteAccount } from "../../../../server/v1/lifecycle";
+import { updateProfileResponse } from "../../../../server/v1/profile";
 
 export const dynamic = "force-dynamic";
 

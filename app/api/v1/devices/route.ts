@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { Device } from "../../../../contracts/honto-api";
-import { apiError, noStore, requireUser } from "../../../../api/v1/context";
-import { ensurePhotosSchema } from "../../../../api/v1/photos-schema";
+import { apiError, noStore, requireUser } from "../../../../server/v1/context";
+import { ensurePhotosSchema } from "../../../../server/v1/photos-schema";
 import { database } from "../../../server-auth";
 
 export const dynamic = "force-dynamic";

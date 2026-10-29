@@ -3,7 +3,7 @@
 // device tokens; with the APNs / FCM settings unset it is a logged no-op so the endpoints keep working.
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 import type { PushData, UnpairReason } from "../../contracts/honto-api";
-import { ensurePhotosSchema } from "../../api/v1/photos-schema";
+import { ensurePhotosSchema } from "../../server/v1/photos-schema";
 import { database } from "../server-auth";
 import { apnsConfig, sendApns, type ApnsEnv, type ApnsMessage, type ApnsResult } from "./apns";
 import { fcmConfig, sendFcm, type FcmResult } from "./fcm";

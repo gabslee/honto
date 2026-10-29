@@ -1,7 +1,7 @@
 // Shared by /api/v1/photos and /api/v1/memories: photo rows, contract mapping, limits and local days.
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 import type { Photo, PhotoContentType, PhotoThumb } from "../../../../contracts/honto-api";
-import { apiError } from "../../../../api/v1/context";
+import { apiError } from "../../../../server/v1/context";
 import { GET_TTL_SECONDS, presignGet, storageConfig } from "../../../storage";
 
 type Sql = NeonQueryFunction<false, false>;

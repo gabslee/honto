@@ -1,4 +1,4 @@
-import { completeAvatarResponse } from "../../../../../../api/v1/profile";
+import { completeAvatarResponse } from "../../../../../../server/v1/profile";
 
 export const dynamic = "force-dynamic";
 

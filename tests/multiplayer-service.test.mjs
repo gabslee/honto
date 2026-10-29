@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertMultiplayerHost, assertRoomCapacity, assertMultiplayerStart, mutateWithRetry } from '../api/multiplayer-service.js';
+import { assertMultiplayerHost, assertRoomCapacity, assertMultiplayerStart, mutateWithRetry } from '../server/multiplayer-service.js';
 
 test('only the authenticated Premium host may enable or start multiplayer', () => {
   const host = { is_host: true, user_id: 'owner' };

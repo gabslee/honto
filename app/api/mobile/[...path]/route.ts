@@ -1,4 +1,4 @@
-import gameHandler from "../../../../api/game";
+import gameHandler from "../../../../server/game";
 import { MAX_PHOTO_BYTES, resolvePhrase, validatePhoto } from "../../../photo-moments.js";
 import { storePhoto } from "../../../photo-storage";
 import { mobileAction } from "../mobile-routes.js";

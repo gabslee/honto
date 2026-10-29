@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { RevenueCatEvent, WebhookAck } from "../../../../../contracts/honto-api";
-import { apiError, noStore } from "../../../../../api/v1/context";
+import { apiError, noStore } from "../../../../../server/v1/context";
 import { applyRevenueCatEvent } from "../../../../entitlements";
 import { database } from "../../../../server-auth";
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { makeRoomCode, normalizeRoomSettings, replaceEstimateQuestion } from "../api/game-contract.js";
+import { makeRoomCode, normalizeRoomSettings, replaceEstimateQuestion } from "../server/game-contract.js";
 
 const themeMap = { general: "general", life: "life", relationships: "relationships", spicy: "spicy" };
 const room = { round_count: 12, theme_category: "general,life", custom_theme: "travel", locale: "en" };

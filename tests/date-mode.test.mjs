@@ -28,7 +28,7 @@ test("date mode labels points, never sips", () => {
 });
 
 test("lobby toggle, server persistence and UI wiring", async () => {
-  const server = await readFile(new URL("../api/game.ts", import.meta.url), "utf8");
+  const server = await readFile(new URL("../server/game.ts", import.meta.url), "utf8");
   assert.match(server, /drink_mode text NOT NULL DEFAULT 'sips'/);
   assert.match(server, /drink_mode = \$\{settings\.drinkMode\}/);
   const client = await readFile(new URL("../app/game-client.tsx", import.meta.url), "utf8");

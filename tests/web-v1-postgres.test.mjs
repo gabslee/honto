@@ -24,7 +24,7 @@ test('daily card, no-drinking mode and couple history over the real API SQL', as
   const oldUrl = process.env.DATABASE_URL;
   process.env.DATABASE_URL = 'postgres://isolated-test';
   try {
-    const { default: handler } = await import('../api/game.ts');
+    const { default: handler } = await import('../server/game.ts');
     await db.query("CREATE TABLE users (id text PRIMARY KEY, display_name text, role text DEFAULT 'user', plan text DEFAULT 'free', subscription_status text, subscription_expires_at timestamptz, trial_ends_at timestamptz)");
     await db.query("INSERT INTO users (id, display_name, plan) VALUES ('free-host', 'Free Host', 'free'), ('premium-host', 'Premium Host', 'premium')");
     async function api(body, user = null) {

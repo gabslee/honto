@@ -1,4 +1,4 @@
-import { deleteAccount } from "../../../api/v1/lifecycle";
+import { deleteAccount } from "../../../server/v1/lifecycle";
 import { ensureEntitlementsSchema, PREMIUM_ENTITLEMENT } from "../../entitlements";
 import { adminCookie, clearAdminCookie, createAdminSession, database, ensureIdentitySchema, getAdminUser, getCurrentUser, hasAdminBootstrapToken } from "../../server-auth";
 

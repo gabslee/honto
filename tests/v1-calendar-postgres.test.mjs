@@ -171,13 +171,13 @@ test('drizzle/0010_calendar_entitlements.sql is idempotent', async () => {
 test('PUT /api/v1/calendar/busy, GET /api/v1/calendar and pruneCalendar', async (t) => {
   await db.exec(baseTables);
   const auth = await import('../app/server-auth.ts');
-  const { ensureFoundationSchema } = await import('../api/v1/foundation-schema.ts');
-  const { ensureCalendarSchema, pruneCalendar } = await import('../api/v1/calendar-schema.ts');
+  const { ensureFoundationSchema } = await import('../server/v1/foundation-schema.ts');
+  const { ensureCalendarSchema, pruneCalendar } = await import('../server/v1/calendar-schema.ts');
   const { ensureEntitlementsSchema } = await import('../app/entitlements.ts');
   const service = await import('../app/api/v1/calendar/calendar-service.ts');
   const busyRoute = await import('../app/api/v1/calendar/busy/route.ts');
   const calendarRoute = await import('../app/api/v1/calendar/route.ts');
-  const { partnerStatus: todayPartnerStatus } = await import('../api/v1/couple.ts');
+  const { partnerStatus: todayPartnerStatus } = await import('../server/v1/couple.ts');
   const sql = auth.database();
 
   await ensureFoundationSchema(sql);

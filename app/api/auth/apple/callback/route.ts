@@ -2,8 +2,8 @@ import { generateAppleClientSecret, verifyAppleIdToken } from "../../../../apple
 import { googleReturnWithAuth } from "../../../../google-return.js";
 import { findOrCreateProviderUser } from "../../../../mobile-auth";
 import { createUserSession, database, ensureIdentitySchema, userCookie } from "../../../../server-auth";
-import { storeAppleRefreshToken } from "../../../../../api/v1/account-cleanup";
-import { ensureLifecycleSchema } from "../../../../../api/v1/lifecycle";
+import { storeAppleRefreshToken } from "../../../../../server/v1/account-cleanup";
+import { ensureLifecycleSchema } from "../../../../../server/v1/lifecycle";
 
 export const dynamic = "force-dynamic";
 

@@ -86,10 +86,10 @@ wager. Ending early because too few players remain does not crown a winner.
 
 ## Implementation and validation
 
-- `api/multiplayer.ts` is a pure immutable rule engine and privacy projection.
+- `server/multiplayer.ts` is a pure immutable rule engine and privacy projection.
   Its complete snapshot is private; clients never receive future cards or
   another player's unrevealed choice.
-- `api/game.ts` authenticates room tokens and Premium host identity, then
+- `server/game.ts` authenticates room tokens and Premium host identity, then
   persists the snapshot through PostgreSQL revision comparisons. A single SQL
   statement commits dependent mutations. Concurrent writes retry against fresh
   state. The server owns randomness, results, scores, and eligibility.

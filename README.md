@@ -39,6 +39,6 @@ npm install
 npm run dev
 ```
 
-The active PostgreSQL schema is initialized in `api/game.ts` and `app/server-auth.ts`. The multiplayer migration is `drizzle/0004_multiplayer.sql`; earlier migration files describe the project's original schema and must not be applied blindly to PostgreSQL.
+The active PostgreSQL schema is initialized in `server/game.ts` and `app/server-auth.ts`. The multiplayer migration is `drizzle/0004_multiplayer.sql`; earlier migration files describe the project's original schema and must not be applied blindly to PostgreSQL.
 
 Use Node 22.18+ and run `npm run test:unit` for behavior tests, including an isolated in-memory PostgreSQL lifecycle test. `npm test` runs these checks followed by the production build. Tests do not use production credentials or data.

@@ -1,4 +1,4 @@
-import { apiError, isCouplePremium, noStore, requireCouple } from "../../../../api/v1/context";
+import { apiError, isCouplePremium, noStore, requireCouple } from "../../../../server/v1/context";
 import { database } from "../../../server-auth";
 import { loadCalendarView, parseCalendarRange } from "./calendar-service";
 

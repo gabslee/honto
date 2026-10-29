@@ -56,14 +56,14 @@ test("answers stay hidden until both partners answered", () => {
 });
 
 test("server: room token identity, 2 players only, limits and adult confirmation enforced", async () => {
-  const source = await readFile(new URL("../api/daily-card.ts", import.meta.url), "utf8");
+  const source = await readFile(new URL("../server/daily-card.ts", import.meta.url), "utf8");
   assert.match(source, /room\.multiplayer\) throw/);
   assert.match(source, /count\) > 2\) throw/);
   assert.match(source, /slot > dailyLimit\(premium\)\) throw/);
   assert.match(source, /hasPremiumAccess\(currentUser\)\) throw new Error\("Spicy is a Premium theme\."\)/);
   assert.match(source, /body\.confirm18 !== true\) throw/);
   assert.match(source, /ON CONFLICT DO NOTHING`;\n {2}\}\n {2}return dailyState/);
-  const game = await readFile(new URL("../api/game.ts", import.meta.url), "utf8");
+  const game = await readFile(new URL("../server/game.ts", import.meta.url), "utf8");
   assert.ok(game.indexOf("handleDaily(sql, room, me") > game.indexOf("await getContext(roomCode, token)"));
 });
 

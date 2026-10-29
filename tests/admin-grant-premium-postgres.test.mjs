@@ -19,7 +19,7 @@ test('POST /api/admin grantPremium: admin-only entitlement row, counted for the 
       CREATE TABLE users (id text PRIMARY KEY, email text UNIQUE NOT NULL, display_name text NOT NULL, role text NOT NULL DEFAULT 'user', created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());`);
     const auth = await import('../app/server-auth.ts');
     const admin = await import('../app/api/admin/route.ts');
-    const { resolveEntitlement } = await import('../api/v1/couple.ts');
+    const { resolveEntitlement } = await import('../server/v1/couple.ts');
     await auth.ensureIdentitySchema();
     await db.query("INSERT INTO users (id, email, display_name) VALUES ('usr_maya', 'maya@example.com', 'Maya'), ('usr_leo', 'leo@example.com', 'Leo')");
     const session = await auth.createAdminSession('owner@example.com', 'Owner');

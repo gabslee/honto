@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import ts from 'typescript';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createMultiplayerState, publicMultiplayer, reduceMultiplayer } from '../api/multiplayer.ts';
+import { createMultiplayerState, publicMultiplayer, reduceMultiplayer } from '../server/multiplayer.ts';
 
 // Render the real TSX component with React; assertions cover visible choices and gates.
 const source = readFileSync(new URL('../app/multiplayer-client.tsx', import.meta.url), 'utf8');

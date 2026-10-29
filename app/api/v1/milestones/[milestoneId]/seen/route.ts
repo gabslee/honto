@@ -1,4 +1,4 @@
-import { markMilestoneSeenResponse } from "../../../../../../api/v1/milestones";
+import { markMilestoneSeenResponse } from "../../../../../../server/v1/milestones";
 
 export const dynamic = "force-dynamic";
 

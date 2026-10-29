@@ -1,4 +1,4 @@
-import { verifyEmailSignIn } from "../../../../../../api/v1/email-login";
+import { verifyEmailSignIn } from "../../../../../../server/v1/email-login";
 
 export const dynamic = "force-dynamic";
 

@@ -1,4 +1,4 @@
-import { todayResponse } from "../../../../api/v1/couple";
+import { todayResponse } from "../../../../server/v1/couple";
 
 export const dynamic = "force-dynamic";
 

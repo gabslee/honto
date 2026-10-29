@@ -94,7 +94,7 @@ test('photos, memories and devices', async (t) => {
   try {
     await db.exec(baseTables);
     const auth = await import('../app/server-auth.ts');
-    const { ensurePhotosSchema } = await import('../api/v1/photos-schema.ts');
+    const { ensurePhotosSchema } = await import('../server/v1/photos-schema.ts');
     const { localDayIn, addDays } = await import('../app/api/v1/photos/photo-rows.ts');
     const photos = await import('../app/api/v1/photos/route.ts');
     const complete = await import('../app/api/v1/photos/[photoId]/complete/route.ts');
@@ -477,8 +477,8 @@ test('photos, memories and devices', async (t) => {
     });
 
     await t.test('W1b object-store seam is app/storage.ts: Today photo URLs, export ZIP and retention', async () => {
-      const lifecycle = await import('../api/v1/lifecycle.ts');
-      const couple = await import('../api/v1/couple.ts');
+      const lifecycle = await import('../server/v1/lifecycle.ts');
+      const couple = await import('../server/v1/couple.ts');
       assert.ok(lifecycle.getObjectStore(), 'wired by default when S3_* is complete');
       setEnv({ S3_SECRET_ACCESS_KEY: '' });
       assert.equal(lifecycle.getObjectStore(), null, 'no keys, no store (W1b keeps its 503 missing_config / null URLs)');

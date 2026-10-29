@@ -13,7 +13,7 @@ import { connectionLabel, roomPollDelay } from "./sync-policy";
 import { lobbyAccess, multiplayerDeckKeys } from "./multiplayer-lobby-rules";
 import { MultiplayerGame } from "./multiplayer-client";
 import { Icon, type IconName } from "./icons";
-import type { publicMultiplayer } from "../api/multiplayer";
+import type { publicMultiplayer } from "../server/multiplayer";
 
 type ThemeKey = "general" | "life" | "relationships" | "videoCall" | "reunion" | "acrossMiles" | "futureUs" | "deepTalk" | "playful" | "spicy" | "spicyLdr";
 type Player = { id: string; name: string; isHost: number; sips: number; joinedAt: string; lastSeenAt?: string; connected?: boolean; accountConnected?: boolean; accountName?: string | null; connectedProvider?: string; hasWager: boolean; wager?: string | null };

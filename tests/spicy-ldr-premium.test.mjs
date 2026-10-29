@@ -19,7 +19,7 @@ test("spicyLdr uses the same Premium + 18+ gate as spicy", () => {
 });
 
 test("game server and lobby gate spicyLdr through the shared Premium check", async () => {
-  const server = await readFile(new URL("../api/game.ts", import.meta.url), "utf8");
+  const server = await readFile(new URL("../server/game.ts", import.meta.url), "utf8");
   assert.match(server, /deckRequiresPremium\(settings\.themeCategory\) && !hasPremiumAccess\(currentUser\)\) throw/);
   const client = await readFile(new URL("../app/game-client.tsx", import.meta.url), "utf8");
   assert.match(client, /key === "spicy" \|\| key === "spicyLdr"/);

@@ -5,7 +5,7 @@ Builds on `docs/launch-private-media.md`. Requires the matching Flutter branch.
 ## Migration
 
 - New file `drizzle/0019_couple_chat.sql`: tables `couple_messages` and `couple_chat_reads`. 0018 is unchanged.
-- The same statements run idempotently at runtime from `api/v1/launch-schema.ts` (`ensureLaunchSchema`), like 0018.
+- The same statements run idempotently at runtime from `server/v1/launch-schema.ts` (`ensureLaunchSchema`), like 0018.
 - **The migration has NOT been applied to any database** (no Neon, no remote). Only isolated PGlite tests ran it.
 
 `couple_messages`: `couple_id` and `author_user_id` cascade on delete; `UNIQUE(author_user_id, client_id)` makes sends
@@ -47,5 +47,5 @@ messageId }`; the preview text is not in the data payload. A completed view-once
 
 ## Deletion
 
-Unpair deletes the couple's messages and read markers (`purgeStatements` in `api/v1/lifecycle.ts`); account deletion
+Unpair deletes the couple's messages and read markers (`purgeStatements` in `server/v1/lifecycle.ts`); account deletion
 cascades through the user and couple foreign keys. Covered by `tests/couple-chat.test.mjs`.

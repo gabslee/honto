@@ -34,13 +34,13 @@ test('email magic link: start, verify by link or code, single use, expiry, limit
   try {
     await db.exec(baseTables);
     const auth = await import('../app/server-auth.ts');
-    const { requireUser } = await import('../api/v1/context.ts');
-    const email = await import('../api/v1/email-login.ts');
+    const { requireUser } = await import('../server/v1/context.ts');
+    const email = await import('../server/v1/email-login.ts');
     const start = await import('../app/api/v1/auth/email/start/route.ts');
     const verify = await import('../app/api/v1/auth/email/verify/route.ts');
     const refresh = await import('../app/api/v1/auth/refresh/route.ts');
     await auth.ensureIdentitySchema();
-    await (await import('../api/v1/lifecycle.ts')).ensureLifecycleSchema(auth.database());
+    await (await import('../server/v1/lifecycle.ts')).ensureLifecycleSchema(auth.database());
     await db.query("INSERT INTO users (id, email, display_name, created_at) VALUES ('usr_ana', 'ana@example.com', 'Ana', '2026-10-01T13:20:00Z')");
 
     let ip = 1;
@@ -63,7 +63,7 @@ test('email magic link: start, verify by link or code, single use, expiry, limit
     const fillWindows = (scope, subject, hits, seconds) => db.query(`INSERT INTO v1_rate_limits (scope, subject, window_start, hits)
       SELECT $1, $2, to_timestamp(floor(extract(epoch FROM now()) / $3::int) * $3::int) + k * make_interval(secs => $3::int), $4::int FROM generate_series(0, 1) k
       ON CONFLICT (scope, subject, window_start) DO UPDATE SET hits = EXCLUDED.hits`, [scope, subject, seconds, hits]);
-    const { saltedHash } = await import('../api/v1/lifecycle.ts');
+    const { saltedHash } = await import('../server/v1/lifecycle.ts');
     const ipSubject = () => saltedHash('ip', `203.0.113.${ip}`);
     const tokenRows = async () => (await db.query('SELECT count(*)::int AS n FROM email_login_tokens')).rows[0].n;
 
@@ -280,7 +280,7 @@ test('email magic link: start, verify by link or code, single use, expiry, limit
         expectError(await post(refresh.POST, body), 400, 'bad_request');
       }
       expectError(await post(refresh.POST, { refreshToken: 'hm_r_unknown', platform: 'android' }), 401, 'invalid_token');
-      const { issueRefreshToken } = await import('../api/v1/refresh-tokens.ts');
+      const { issueRefreshToken } = await import('../server/v1/refresh-tokens.ts');
       const sql = auth.database();
       const other = await issueRefreshToken(sql, 'usr_ana', 'android');
       const expired = await issueRefreshToken(sql, 'usr_ana', 'android');
@@ -288,7 +288,7 @@ test('email magic link: start, verify by link or code, single use, expiry, limit
       expectError(await post(refresh.POST, { refreshToken: expired, platform: 'android' }), 401, 'invalid_token');
       const ok = await post(refresh.POST, { refreshToken: other, platform: 'android' });
       assert.equal(ok.status, 200, 'an expired chain does not affect another sign-in');
-      const { runRetention } = await import('../api/v1/lifecycle.ts');
+      const { runRetention } = await import('../server/v1/lifecycle.ts');
       const before = (await db.query('SELECT count(*)::int AS n FROM v1_refresh_tokens')).rows[0].n;
       await runRetention(sql, null);
       const after = (await db.query('SELECT count(*)::int AS n FROM v1_refresh_tokens')).rows[0].n;

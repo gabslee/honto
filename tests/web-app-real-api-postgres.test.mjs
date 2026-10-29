@@ -56,7 +56,7 @@ test('/app loads real /api/v1 data with the web session cookie', async (t) => {
     await db.exec(baseTables);
     const auth = await import('../app/server-auth.ts');
     await auth.ensureIdentitySchema();
-    const { ensurePhotosSchema } = await import('../api/v1/photos-schema.ts');
+    const { ensurePhotosSchema } = await import('../server/v1/photos-schema.ts');
     const { localDayIn, addDays } = await import('../app/api/v1/photos/photo-rows.ts');
     const routes = {
       me: await import('../app/api/v1/me/route.ts'),

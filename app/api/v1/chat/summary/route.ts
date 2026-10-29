@@ -1,4 +1,4 @@
-import { chatSummaryResponse } from "../../../../../api/v1/chat";
+import { chatSummaryResponse } from "../../../../../server/v1/chat";
 
 export const dynamic = "force-dynamic";
 

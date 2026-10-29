@@ -37,7 +37,7 @@ const hooks = () => module.registerHooks({ resolve(specifier, context, next) {
 test('streak and milestone rules (pure)', async () => {
   const registered = hooks();
   try {
-    const m = await import('../api/v1/milestones.ts');
+    const m = await import('../server/v1/milestones.ts');
     assert.equal(m.addDays('2026-12-31', 1), '2027-01-01');
     assert.equal(m.addYears('2024-02-29', 1), '2025-02-28', 'Feb 29 falls on Feb 28');
     assert.equal(m.addYears('2024-02-29', 4), '2028-02-29');
@@ -93,11 +93,11 @@ test('streak and milestones over the real route handlers', async (t) => {
   try {
     await db.exec(baseTables);
     const auth = await import('../app/server-auth.ts');
-    const couple = await import('../api/v1/couple.ts');
-    const milestones = await import('../api/v1/milestones.ts');
+    const couple = await import('../server/v1/couple.ts');
+    const milestones = await import('../server/v1/milestones.ts');
     const listRoute = await import('../app/api/v1/milestones/route.ts');
     const seenRoute = await import('../app/api/v1/milestones/[milestoneId]/seen/route.ts');
-    const lifecycle = await import('../api/v1/lifecycle.ts');
+    const lifecycle = await import('../server/v1/lifecycle.ts');
     await lifecycle.ensureLifecycleSchema(auth.database());
     await milestones.ensureMilestonesSchema(auth.database());
     await milestones.ensureMilestonesSchema(auth.database());

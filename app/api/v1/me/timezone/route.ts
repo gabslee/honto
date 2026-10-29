@@ -1,5 +1,5 @@
 import type { TimeZoneResult } from "../../../../../contracts/honto-api";
-import { apiError, noStore, normalizeTimeZone, requireUser } from "../../../../../api/v1/context";
+import { apiError, noStore, normalizeTimeZone, requireUser } from "../../../../../server/v1/context";
 import { database } from "../../../../server-auth";
 
 export const dynamic = "force-dynamic";

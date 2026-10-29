@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as module from 'node:module';
 import { readFileSync } from 'node:fs';
 import { pgliteSql } from './helpers/pglite-sql.mjs';
-import { inspectDailyVideo } from '../api/v1/mp4.ts';
+import { inspectDailyVideo } from '../server/v1/mp4.ts';
 
 function mp4(duration = 15000, width = 1280, height = 720) {
   const box = (tag, bytes) => { const b = Buffer.alloc(8 + bytes.length); b.writeUInt32BE(b.length); b.write(tag, 4); bytes.copy(b, 8); return b; };
@@ -34,11 +34,11 @@ test('launch city and private-media routes over isolated PostgreSQL', async t =>
       CREATE TABLE users(id text PRIMARY KEY,email text UNIQUE NOT NULL,display_name text NOT NULL,role text NOT NULL DEFAULT 'user',created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());
       CREATE TABLE couples(id text PRIMARY KEY,host_user_id text,partner_key text,reunion_date text,adult_confirmed_at timestamptz,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());`);
     const auth = await import('../app/server-auth.ts');
-    const schema = await import('../api/v1/launch-schema.ts');
-    const city = await import('../api/v1/city.ts');
-    const media = await import('../api/v1/private-media.ts');
+    const schema = await import('../server/v1/launch-schema.ts');
+    const city = await import('../server/v1/city.ts');
+    const media = await import('../server/v1/private-media.ts');
     const push = await import('../app/push/index.ts');
-    const lifecycle = await import('../api/v1/lifecycle.ts');
+    const lifecycle = await import('../server/v1/lifecycle.ts');
     await schema.ensureLaunchSchema(sql);
     await db.exec(readFileSync(new URL('../drizzle/0018_launch_private_media.sql', import.meta.url), 'utf8'));
     await db.exec(`INSERT INTO users(id,email,display_name,time_zone) VALUES ('a','a@test.com','Ana','America/Sao_Paulo'),('b','b@test.com','Kenji','Asia/Tokyo'),('z','z@test.com','Zoe','UTC');

@@ -30,8 +30,8 @@ test('v1 Google / Apple sign-in relinks existing accounts; logout revokes the cu
     await db.exec(`CREATE TABLE players (id text PRIMARY KEY);
       CREATE TABLE users (id text PRIMARY KEY, email text UNIQUE NOT NULL, display_name text NOT NULL, role text NOT NULL DEFAULT 'user', created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());`);
     const auth = await import('../app/server-auth.ts');
-    const { requireUser } = await import('../api/v1/context.ts');
-    const providers = await import('../api/v1/provider-login.ts');
+    const { requireUser } = await import('../server/v1/context.ts');
+    const providers = await import('../server/v1/provider-login.ts');
     const google = await import('../app/api/v1/auth/google/route.ts');
     const apple = await import('../app/api/v1/auth/apple/route.ts');
     const logout = await import('../app/api/v1/auth/logout/route.ts');

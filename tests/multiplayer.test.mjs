@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createMultiplayerState, reduceMultiplayer, publicMultiplayer } from '../api/multiplayer.ts';
+import { createMultiplayerState, reduceMultiplayer, publicMultiplayer } from '../server/multiplayer.ts';
 
 const players = n => Array.from({length:n},(_,i)=>({id:`p${i}`,name:`Player ${i}`}));
 const make = (type='honto',n=3,extra={}) => act(createMultiplayerState({players:players(n),cards:[{id:'c1',type,...extra},{id:'c2',type:'both'}]}),'p0','draw');

@@ -1,4 +1,4 @@
-import { logoutResponse } from "../../../../../api/v1/provider-login";
+import { logoutResponse } from "../../../../../server/v1/provider-login";
 
 export const dynamic = "force-dynamic";
 

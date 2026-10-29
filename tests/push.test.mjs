@@ -91,7 +91,7 @@ clearPushEnv();
 const apns = await import('../app/push/apns.ts');
 const fcm = await import('../app/push/fcm.ts');
 const push = await import('../app/push/index.ts');
-const { ensurePhotosSchema } = await import('../api/v1/photos-schema.ts');
+const { ensurePhotosSchema } = await import('../server/v1/photos-schema.ts');
 const { database } = await import('../app/server-auth.ts');
 
 test('apnsConfig / fcmConfig: null while the keys are pending', () => {

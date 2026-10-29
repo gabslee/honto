@@ -1,4 +1,4 @@
-import { apiError, noStore, requireCouple } from "../../../../../api/v1/context";
+import { apiError, noStore, requireCouple } from "../../../../../server/v1/context";
 import { database } from "../../../../server-auth";
 import { parseBusyUpload, replaceBusyBlocks } from "../calendar-service";
 

@@ -1,6 +1,6 @@
-import { authorized } from '../../../../api/v1/cron-auth';
-import { apiError, noStore } from '../../../../api/v1/context';
-import { expirePrivateMedia } from '../../../../api/v1/private-media';
+import { authorized } from '../../../../server/v1/cron-auth';
+import { apiError, noStore } from '../../../../server/v1/context';
+import { expirePrivateMedia } from '../../../../server/v1/private-media';
 import { database } from '../../../server-auth';
 export const dynamic='force-dynamic';
 export const runtime='nodejs';

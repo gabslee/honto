@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { PhotoContentType, PhotoCreateResponse } from "../../../../contracts/honto-api";
-import { apiError, noStore, normalizeTimeZone, requireCouple } from "../../../../api/v1/context";
-import { ensurePhotosSchema } from "../../../../api/v1/photos-schema";
+import { apiError, noStore, normalizeTimeZone, requireCouple } from "../../../../server/v1/context";
+import { ensurePhotosSchema } from "../../../../server/v1/photos-schema";
 import { JAPANESE_PHRASES } from "../../../photo-moments.js";
 import { database } from "../../../server-auth";
 import { presignPut } from "../../../storage";

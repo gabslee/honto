@@ -1,4 +1,4 @@
-import gameHandler from "../../../api/game";
+import gameHandler from "../../../server/game";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

@@ -24,7 +24,7 @@ test('legacy room data migrates to a room-scoped couple and merges into the stab
       INSERT INTO daily_cards VALUES ('r1', '2026-10-14', 1, 'deepTalk', 3, now());
       INSERT INTO daily_answers VALUES ('r1', '2026-10-14', 1, 'p1', 'a1', now()), ('r1', '2026-10-14', 1, 'p2', 'b1', now());
       INSERT INTO couple_moments VALUES ('c1', 'r1', 'wouldrather', 'A / B', 'B', now());`);
-    const { ensureCoupleSchema, resolveCouple, rememberPartnerKey } = await import('../api/couple.ts');
+    const { ensureCoupleSchema, resolveCouple, rememberPartnerKey } = await import('../server/couple.ts');
     await ensureCoupleSchema(globalThis.__hontoTestSql);
     const migrated = (await db.query("SELECT couple_id FROM rooms WHERE id = 'r1'")).rows[0].couple_id;
     assert.equal(migrated, 'room:r1');

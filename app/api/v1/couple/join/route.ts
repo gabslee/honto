@@ -1,4 +1,4 @@
-import { joinCoupleResponse } from "../../../../../api/v1/couple";
+import { joinCoupleResponse } from "../../../../../server/v1/couple";
 
 export const dynamic = "force-dynamic";
 

@@ -21,7 +21,7 @@ test('mobile auth tokens, account-free partner device token and photo moments', 
   process.env.DATABASE_URL = 'postgres://isolated-test';
   process.env.BLOB_READ_WRITE_TOKEN = 'test-token';
   try {
-    const { default: game } = await import('../api/game.ts');
+    const { default: game } = await import('../server/game.ts');
     const auth = await import('../app/server-auth.ts');
     const { findOrCreateProviderUser } = await import('../app/mobile-auth.ts');
     const mobile = await import('../app/api/mobile/[...path]/route.ts');

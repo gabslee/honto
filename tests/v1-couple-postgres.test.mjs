@@ -132,8 +132,8 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
   try {
     await db.exec(baseTables);
     const auth = await import('../app/server-auth.ts');
-    const couple = await import('../api/v1/couple.ts');
-    const lifecycle = await import('../api/v1/lifecycle.ts');
+    const couple = await import('../server/v1/couple.ts');
+    const lifecycle = await import('../server/v1/lifecycle.ts');
     const meRoute = await import('../app/api/v1/me/route.ts');
     const coupleRoute = await import('../app/api/v1/couple/route.ts');
     const inviteRoute = await import('../app/api/v1/couple/invite/route.ts');
@@ -812,7 +812,7 @@ test('W1b couple lifecycle over the real route handlers', async (t) => {
       assert.equal(lifecycle.crc32(new TextEncoder().encode('honto')), zlibCrc32(Buffer.from('honto')) >>> 0);
     });
   } finally {
-    (await import('../api/v1/lifecycle.ts')).setUnpairNotifier(null);
+    (await import('../server/v1/lifecycle.ts')).setUnpairNotifier(null);
     hooks.deregister();
     for (const [key, value] of Object.entries(saved)) if (value === undefined) delete process.env[key]; else process.env[key] = value;
     await db.close();

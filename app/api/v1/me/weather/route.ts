@@ -1,4 +1,4 @@
-import { clearWeatherResponse, reportWeatherResponse } from "../../../../../api/v1/weather";
+import { clearWeatherResponse, reportWeatherResponse } from "../../../../../server/v1/weather";
 
 export const dynamic = "force-dynamic";
 

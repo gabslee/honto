@@ -10,7 +10,7 @@ const hooks = module.registerHooks({ resolve(specifier, context, next) {
 } });
 test.after(() => hooks.deregister());
 
-const { deleteRevenueCatCustomer } = await import('../api/v1/account-cleanup.ts');
+const { deleteRevenueCatCustomer } = await import('../server/v1/account-cleanup.ts');
 const env = { REVENUECAT_SECRET_API_KEY: 'sk_v2_test', REVENUECAT_PROJECT_ID: 'projtest1' };
 
 async function withFetch(respond, run) {

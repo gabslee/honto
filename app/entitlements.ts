@@ -11,7 +11,7 @@ export const PREMIUM_ENTITLEMENT = "premium";
 /**
  * Idempotent entitlements schema (mirrors the billing part of drizzle/0010_calendar_entitlements.sql).
  * `entitlements` is per user and source; the couple is Premium when either active member has an active row
- * (see `isCouplePremium` in api/v1/context.ts). Stripe subscribers keep counting through `users.plan`.
+ * (see `isCouplePremium` in server/v1/context.ts). Stripe subscribers keep counting through `users.plan`.
  * `revenuecat_events` makes the webhook idempotent by `event.id` and keeps the raw payload.
  */
 export function ensureEntitlementsSchema(sql: Sql) {

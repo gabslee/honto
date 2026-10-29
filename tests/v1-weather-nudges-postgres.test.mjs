@@ -33,7 +33,7 @@ const hooks = () => module.registerHooks({ resolve(specifier, context, next) {
 test('weather validation and nudge push payload (pure)', async () => {
   const registered = hooks();
   try {
-    const w = await import('../api/v1/weather.ts');
+    const w = await import('../server/v1/weather.ts');
     const now = Date.parse('2026-10-19T15:00:00Z');
     const ok = { condition: 'rain', temperatureC: 14, isDay: true, observedAt: '2026-10-19T14:20:00.123Z' };
     assert.deepEqual(w.parseWeather(ok, now), { ...ok, observedAt: '2026-10-19T14:20:00Z' });
@@ -85,11 +85,11 @@ test('weather and nudges over the real route handlers', async () => {
   try {
     await db.exec(baseTables);
     const auth = await import('../app/server-auth.ts');
-    const couple = await import('../api/v1/couple.ts');
-    const weather = await import('../api/v1/weather.ts');
-    const nudges = await import('../api/v1/nudges.ts');
+    const couple = await import('../server/v1/couple.ts');
+    const weather = await import('../server/v1/weather.ts');
+    const nudges = await import('../server/v1/nudges.ts');
     const weatherRoute = await import('../app/api/v1/me/weather/route.ts');
-    const lifecycle = await import('../api/v1/lifecycle.ts');
+    const lifecycle = await import('../server/v1/lifecycle.ts');
     await lifecycle.ensureLifecycleSchema(auth.database());
     await weather.ensureWeatherSchema(auth.database());
     await nudges.ensureNudgesSchema(auth.database());

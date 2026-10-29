@@ -1,4 +1,4 @@
-import { ensureCoupleSchema } from "../../../api/couple";
+import { ensureCoupleSchema } from "../../../server/couple";
 import { database, getCurrentUser, getMobileToken } from "../../server-auth";
 
 /**

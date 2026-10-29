@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Icon } from "./icons";
 import type { Locale } from "./i18n";
-import type { PublicMultiplayerState } from "../api/multiplayer";
+import type { PublicMultiplayerState } from "../server/multiplayer";
 
 type Participant = { id: string; name: string; isHost: number; sips: number; connected?: boolean; hasWager: boolean; wager?: string | null };
 type GroupView = PublicMultiplayerState;

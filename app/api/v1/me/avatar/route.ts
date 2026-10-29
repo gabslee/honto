@@ -1,4 +1,4 @@
-import { deleteAvatarResponse } from "../../../../../api/v1/profile";
+import { deleteAvatarResponse } from "../../../../../server/v1/profile";
 
 export const dynamic = "force-dynamic";
 

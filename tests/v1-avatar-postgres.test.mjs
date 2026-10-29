@@ -90,9 +90,9 @@ test('profile photo and profile edit', async (t) => {
   try {
     await db.exec(baseTables);
     const auth = await import('../app/server-auth.ts');
-    const { ensurePhotosSchema } = await import('../api/v1/photos-schema.ts');
-    const { ensureAvatarSchema, normalizeDisplayName } = await import('../api/v1/profile.ts');
-    const lifecycle = await import('../api/v1/lifecycle.ts');
+    const { ensurePhotosSchema } = await import('../server/v1/photos-schema.ts');
+    const { ensureAvatarSchema, normalizeDisplayName } = await import('../server/v1/profile.ts');
+    const lifecycle = await import('../server/v1/lifecycle.ts');
     const me = await import('../app/api/v1/me/route.ts');
     const avatar = await import('../app/api/v1/me/avatar/route.ts');
     const upload = await import('../app/api/v1/me/avatar/upload/route.ts');

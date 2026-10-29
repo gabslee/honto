@@ -1,6 +1,6 @@
-import { authorized } from '../../../../api/v1/cron-auth';
-import { apiError, noStore } from "../../../../api/v1/context";
-import { runRetention } from "../../../../api/v1/lifecycle";
+import { authorized } from '../../../../server/v1/cron-auth';
+import { apiError, noStore } from "../../../../server/v1/context";
+import { runRetention } from "../../../../server/v1/lifecycle";
 import { database } from "../../../server-auth";
 
 export const dynamic = "force-dynamic";
