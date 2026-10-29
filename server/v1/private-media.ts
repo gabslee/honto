@@ -26,7 +26,7 @@ export function validPrivateUpload(v:unknown): v is PrivateMediaUploadRequest {
 async function authPremium(request:Request) {
   const auth=await requireCouple(request);if(auth instanceof Response)return auth;
   const sql=database()!;await ensureLaunchSchema(sql);
-  if(!(await resolveEntitlement(sql,auth.user.id,auth.partner.id)).premium)return apiError(402,'premium_required','This feature is included in Honto Premium for your couple.');
+  if(!(await resolveEntitlement(sql,auth.user.id,auth.partner.id)).premium){console.warn('[private-media] premium required');return apiError(402,'premium_required','This feature is included in Honto Premium for your couple.');}
   return {...auth,sql};
 }
 function item(row:Row,viewer:string):PrivateMediaItem {
@@ -44,7 +44,7 @@ export async function privateFeedResponse(request:Request) {
 export async function createPrivateUploadResponse(request:Request) {
   const auth=await authPremium(request);if(auth instanceof Response)return auth;
   if(!getObjectStore())return apiError(503,'storage_not_configured','Media storage is unavailable.');
-  const body=await request.json().catch(()=>null);if(!validPrivateUpload(body))return apiError(400,'bad_request','Use a JPEG photo up to 2 MB or a 720p MP4 up to 15 seconds.');
+  const body=await request.json().catch(()=>null);if(!validPrivateUpload(body)){console.warn('[private-media] invalid upload',{kind:body?.kind,contentType:body?.contentType,bytes:body?.bytes,width:body?.width,height:body?.height});return apiError(400,'bad_request','Use a JPEG photo up to 2 MB or a 720p MP4 up to 15 seconds.');}
   const {sql,user,partner,couple}=auth;
   const prior=(await sql`SELECT * FROM private_media WHERE author_user_id=${user.id} AND client_id=${body.clientId}`)[0] as Row|undefined;
   if(prior&&(prior.couple_id!==couple.id||prior.kind!==body.kind))return apiError(409,'bad_request','Upload id already used.');
@@ -95,7 +95,7 @@ export async function completePrivateResponse(request:Request,id:string) {
   if(!claim.length)return apiError(409,'media_unavailable','This upload is being processed.');
   try {
     const head=await headObject(row.upload_key);
-    if(!head||head.size!==row.size_bytes||(head.contentType||'').split(';')[0]!==row.content_type)return apiError(422,'upload_size_mismatch','Upload does not match.');
+    if(!head||head.size!==row.size_bytes||(head.contentType||'').split(';')[0]!==row.content_type){console.warn('[private-media] upload mismatch',{kind:row.kind,found:!!head,size:head?.size,expected:row.size_bytes,contentType:head?.contentType});return apiError(422,'upload_size_mismatch','Upload does not match.');}
     const bytes=await store.getObject(row.upload_key);
     if(!bytes||bytes.length!==row.size_bytes)return apiError(422,'upload_size_mismatch','Upload does not match.');
     if(row.kind==='daily_video') {
@@ -116,7 +116,7 @@ export async function completePrivateResponse(request:Request,id:string) {
     const saved=(await sql`SELECT *,to_char(local_day,'YYYY-MM-DD') AS local_day FROM private_media WHERE id=${id} AND couple_id=${couple.id}`)[0] as Row|undefined;
     if(!saved)return apiError(410,'media_unavailable','Media no longer available.');
     return json(item(saved,user.id));
-  } catch {return apiError(503,'storage_not_configured','Media storage is unavailable. Try again.');}
+  } catch (error) {console.error('[private-media] complete failed',{kind:row.kind,error:error instanceof Error?`${error.name}: ${error.message}`:String(error)});return apiError(503,'storage_not_configured','Media storage is unavailable. Try again.');}
   finally {await sql`UPDATE private_media SET status='pending' WHERE id=${id} AND status='processing'`;}
 }
 export async function playbackPrivateResponse(request:Request,id:string) {
