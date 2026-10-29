@@ -115,9 +115,10 @@ export async function getObject(key: string, options: StorageOptions = {}): Prom
 }
 
 /** Server-side write of a generated object (the export ZIP). Photos are uploaded by the devices, never here. */
+// Content-Length is explicit: a runtime that streams the body would otherwise send it chunked, which S3/R2 reject (411).
 export async function putObject(key: string, body: Uint8Array, contentType: string, options: StorageOptions = {}): Promise<void> {
   const config = resolve(options);
-  const response = await client(config).fetch(objectUrl(config, key), { method: "PUT", body: body as Uint8Array<ArrayBuffer>, headers: { "Content-Type": contentType } });
+  const response = await client(config).fetch(objectUrl(config, key), { method: "PUT", body: body as Uint8Array<ArrayBuffer>, headers: { "Content-Type": contentType, "Content-Length": String(body.byteLength) } });
   if (!response.ok) throw new StorageError("PUT", response.status);
 }
 
@@ -146,7 +147,7 @@ export async function deleteObjects(keys: string[], options: StorageOptions = {}
     const batch = unique.slice(i, i + 1000);
     const body = `<?xml version="1.0" encoding="UTF-8"?><Delete><Quiet>true</Quiet>${batch.map((key) => `<Object><Key>${xmlEscape(key)}</Key></Object>`).join("")}</Delete>`;
     const md5 = createHash("md5").update(body).digest("base64");
-    const response = await aws.fetch(`${bucketUrl(config)}?delete`, { method: "POST", body, headers: { "Content-Type": "application/xml", "Content-MD5": md5 } });
+    const response = await aws.fetch(`${bucketUrl(config)}?delete`, { method: "POST", body, headers: { "Content-Type": "application/xml", "Content-MD5": md5, "Content-Length": String(Buffer.byteLength(body)) } });
     if (response.status === 501) {
       for (const key of batch) {
         const single = await aws.fetch(objectUrl(config, key), { method: "DELETE" });
