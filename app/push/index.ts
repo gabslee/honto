@@ -13,6 +13,7 @@ type Sql = NeonQueryFunction<false, false>;
 /** Events W2a sends (plus `nudge.new`, feedback r1). `reunion.changed` is a widget refresh only (no visible alert). */
 export type PushEvent =
   | { type: "private_photo.new"; mediaId: string; fromName?: string | null }
+  | { type: "chat_message"; messageId: string; preview: string; fromName?: string | null }
   | { type: "photo.new"; photoId: string; thumbUrl?: string | null; fromName?: string | null }
   | { type: "nudge.new"; nudgeId: string; createdAt?: string | null; fromName?: string | null }
   | { type: "couple.joined"; fromName?: string | null }
@@ -30,6 +31,8 @@ const rfc3339 = (date: Date) => date.toISOString().replace(/\.\d{3}Z$/, "Z");
 export function pushData(coupleId: string, event: PushEvent, now = new Date()): PushData {
   const data: PushData = { type: event.type, coupleId, sentAt: rfc3339(now) };
   if (event.type === "private_photo.new") data.mediaId = event.mediaId;
+  // The preview text only goes into the APNs alert below, never into PushData (FCM data / widget).
+  if (event.type === "chat_message") data.messageId = event.messageId;
   if (event.type === "photo.new") {
     data.photoId = event.photoId;
     if (event.thumbUrl) data.thumbUrl = event.thumbUrl;
@@ -44,8 +47,10 @@ export function pushData(coupleId: string, event: PushEvent, now = new Date()): 
 }
 
 /** APNs alert body: the visible text (English, no emoji) plus `honto` = PushData. Null for widget-only events. */
-export function apnsAlertPayload(data: PushData) {
+export function apnsAlertPayload(data: PushData, preview?: string) {
   const from = data.fromName || "Your partner";
+  // Chat: text only (no attachment, no mutable-content), grouped in the couple thread.
+  if (data.type === "chat_message") return { aps: { alert: { title: from, body: preview || "Sent you a message" }, sound: "default", "thread-id": data.coupleId }, honto: data };
   // Private photos never carry a URL, attachment, or mutable-content NSE request.
   if (data.type === "private_photo.new") return { aps: { alert: { title: "Honto", body: `Nova foto do ${from}` }, sound: "default", "thread-id": data.coupleId }, honto: data };
   if (data.type === "photo.new") return { aps: { alert: { title: from, body: "Sent you a photo" }, sound: "default", "mutable-content": 1, "thread-id": data.coupleId }, honto: data };
@@ -85,7 +90,7 @@ export async function notifyPartner(coupleId: string, fromUserId: string, event:
     summary.devices = devices.length;
     if (!devices.length) return summary;
     const data = pushData(coupleId, event, options.now);
-    const alert = apnsAlertPayload(data);
+    const alert = apnsAlertPayload(data, event.type === "chat_message" ? event.preview : undefined);
 
     const apnsDevices: { device: DeviceRow; message: ApnsMessage }[] = [];
     for (const device of devices) {

@@ -305,6 +305,9 @@ class FakeHontoApi implements HontoApi {
   @override
   Future<UnpairResult> unpairCouple() => _run('unpairCouple', () {
         _paired = false;
+        // The chat is shared history: removed at unpair, like the server.
+        _chat.clear();
+        _chatReadId = null;
         final now = _clock();
         return UnpairResult(unpairedAt: now, photosAvailableUntil: now.add(const Duration(days: 30)));
       }, needsCouple: true);
@@ -546,6 +549,17 @@ class FakeHontoApi implements HontoApi {
           );
         }
         _media[mediaId] = item;
+        // Like the server: a ready disappearing photo becomes a view_once chat message (once per media id).
+        if (item.kind == PrivateMediaKind.viewOnce && !_chat.any((m) => m['clientId'] == mediaId)) {
+          _chat.insert(0, _chatMessage(
+            id: 'msg_fake_${_chat.length + 1}_${now.microsecondsSinceEpoch}',
+            clientId: mediaId,
+            mine: true,
+            kind: ChatMessageKind.viewOnce,
+            body: null,
+            createdAt: now,
+          )..['viewOnce'] = {'mediaId': mediaId, 'status': 'unopened', 'expiresAt': _iso(item.expiresAt!), 'isRecipient': false});
+        }
         return item;
       }, needsCouple: true);
   @override
@@ -560,6 +574,16 @@ class FakeHontoApi implements HontoApi {
   Future<PrivatePhotoOpened> openPrivatePhoto(String mediaId) =>
       _run('openPrivatePhoto', () {
         _requirePrivatePremium();
+        // A partner's unopened disappearing photo in the chat opens once; the message stays as a tombstone.
+        _expireChatViewOnce();
+        for (final m in _chat) {
+          final ref = m['viewOnce'] as Map<String, dynamic>?;
+          if (ref == null || ref['mediaId'] != mediaId || ref['isRecipient'] != true || ref['status'] != 'unopened') continue;
+          ref
+            ..['status'] = 'opened'
+            ..['mediaId'] = null;
+          return PrivatePhotoOpened.fromJson(_json('openPrivatePhoto.200'));
+        }
         throw HontoApiException(
           410,
           ApiError(
@@ -568,4 +592,162 @@ class FakeHontoApi implements HontoApi {
           ),
         );
       }, needsCouple: true);
+
+  // ---- chat ----------------------------------------------------------------------------------
+  // In-memory couple chat, newest first. Seeded from listChatMessages.200 (text, photo comment, video comment,
+  // and an unopened disappearing photo from Kenji), re-dated to just before the clock so it reads as "today".
+  static const _meUserId = 'usr_ana';
+  static const _partnerUserId = 'usr_kenji';
+  static const _partnerVideoId = 'pm_kenji_video';
+  static final _uuid = RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', caseSensitive: false);
+  late final List<Map<String, dynamic>> _chat = _seedChat();
+  String? _chatReadId;
+
+  List<Map<String, dynamic>> _seedChat() {
+    final seed = (_json('listChatMessages.200')['messages'] as List<dynamic>).cast<Map<String, dynamic>>();
+    final latest = DateTime.parse(seed.first['createdAt'] as String);
+    final shift = _clock().toUtc().subtract(const Duration(minutes: 2)).difference(latest);
+    String moved(Object? iso) => _iso(DateTime.parse(iso as String).add(shift));
+    for (final m in seed) {
+      m['createdAt'] = moved(m['createdAt']);
+      for (final key in ['photo', 'viewOnce']) {
+        final ref = m[key] as Map<String, dynamic>?;
+        if (ref != null && ref['expiresAt'] != null) ref['expiresAt'] = moved(ref['expiresAt']);
+      }
+    }
+    _chatReadId = (_json('getChatSummary.200')['lastReadMessageId'] as String?);
+    return seed;
+  }
+
+  Map<String, dynamic> _chatMessage({
+    required String id,
+    required String clientId,
+    required bool mine,
+    required ChatMessageKind kind,
+    required String? body,
+    required DateTime createdAt,
+  }) =>
+      {
+        'id': id,
+        'clientId': clientId,
+        'author': mine ? 'me' : 'partner',
+        'authorUserId': mine ? _meUserId : _partnerUserId,
+        'kind': kind.wire,
+        'body': body,
+        'createdAt': _iso(createdAt),
+        'photo': null,
+        'video': null,
+        'viewOnce': null,
+      };
+
+  /// Unopened disappearing photos past their 24 h become "expired" tombstones (no media id).
+  void _expireChatViewOnce() {
+    final now = _clock();
+    for (final m in _chat) {
+      final ref = m['viewOnce'] as Map<String, dynamic>?;
+      if (ref == null || ref['status'] != 'unopened' || ref['expiresAt'] == null) continue;
+      if (!DateTime.parse(ref['expiresAt'] as String).isAfter(now)) {
+        ref
+          ..['status'] = 'expired'
+          ..['mediaId'] = null;
+      }
+    }
+  }
+
+  HontoApiException _chatBadRequest(String message) =>
+      HontoApiException(400, ApiError(error: message, code: ErrorCode.badRequest));
+
+  ChatSummary _chatSummary() {
+    _expireChatViewOnce();
+    final readIndex = _chatReadId == null ? _chat.length : _chat.indexWhere((m) => m['id'] == _chatReadId);
+    final newer = _chat.take(readIndex < 0 ? _chat.length : readIndex);
+    return ChatSummary(
+      unreadCount: newer.where((m) => m['author'] == 'partner').length,
+      lastReadMessageId: _chatReadId,
+      latest: _chat.isEmpty ? null : ChatMessage.fromJson(_chat.first),
+    );
+  }
+
+  @override
+  Future<ChatMessagePage> listChatMessages({String? before, String? limit}) => _run('listChatMessages', () {
+        final size = limit == null ? 30 : int.tryParse(limit);
+        if (size == null || size < 1 || size > 100) throw _chatBadRequest('limit must be between 1 and 100.');
+        _expireChatViewOnce();
+        var start = 0;
+        if (before != null && before.isNotEmpty) {
+          final index = _chat.indexWhere((m) => m['id'] == before);
+          if (index < 0) throw _chatBadRequest('Unknown before cursor.');
+          start = index + 1;
+        }
+        final page = _chat.skip(start).take(size).toList();
+        final more = start + page.length < _chat.length;
+        return ChatMessagePage(
+          messages: [for (final m in page) ChatMessage.fromJson(m)],
+          nextBefore: more && page.isNotEmpty ? page.last['id'] as String : null,
+        );
+      }, needsCouple: true);
+
+  /// Free. Comments only on the partner's photo of the day (`ph_kenji_...`) or daily video (`pm_kenji_video`).
+  @override
+  Future<ChatMessage> sendChatMessage(ChatMessageRequest body) => _run('sendChatMessage', () {
+        if (!_uuid.hasMatch(body.clientId)) throw _chatBadRequest('clientId must be a UUID.');
+        final text = body.body.trim();
+        if (text.isEmpty || text.runes.length > 2000) throw _chatBadRequest('Write 1 to 2000 characters.');
+        if (body.photoId != null && body.privateMediaId != null) throw _chatBadRequest('Comment on a photo or a video, not both.');
+        final clientId = body.clientId.toLowerCase();
+        final existing = _chat.where((m) => m['author'] == 'me' && m['clientId'] == clientId);
+        if (existing.isNotEmpty) return ChatMessage.fromJson(existing.first);
+        final photoRef = body.photoId == null ? null : _partnerPhotoRef(body.photoId!);
+        if (body.photoId != null && photoRef == null) {
+          throw HontoApiException(422, const ApiError(error: "You can comment on your partner's photos only.", code: ErrorCode.mediaUnavailable));
+        }
+        if (body.privateMediaId != null && body.privateMediaId != _partnerVideoId) {
+          throw HontoApiException(422, const ApiError(error: "You can comment on your partner's videos only.", code: ErrorCode.mediaUnavailable));
+        }
+        final now = _clock();
+        final kind = body.photoId != null
+            ? ChatMessageKind.photoComment
+            : body.privateMediaId != null
+                ? ChatMessageKind.videoComment
+                : ChatMessageKind.text;
+        final message = _chatMessage(
+            id: 'msg_fake_${_chat.length + 1}_${now.microsecondsSinceEpoch}', clientId: clientId, mine: true, kind: kind, body: text, createdAt: now);
+        if (kind == ChatMessageKind.photoComment) {
+          message['photo'] = photoRef;
+        }
+        if (kind == ChatMessageKind.videoComment) {
+          message['video'] = {'mediaId': body.privateMediaId, 'available': true, 'posterUrl': null};
+        }
+        _chat.insert(0, message);
+        return ChatMessage.fromJson(message);
+      }, needsCouple: true);
+
+  /// Photo reference for a comment on the partner's photo (Today's daily/latest photo, or one already in the chat).
+  Map<String, dynamic>? _partnerPhotoRef(String photoId) {
+    final partner = _today['partner'] as Map<String, dynamic>;
+    for (final key in ['dailyPhoto', 'latestPhoto']) {
+      final photo = partner[key] as Map<String, dynamic>?;
+      if (photo?['id'] != photoId) continue;
+      final urls = photo!['urls'] as Map<String, dynamic>?;
+      return {'photoId': photoId, 'available': true, 'thumbUrl': urls?['thumb'], 'expiresAt': urls?['expiresAt']};
+    }
+    for (final m in _chat) {
+      final ref = m['photo'] as Map<String, dynamic>?;
+      if (ref != null && ref['photoId'] == photoId && m['author'] == 'me') return Map<String, dynamic>.of(ref);
+    }
+    return null;
+  }
+
+  /// Moves the read marker forward only.
+  @override
+  Future<ChatSummary> markChatRead(ChatReadRequest body) => _run('markChatRead', () {
+        final index = _chat.indexWhere((m) => m['id'] == body.messageId);
+        if (index < 0) throw HontoApiException(404, const ApiError(error: 'Message not found.', code: ErrorCode.notFound));
+        final current = _chatReadId == null ? -1 : _chat.indexWhere((m) => m['id'] == _chatReadId);
+        if (current < 0 || index < current) _chatReadId = body.messageId;
+        return _chatSummary();
+      }, needsCouple: true);
+
+  @override
+  Future<ChatSummary> getChatSummary() => _run('getChatSummary', _chatSummary, needsCouple: true);
 }

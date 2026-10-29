@@ -102,4 +102,44 @@ void main() {
     expect(today.unseenMilestones, isEmpty);
     expect((await api.listMilestones()).milestones, hasLength(2));
   });
+
+  test('chat: seeded history, send and comment (Free), read marker, view-once honors Premium', () async {
+    final free = FakeHontoApi(scenario: FakeScenario.pairedFree, clock: clock);
+    final seeded = (await free.listChatMessages()).messages;
+    expect(seeded.map((m) => m.kind),
+        [ChatMessageKind.viewOnce, ChatMessageKind.videoComment, ChatMessageKind.photoComment, ChatMessageKind.text]);
+    expect(seeded[2].photo?.thumbUrl, isNotNull);
+    expect(seeded.first.viewOnce?.status, ViewOnceStatus.unopened);
+    expect((await free.getChatSummary()).unreadCount, 1);
+    final sent = await free.sendChatMessage(const ChatMessageRequest(clientId: '6b1f3c9e-2d4a-4b7e-9c11-0a2b3c4d5e09', body: '  hi  '));
+    expect([sent.body, sent.author, sent.kind], ['hi', PhotoAuthor.me, ChatMessageKind.text]);
+    final again = await free.sendChatMessage(const ChatMessageRequest(clientId: '6b1f3c9e-2d4a-4b7e-9c11-0a2b3c4d5e09', body: 'other'));
+    expect(again.id, sent.id, reason: 'idempotent per clientId');
+    final comment = await free.sendChatMessage(
+        const ChatMessageRequest(clientId: '6b1f3c9e-2d4a-4b7e-9c11-0a2b3c4d5e10', body: 'Love it', photoId: 'ph_kenji_1019'));
+    expect(comment.photo?.available, isTrue);
+    await expectLater(
+        free.sendChatMessage(const ChatMessageRequest(clientId: '6b1f3c9e-2d4a-4b7e-9c11-0a2b3c4d5e11', body: 'x', photoId: 'ph_mine')),
+        throwsA(isA<HontoApiException>().having((e) => e.statusCode, 's', 422)));
+    final page = await free.listChatMessages(limit: '2');
+    expect(page.messages.first.id, comment.id);
+    expect((await free.listChatMessages(before: page.nextBefore, limit: '100')).messages, hasLength(4));
+    final summary = await free.markChatRead(ChatReadRequest(messageId: seeded.first.id));
+    expect(summary.unreadCount, 0);
+    expect((await free.markChatRead(ChatReadRequest(messageId: seeded.last.id))).lastReadMessageId, seeded.first.id);
+    await expectLater(free.openPrivatePhoto(seeded.first.viewOnce!.mediaId!),
+        throwsA(isA<HontoApiException>().having((e) => e.statusCode, 's', 402)));
+
+    final premium = FakeHontoApi(clock: clock);
+    final once = (await premium.listChatMessages()).messages.first.viewOnce!;
+    expect((await premium.openPrivatePhoto(once.mediaId!)).contentType, 'image/jpeg');
+    final tombstone = (await premium.listChatMessages()).messages.first.viewOnce!;
+    expect([tombstone.status, tombstone.mediaId], [ViewOnceStatus.opened, null]);
+    await expectLater(premium.openPrivatePhoto(once.mediaId!), throwsA(isA<HontoApiException>().having((e) => e.statusCode, 's', 410)));
+    await premium.createPrivateMediaUpload(const PrivateMediaUploadRequest(
+        clientId: 'pm_fake_once', kind: PrivateMediaKind.viewOnce, contentType: PrivateMediaContentType.imageJpeg, bytes: 1000, width: 1080, height: 1440, timeZone: 'America/Sao_Paulo'));
+    await premium.completePrivateMedia('pm_fake_once');
+    final mine = (await premium.listChatMessages()).messages.first;
+    expect([mine.kind, mine.author, mine.viewOnce?.isRecipient], [ChatMessageKind.viewOnce, PhotoAuthor.me, false]);
+  });
 }

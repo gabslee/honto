@@ -2,13 +2,13 @@ import { randomBytes } from 'node:crypto';
 import type { PrivateMediaFeed, PrivateMediaItem, PrivateMediaUploadRequest } from '../../contracts/honto-api';
 import { database } from '../../app/server-auth';
 import { headObject, presignPut } from '../../app/storage';
-import { notifyPartner } from '../../app/push/index';
 import { apiError, noStore, normalizeTimeZone, requireCouple } from './context';
 import { resolveEntitlement } from './couple';
 import { getObjectStore, hitRateLimit, type ObjectStore } from './lifecycle';
 import { ensureLaunchSchema, type LaunchSql } from './launch-schema';
 import { localDayIn } from '../../app/api/v1/photos/photo-rows';
 import { inspectDailyVideo } from './mp4';
+import { postViewOnceMessage } from './chat';
 
 type Row = {id:string;couple_id:string;author_user_id:string;recipient_user_id:string;client_id:string;kind:'daily_video'|'view_once';status:'pending'|'processing'|'ready'|'opening';object_key:string;upload_key:string;content_type:string;size_bytes:number;local_day:string;duration_ms:number|null;width:number;height:number;created_at:string;expires_at:string|null};
 const headers = {...noStore,Pragma:'no-cache','X-Content-Type-Options':'nosniff'};
@@ -85,7 +85,11 @@ export async function completePrivateResponse(request:Request,id:string) {
   const {sql,user,couple}=auth,store=getObjectStore();if(!store)return apiError(503,'storage_not_configured','Media storage is unavailable.');
   const row=(await sql`SELECT *,to_char(local_day,'YYYY-MM-DD') AS local_day FROM private_media WHERE id=${id} AND couple_id=${couple.id} AND author_user_id=${user.id}`)[0] as Row|undefined;
   if(!row)return apiError(404,'not_found','Media not found.');
-  if(row.status==='ready')return json(item(row,user.id));
+  if(row.status==='ready') {
+    // Retry after a crash between "ready" and the chat message: the message is idempotent per media id.
+    if(row.kind==='view_once')await postViewOnceMessage(sql,{id,coupleId:couple.id,authorUserId:user.id,fromName:user.displayName});
+    return json(item(row,user.id));
+  }
   if(row.status!=='pending'||(row.expires_at&&Date.parse(row.expires_at)<=Date.now()))return apiError(410,'media_unavailable','Upload expired.');
   const claim=await sql`UPDATE private_media SET status='processing' WHERE id=${id} AND status='pending' RETURNING id`;
   if(!claim.length)return apiError(409,'media_unavailable','This upload is being processed.');
@@ -105,7 +109,8 @@ export async function completePrivateResponse(request:Request,id:string) {
     if(row.kind==='daily_video')retired=await activateDailyVideo(sql,row);
     else {
       const changed=await sql`UPDATE private_media SET status='ready',ready_at=now(),expires_at=now()+interval '24 hours' WHERE id=${id} AND status='processing' RETURNING id`;
-      if(changed.length)await notifyPartner(couple.id,user.id,{type:'private_photo.new',mediaId:id,fromName:user.displayName});
+      // The disappearing photo shows up in the couple chat; its push (chat_message) carries text only.
+      if(changed.length)await postViewOnceMessage(sql,{id,coupleId:couple.id,authorUserId:user.id,fromName:user.displayName});
     }
     await queueKeys(sql,[row.upload_key]);await flushKeys(sql,[row.upload_key,...retired],store);
     const saved=(await sql`SELECT *,to_char(local_day,'YYYY-MM-DD') AS local_day FROM private_media WHERE id=${id} AND couple_id=${couple.id}`)[0] as Row|undefined;
@@ -123,7 +128,8 @@ export async function playbackPrivateResponse(request:Request,id:string) {
 }
 /** Only the intended recipient can claim a photo; the conditional update settles races. */
 export async function claimPrivatePhoto(sql:LaunchSql,coupleId:string,userId:string,id:string) {
-  return (await sql`UPDATE private_media SET status='opening',opening_at=now() WHERE id=${id} AND couple_id=${coupleId} AND recipient_user_id=${userId} AND kind='view_once' AND status='ready' AND expires_at>now() RETURNING *`)[0] as Row|undefined;
+  // The chat message keeps an "opened" tombstone after the media row is deleted.
+  return (await sql`WITH claimed AS (UPDATE private_media SET status='opening',opening_at=now() WHERE id=${id} AND couple_id=${coupleId} AND recipient_user_id=${userId} AND kind='view_once' AND status='ready' AND expires_at>now() RETURNING *), opened AS (UPDATE couple_messages SET media_opened_at=now() WHERE private_media_id IN (SELECT id FROM claimed) AND kind='view_once') SELECT * FROM claimed`)[0] as Row|undefined;
 }
 export async function removePrivateRows(sql:LaunchSql,ids:string[]) {
   const keys=await sql`WITH gone AS (DELETE FROM private_media WHERE id=ANY(${ids}::text[]) RETURNING object_key,upload_key), queued AS (INSERT INTO storage_deletions (object_key,reason) SELECT key,'private_media' FROM gone CROSS JOIN LATERAL (VALUES(gone.object_key),(gone.upload_key)) AS k(key) ON CONFLICT DO NOTHING) SELECT key FROM gone CROSS JOIN LATERAL (VALUES(gone.object_key),(gone.upload_key)) AS k(key)`;

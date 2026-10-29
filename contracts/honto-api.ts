@@ -749,7 +749,7 @@ export interface CronRetentionResult {
   objectsPending: number;
 }
 
-export const PushEventTypeValues = ["photo.new", "nudge.new", "couple.joined", "couple.unpaired", "reunion.changed", "trip.start", "trip.update", "trip.end", "private_photo.new"] as const;
+export const PushEventTypeValues = ["photo.new", "nudge.new", "couple.joined", "couple.unpaired", "reunion.changed", "trip.start", "trip.update", "trip.end", "private_photo.new", "chat_message"] as const;
 export type PushEventType = (typeof PushEventTypeValues)[number];
 
 /** Custom data carried by every push. FCM: sent as `data` (all values strings; nulls omitted). */
@@ -770,6 +770,8 @@ export interface PushData {
   /** couple.unpaired only. */
   reason?: UnpairReason;
   mediaId?: string;
+  /** chat_message only: deep link to the chat. The alert carries text only, never media. */
+  messageId?: string;
 }
 
 export const TripActivityPhaseValues = ["before", "inTransit", "landed"] as const;
@@ -906,6 +908,81 @@ export interface PrivatePhotoOpened {
 export const PrivateMediaContentTypeValues = ["video/mp4", "image/jpeg"] as const;
 export type PrivateMediaContentType = (typeof PrivateMediaContentTypeValues)[number];
 
+export const ChatMessageKindValues = ["text", "photo_comment", "video_comment", "view_once"] as const;
+export type ChatMessageKind = (typeof ChatMessageKindValues)[number];
+
+export const ViewOnceStatusValues = ["unopened", "opened", "expired"] as const;
+export type ViewOnceStatus = (typeof ViewOnceStatusValues)[number];
+
+export interface ChatPhotoRef {
+  /** Null once the photo was deleted. */
+  photoId: string | null;
+  available: boolean;
+  /** Signed thumb (24h), same as Memories. Cache by photo id. */
+  thumbUrl: string | null;
+  expiresAt: IsoDateTime | null;
+}
+
+export interface ChatVideoRef {
+  /** Daily video id (play with getPrivateMediaPlayback). Null once replaced or deleted. */
+  mediaId: string | null;
+  available: boolean;
+  /** No posters are generated yet: always null (show a video glyph). */
+  posterUrl: string | null;
+}
+
+export interface ChatViewOnceRef {
+  /** Only while unopened; open with openPrivatePhoto (recipient, Premium). */
+  mediaId: string | null;
+  status: ViewOnceStatus;
+  expiresAt: IsoDateTime | null;
+  isRecipient: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  clientId: string;
+  author: PhotoAuthor;
+  authorUserId: string;
+  kind: ChatMessageKind;
+  /** Null for view_once. */
+  body: string | null;
+  createdAt: IsoDateTime;
+  /** photo_comment only. */
+  photo: ChatPhotoRef | null;
+  /** video_comment only. */
+  video: ChatVideoRef | null;
+  /** view_once only. */
+  viewOnce: ChatViewOnceRef | null;
+}
+
+export interface ChatMessagePage {
+  /** Newest first. */
+  messages: Array<ChatMessage>;
+  /** Pass as `before` for older messages; null on the last page. */
+  nextBefore: string | null;
+}
+
+export interface ChatMessageRequest {
+  /** Idempotency key generated on the device. */
+  clientId: string;
+  body: string;
+  /** Comment on my partner's photo. */
+  photoId?: string;
+  /** Comment on my partner's daily video. */
+  privateMediaId?: string;
+}
+
+export interface ChatReadRequest {
+  messageId: string;
+}
+
+export interface ChatSummary {
+  unreadCount: number;
+  lastReadMessageId: string | null;
+  latest: ChatMessage | null;
+}
+
 /** Every operation of the API, keyed by operationId. */
 export interface Operations {
   /** POST /api/v1/auth/google: Native Google Sign-In; returns an hm_u_ token. */
@@ -1018,6 +1095,14 @@ export interface Operations {
   getPrivateMediaPlayback: { method: "GET"; path: "/api/v1/private-media/{mediaId}/playback"; pathParams: { mediaId: string }; query: never; body: never; responses: { 200: PrivateMediaPlayback; 400: ApiError; 401: ApiError; 402: ApiError; 409: ApiError; 410: ApiError; 422: ApiError; 503: ApiError } };
   /** POST /api/v1/private-media/{mediaId}/open: openPrivatePhoto */
   openPrivatePhoto: { method: "POST"; path: "/api/v1/private-media/{mediaId}/open"; pathParams: { mediaId: string }; query: never; body: never; responses: { 200: PrivatePhotoOpened; 400: ApiError; 401: ApiError; 402: ApiError; 409: ApiError; 410: ApiError; 422: ApiError; 503: ApiError } };
+  /** GET /api/v1/chat/messages: Chat history, newest first. Page with `before` = the last (oldest) message id of the previous page. */
+  listChatMessages: { method: "GET"; path: "/api/v1/chat/messages"; pathParams: never; query: { before?: string; limit?: string }; body: never; responses: { 200: ChatMessagePage; 400: ApiError; 401: ApiError; 409: ApiError } };
+  /** POST /api/v1/chat/messages: Send a text, or comment on my partner's photo (`photoId`) or daily video (`privateMediaId`). Free. */
+  sendChatMessage: { method: "POST"; path: "/api/v1/chat/messages"; pathParams: never; query: never; body: ChatMessageRequest; responses: { 201: ChatMessage; 400: ApiError; 401: ApiError; 409: ApiError; 422: ApiError; 429: ApiError } };
+  /** POST /api/v1/chat/read: Mark the chat read up to a message (never moves backwards). Returns the new summary. */
+  markChatRead: { method: "POST"; path: "/api/v1/chat/read"; pathParams: never; query: never; body: ChatReadRequest; responses: { 200: ChatSummary; 400: ApiError; 401: ApiError; 404: ApiError; 409: ApiError } };
+  /** GET /api/v1/chat/summary: Unread count (partner messages after my read marker) and the latest message, for the Today card. */
+  getChatSummary: { method: "GET"; path: "/api/v1/chat/summary"; pathParams: never; query: never; body: never; responses: { 200: ChatSummary; 401: ApiError; 409: ApiError } };
 }
 
 export type OperationId = keyof Operations;
@@ -1081,4 +1166,8 @@ export const operations = {
   completePrivateMedia: { method: "POST", path: "/api/v1/private-media/{mediaId}/complete", auth: ["bearerAuth","cookieAuth"] },
   getPrivateMediaPlayback: { method: "GET", path: "/api/v1/private-media/{mediaId}/playback", auth: ["bearerAuth","cookieAuth"] },
   openPrivatePhoto: { method: "POST", path: "/api/v1/private-media/{mediaId}/open", auth: ["bearerAuth","cookieAuth"] },
+  listChatMessages: { method: "GET", path: "/api/v1/chat/messages", auth: ["bearerAuth","cookieAuth"] },
+  sendChatMessage: { method: "POST", path: "/api/v1/chat/messages", auth: ["bearerAuth","cookieAuth"] },
+  markChatRead: { method: "POST", path: "/api/v1/chat/read", auth: ["bearerAuth","cookieAuth"] },
+  getChatSummary: { method: "GET", path: "/api/v1/chat/summary", auth: ["bearerAuth","cookieAuth"] },
 } as const satisfies Record<OperationId, { method: string; path: string; auth: readonly string[] }>;

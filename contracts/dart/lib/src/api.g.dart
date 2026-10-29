@@ -162,6 +162,18 @@ abstract class HontoApi {
   /// `POST /api/v1/private-media/{mediaId}/open`: openPrivatePhoto
   Future<PrivatePhotoOpened> openPrivatePhoto(String mediaId);
 
+  /// `GET /api/v1/chat/messages`: Chat history, newest first. Page with `before` = the last (oldest) message id of the previous page.
+  Future<ChatMessagePage> listChatMessages({String? before, String? limit});
+
+  /// `POST /api/v1/chat/messages`: Send a text, or comment on my partner's photo (`photoId`) or daily video (`privateMediaId`). Free.
+  Future<ChatMessage> sendChatMessage(ChatMessageRequest body);
+
+  /// `POST /api/v1/chat/read`: Mark the chat read up to a message (never moves backwards). Returns the new summary.
+  Future<ChatSummary> markChatRead(ChatReadRequest body);
+
+  /// `GET /api/v1/chat/summary`: Unread count (partner messages after my read marker) and the latest message, for the Today card.
+  Future<ChatSummary> getChatSummary();
+
 }
 
 /// Real implementation over [HontoTransport] (bearer token, JSON, error mapping).
@@ -471,6 +483,30 @@ class HttpHontoApi implements HontoApi {
   Future<PrivatePhotoOpened> openPrivatePhoto(String mediaId) async {
     final json = await transport.send('POST', '/api/v1/private-media/${Uri.encodeComponent(mediaId)}/open');
     return PrivatePhotoOpened.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<ChatMessagePage> listChatMessages({String? before, String? limit}) async {
+    final json = await transport.send('GET', '/api/v1/chat/messages', query: {if (before != null) 'before': before, if (limit != null) 'limit': limit});
+    return ChatMessagePage.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<ChatMessage> sendChatMessage(ChatMessageRequest body) async {
+    final json = await transport.send('POST', '/api/v1/chat/messages', body: body.toJson());
+    return ChatMessage.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<ChatSummary> markChatRead(ChatReadRequest body) async {
+    final json = await transport.send('POST', '/api/v1/chat/read', body: body.toJson());
+    return ChatSummary.fromJson(json as Map<String, dynamic>);
+  }
+
+  @override
+  Future<ChatSummary> getChatSummary() async {
+    final json = await transport.send('GET', '/api/v1/chat/summary');
+    return ChatSummary.fromJson(json as Map<String, dynamic>);
   }
 
 }

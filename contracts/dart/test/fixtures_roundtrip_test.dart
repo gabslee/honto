@@ -7,7 +7,14 @@ final _dateTime = RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d
 
 Object? normalize(Object? v) {
   if (v is String && _dateTime.hasMatch(v)) return DateTime.parse(v).toUtc().toIso8601String();
-  if (v is Map) return {for (final e in v.entries) e.key as String: normalize(e.value)};
+  // Optional nullable fields: the server may send an explicit null, the
+  // serializer omits it. Both mean "absent", so compare them as equal.
+  if (v is Map) {
+    return {
+      for (final e in v.entries)
+        if (e.value != null) e.key as String: normalize(e.value),
+    };
+  }
   if (v is List) return v.map(normalize).toList();
   return v;
 }

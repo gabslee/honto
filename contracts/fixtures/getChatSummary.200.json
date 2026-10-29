@@ -1,0 +1,16 @@
+{
+  "unreadCount": 1,
+  "lastReadMessageId": "msg_01",
+  "latest": {
+    "id": "msg_04",
+    "clientId": "pm_kenji_once",
+    "author": "partner",
+    "authorUserId": "usr_kenji",
+    "kind": "view_once",
+    "body": null,
+    "createdAt": "2026-10-19T12:20:00Z",
+    "photo": null,
+    "video": null,
+    "viewOnce": { "mediaId": "pm_kenji_once", "status": "unopened", "expiresAt": "2026-10-20T12:20:00Z", "isRecipient": true }
+  }
+}
