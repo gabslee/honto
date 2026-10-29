@@ -105,7 +105,7 @@ export function s3ObjectStore(): ObjectStore | null {
 // Tables owned by other workstreams, read only when present (W2a photos, W3 calendar/entitlements,
 // W2b trips/nudges). Present tables never disappear, so a fully present set is cached.
 // ---------------------------------------------------------------------------------------------------
-export type OptionalTables = { photos: boolean; exports: boolean; calendar: boolean; trips: boolean; nudges: boolean; entitlements: boolean };
+export type OptionalTables = { photos: boolean; exports: boolean; calendar: boolean; trips: boolean; nudges: boolean; entitlements: boolean; chat: boolean };
 const PHOTO_COLUMNS = 10;
 let allTables: OptionalTables | null = null;
 export async function optionalTables(sql: Sql): Promise<OptionalTables> {
@@ -116,8 +116,9 @@ export async function optionalTables(sql: Sql): Promise<OptionalTables> {
       (to_regclass('calendar_busy') IS NOT NULL AND to_regclass('calendar_sync') IS NOT NULL) AS calendar,
       to_regclass('trips') IS NOT NULL AS trips,
       to_regclass('couple_nudges') IS NOT NULL AS nudges,
-      to_regclass('entitlements') IS NOT NULL AS entitlements`)[0];
-  const tables = { photos: Number(row.photoColumns) === PHOTO_COLUMNS, exports: Boolean(row.exports), calendar: Boolean(row.calendar), trips: Boolean(row.trips), nudges: Boolean(row.nudges), entitlements: Boolean(row.entitlements) };
+      to_regclass('entitlements') IS NOT NULL AS entitlements,
+      (to_regclass('couple_messages') IS NOT NULL AND to_regclass('couple_chat_reads') IS NOT NULL) AS chat`)[0];
+  const tables = { photos: Number(row.photoColumns) === PHOTO_COLUMNS, exports: Boolean(row.exports), calendar: Boolean(row.calendar), trips: Boolean(row.trips), nudges: Boolean(row.nudges), entitlements: Boolean(row.entitlements), chat: Boolean(row.chat) };
   if (Object.values(tables).every(Boolean)) allTables = tables;
   return tables;
 }
@@ -204,7 +205,7 @@ const unpairedRows = (rows: Row[]): UnpairedRow[] => rows.map((row) => ({
 
 /**
  * Statements that remove what both partners shared in the given (already unpaired) couples, when the other
- * workstreams' tables exist: trips (with their Live Activity tokens), nudges, the calendar mirror of every
+ * workstreams' tables exist: trips (with their Live Activity tokens), nudges, chat messages, the calendar mirror of every
  * member who has no active couple left, and `delete_after` = unpair + 30 days on every photo still kept.
  * Safe to repeat (the retention cron runs them again for couples past the grace).
  */
@@ -213,6 +214,8 @@ function purgeStatements(sql: Sql, tables: OptionalTables, coupleIds: string[]):
   const statements: Statement[] = [];
   if (tables.trips) statements.push(sql`DELETE FROM trips WHERE couple_id IN (SELECT jsonb_array_elements_text(${ids}::jsonb))`);
   if (tables.nudges) statements.push(sql`DELETE FROM couple_nudges WHERE couple_id IN (SELECT jsonb_array_elements_text(${ids}::jsonb))`);
+  // Couple chat (drizzle/0019): messages are shared history, removed at unpair (they also cascade with the couple).
+  if (tables.chat) statements.push(sql`DELETE FROM couple_messages WHERE couple_id IN (SELECT jsonb_array_elements_text(${ids}::jsonb))`, sql`DELETE FROM couple_chat_reads WHERE couple_id IN (SELECT jsonb_array_elements_text(${ids}::jsonb))`);
   if (tables.calendar) statements.push(sql`DELETE FROM calendar_busy WHERE user_id IN (SELECT m.user_id FROM couple_members m WHERE m.couple_id IN (SELECT jsonb_array_elements_text(${ids}::jsonb)) AND NOT EXISTS (SELECT 1 FROM couple_members a WHERE a.user_id = m.user_id AND a.left_at IS NULL))`);
   if (tables.photos) statements.push(sql`UPDATE couple_photos p SET delete_after = c.unpaired_at + make_interval(days => ${UNPAIR_GRACE_DAYS}::int) FROM couples c WHERE c.id = p.couple_id AND p.couple_id IN (SELECT jsonb_array_elements_text(${ids}::jsonb)) AND c.unpaired_at IS NOT NULL AND p.delete_after IS NULL`);
   return statements;

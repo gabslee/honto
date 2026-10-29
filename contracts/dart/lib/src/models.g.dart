@@ -2361,6 +2361,7 @@ enum PushEventType {
   tripUpdate('trip.update'),
   tripEnd('trip.end'),
   privatePhotoNew('private_photo.new'),
+  chatMessage('chat_message'),
   /// A value added to the API after this client was built.
   unrecognized('');
 
@@ -2375,7 +2376,7 @@ enum PushEventType {
 /// APNs alert: top-level key `honto` next to `aps` (with `mutable-content: 1` for photo.new / nudge.new
 /// so the NSE refreshes the App Group snapshot). APNs widget push (iOS 26): `{"aps":{"content-changed":true}}` only.
 class PushData {
-  const PushData({required this.type, required this.coupleId, required this.sentAt, this.photoId, this.thumbUrl, this.nudgeId, this.createdAt, this.tripId, this.fromName, this.reason, this.mediaId});
+  const PushData({required this.type, required this.coupleId, required this.sentAt, this.photoId, this.thumbUrl, this.nudgeId, this.createdAt, this.tripId, this.fromName, this.reason, this.mediaId, this.messageId});
 
   final PushEventType type;
   final String coupleId;
@@ -2391,6 +2392,8 @@ class PushData {
   /// couple.unpaired only.
   final UnpairReason? reason;
   final String? mediaId;
+  /// chat_message only: deep link to the chat. The alert carries text only, never media.
+  final String? messageId;
 
   factory PushData.fromJson(Map<String, dynamic> json) => PushData(
         type: PushEventType.fromJson(json['type'] as String),
@@ -2404,6 +2407,7 @@ class PushData {
         fromName: json['fromName'] == null ? null : json['fromName'] as String,
         reason: json['reason'] == null ? null : UnpairReason.fromJson(json['reason'] as String),
         mediaId: json['mediaId'] == null ? null : json['mediaId'] as String,
+        messageId: json['messageId'] == null ? null : json['messageId'] as String,
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -2418,6 +2422,7 @@ class PushData {
         if (fromName != null) 'fromName': fromName!,
         if (reason != null) 'reason': reason!.toJson(),
         if (mediaId != null) 'mediaId': mediaId!,
+        if (messageId != null) 'messageId': messageId!,
       };
 
   @override
@@ -2888,6 +2893,254 @@ enum PrivateMediaContentType {
   String toJson() => wire;
 }
 
+enum ChatMessageKind {
+  text('text'),
+  photoComment('photo_comment'),
+  videoComment('video_comment'),
+  viewOnce('view_once'),
+  /// A value added to the API after this client was built.
+  unrecognized('');
+
+  const ChatMessageKind(this.wire);
+  final String wire;
+
+  static ChatMessageKind fromJson(String value) => values.firstWhere((e) => e.wire == value && e != unrecognized, orElse: () => unrecognized);
+  String toJson() => wire;
+}
+
+enum ViewOnceStatus {
+  unopened('unopened'),
+  opened('opened'),
+  expired('expired'),
+  /// A value added to the API after this client was built.
+  unrecognized('');
+
+  const ViewOnceStatus(this.wire);
+  final String wire;
+
+  static ViewOnceStatus fromJson(String value) => values.firstWhere((e) => e.wire == value && e != unrecognized, orElse: () => unrecognized);
+  String toJson() => wire;
+}
+
+class ChatPhotoRef {
+  const ChatPhotoRef({required this.photoId, required this.available, required this.thumbUrl, required this.expiresAt});
+
+  /// Null once the photo was deleted.
+  final String? photoId;
+  final bool available;
+  /// Signed thumb (24h), same as Memories. Cache by photo id.
+  final String? thumbUrl;
+  final DateTime? expiresAt;
+
+  factory ChatPhotoRef.fromJson(Map<String, dynamic> json) => ChatPhotoRef(
+        photoId: json['photoId'] == null ? null : json['photoId'] as String,
+        available: json['available'] as bool,
+        thumbUrl: json['thumbUrl'] == null ? null : json['thumbUrl'] as String,
+        expiresAt: json['expiresAt'] == null ? null : DateTime.parse(json['expiresAt'] as String),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'photoId': photoId,
+        'available': available,
+        'thumbUrl': thumbUrl,
+        'expiresAt': expiresAt == null ? null : expiresAt!.toUtc().toIso8601String(),
+      };
+
+  @override
+  String toString() => 'ChatPhotoRef(${toJson()})';
+}
+
+class ChatVideoRef {
+  const ChatVideoRef({required this.mediaId, required this.available, required this.posterUrl});
+
+  /// Daily video id (play with getPrivateMediaPlayback). Null once replaced or deleted.
+  final String? mediaId;
+  final bool available;
+  /// No posters are generated yet: always null (show a video glyph).
+  final String? posterUrl;
+
+  factory ChatVideoRef.fromJson(Map<String, dynamic> json) => ChatVideoRef(
+        mediaId: json['mediaId'] == null ? null : json['mediaId'] as String,
+        available: json['available'] as bool,
+        posterUrl: json['posterUrl'] == null ? null : json['posterUrl'] as String,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'mediaId': mediaId,
+        'available': available,
+        'posterUrl': posterUrl,
+      };
+
+  @override
+  String toString() => 'ChatVideoRef(${toJson()})';
+}
+
+class ChatViewOnceRef {
+  const ChatViewOnceRef({required this.mediaId, required this.status, required this.expiresAt, required this.isRecipient});
+
+  /// Only while unopened; open with openPrivatePhoto (recipient, Premium).
+  final String? mediaId;
+  final ViewOnceStatus status;
+  final DateTime? expiresAt;
+  final bool isRecipient;
+
+  factory ChatViewOnceRef.fromJson(Map<String, dynamic> json) => ChatViewOnceRef(
+        mediaId: json['mediaId'] == null ? null : json['mediaId'] as String,
+        status: ViewOnceStatus.fromJson(json['status'] as String),
+        expiresAt: json['expiresAt'] == null ? null : DateTime.parse(json['expiresAt'] as String),
+        isRecipient: json['isRecipient'] as bool,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'mediaId': mediaId,
+        'status': status.toJson(),
+        'expiresAt': expiresAt == null ? null : expiresAt!.toUtc().toIso8601String(),
+        'isRecipient': isRecipient,
+      };
+
+  @override
+  String toString() => 'ChatViewOnceRef(${toJson()})';
+}
+
+class ChatMessage {
+  const ChatMessage({required this.id, required this.clientId, required this.author, required this.authorUserId, required this.kind, required this.body, required this.createdAt, required this.photo, required this.video, required this.viewOnce});
+
+  final String id;
+  final String clientId;
+  final PhotoAuthor author;
+  final String authorUserId;
+  final ChatMessageKind kind;
+  /// Null for view_once.
+  final String? body;
+  final DateTime createdAt;
+  /// photo_comment only.
+  final ChatPhotoRef? photo;
+  /// video_comment only.
+  final ChatVideoRef? video;
+  /// view_once only.
+  final ChatViewOnceRef? viewOnce;
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
+        id: json['id'] as String,
+        clientId: json['clientId'] as String,
+        author: PhotoAuthor.fromJson(json['author'] as String),
+        authorUserId: json['authorUserId'] as String,
+        kind: ChatMessageKind.fromJson(json['kind'] as String),
+        body: json['body'] == null ? null : json['body'] as String,
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        photo: json['photo'] == null ? null : ChatPhotoRef.fromJson(json['photo'] as Map<String, dynamic>),
+        video: json['video'] == null ? null : ChatVideoRef.fromJson(json['video'] as Map<String, dynamic>),
+        viewOnce: json['viewOnce'] == null ? null : ChatViewOnceRef.fromJson(json['viewOnce'] as Map<String, dynamic>),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'clientId': clientId,
+        'author': author.toJson(),
+        'authorUserId': authorUserId,
+        'kind': kind.toJson(),
+        'body': body,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'photo': photo == null ? null : photo!.toJson(),
+        'video': video == null ? null : video!.toJson(),
+        'viewOnce': viewOnce == null ? null : viewOnce!.toJson(),
+      };
+
+  @override
+  String toString() => 'ChatMessage(${toJson()})';
+}
+
+class ChatMessagePage {
+  const ChatMessagePage({required this.messages, required this.nextBefore});
+
+  /// Newest first.
+  final List<ChatMessage> messages;
+  /// Pass as `before` for older messages; null on the last page.
+  final String? nextBefore;
+
+  factory ChatMessagePage.fromJson(Map<String, dynamic> json) => ChatMessagePage(
+        messages: (json['messages'] as List<dynamic>).map((e) => ChatMessage.fromJson(e as Map<String, dynamic>)).toList(),
+        nextBefore: json['nextBefore'] == null ? null : json['nextBefore'] as String,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'messages': messages.map((e) => e.toJson()).toList(),
+        'nextBefore': nextBefore,
+      };
+
+  @override
+  String toString() => 'ChatMessagePage(${toJson()})';
+}
+
+class ChatMessageRequest {
+  const ChatMessageRequest({required this.clientId, required this.body, this.photoId, this.privateMediaId});
+
+  /// Idempotency key generated on the device.
+  final String clientId;
+  final String body;
+  /// Comment on my partner's photo.
+  final String? photoId;
+  /// Comment on my partner's daily video.
+  final String? privateMediaId;
+
+  factory ChatMessageRequest.fromJson(Map<String, dynamic> json) => ChatMessageRequest(
+        clientId: json['clientId'] as String,
+        body: json['body'] as String,
+        photoId: json['photoId'] == null ? null : json['photoId'] as String,
+        privateMediaId: json['privateMediaId'] == null ? null : json['privateMediaId'] as String,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'clientId': clientId,
+        'body': body,
+        if (photoId != null) 'photoId': photoId!,
+        if (privateMediaId != null) 'privateMediaId': privateMediaId!,
+      };
+
+  @override
+  String toString() => 'ChatMessageRequest(${toJson()})';
+}
+
+class ChatReadRequest {
+  const ChatReadRequest({required this.messageId});
+
+  final String messageId;
+
+  factory ChatReadRequest.fromJson(Map<String, dynamic> json) => ChatReadRequest(
+        messageId: json['messageId'] as String,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'messageId': messageId,
+      };
+
+  @override
+  String toString() => 'ChatReadRequest(${toJson()})';
+}
+
+class ChatSummary {
+  const ChatSummary({required this.unreadCount, required this.lastReadMessageId, required this.latest});
+
+  final int unreadCount;
+  final String? lastReadMessageId;
+  final ChatMessage? latest;
+
+  factory ChatSummary.fromJson(Map<String, dynamic> json) => ChatSummary(
+        unreadCount: (json['unreadCount'] as num).toInt(),
+        lastReadMessageId: json['lastReadMessageId'] == null ? null : json['lastReadMessageId'] as String,
+        latest: json['latest'] == null ? null : ChatMessage.fromJson(json['latest'] as Map<String, dynamic>),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'unreadCount': unreadCount,
+        'lastReadMessageId': lastReadMessageId,
+        'latest': latest == null ? null : latest!.toJson(),
+      };
+
+  @override
+  String toString() => 'ChatSummary(${toJson()})';
+}
+
 /// Decoders for every object model, keyed by Dart type name (used by fakes and fixture tests).
 final Map<String, Object Function(Map<String, dynamic>)> hontoModelDecoders = <String, Object Function(Map<String, dynamic>)>{
   'ApiError': ApiError.fromJson,
@@ -2978,4 +3231,12 @@ final Map<String, Object Function(Map<String, dynamic>)> hontoModelDecoders = <S
   'PrivateMediaUpload': PrivateMediaUpload.fromJson,
   'PrivateMediaPlayback': PrivateMediaPlayback.fromJson,
   'PrivatePhotoOpened': PrivatePhotoOpened.fromJson,
+  'ChatPhotoRef': ChatPhotoRef.fromJson,
+  'ChatVideoRef': ChatVideoRef.fromJson,
+  'ChatViewOnceRef': ChatViewOnceRef.fromJson,
+  'ChatMessage': ChatMessage.fromJson,
+  'ChatMessagePage': ChatMessagePage.fromJson,
+  'ChatMessageRequest': ChatMessageRequest.fromJson,
+  'ChatReadRequest': ChatReadRequest.fromJson,
+  'ChatSummary': ChatSummary.fromJson,
 };

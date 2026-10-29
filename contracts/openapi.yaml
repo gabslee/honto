@@ -61,6 +61,8 @@ tags:
     description: 'Reunion trips that drive the Live Activity / Live Update.'
   - name: nudges
     description: '"Thinking of you" (Free).'
+  - name: chat
+    description: 'Couple chat ("Just between you"). Free; disappearing photos inside it are Premium.'
   - name: billing
     description: 'RevenueCat webhook.'
   - name: cron
@@ -1185,6 +1187,93 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/StorageNotConfigured"
+  /api/v1/chat/messages:
+    get:
+      tags: [ chat ]
+      operationId: listChatMessages
+      summary: Chat history, newest first. Page with `before` = the last (oldest) message id of the previous page.
+      description: |
+        `limit` 1-100 (default 30). `nextBefore` is null on the last page. Comments carry a small media reference
+        (`photo` / `video`); view-once messages carry `viewOnce` (status only, never a URL: open it with
+        `POST /api/v1/private-media/{mediaId}/open`). Photo thumbnails follow the Memories rules (signed 24h; null when the
+        photo was deleted, storage is unavailable, or the day is outside the Free 7-day window).
+      parameters:
+        - name: before
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatMessagePage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [ chat ]
+      operationId: sendChatMessage
+      summary: Send a text, or comment on my partner's photo (`photoId`) or daily video (`privateMediaId`). Free.
+      description: |
+        Idempotent per `clientId` (a retry returns the first message). The body is trimmed, 1-2000 characters.
+        `photoId` and `privateMediaId` are exclusive and must reference a ready photo / daily video of this couple
+        authored by my partner (`422 media_unavailable` otherwise, including my own media). Disappearing photos are
+        not sent here: they use the private-media upload flow and appear in the chat once completed.
+        Rate limit 60 per minute (`429 rate_limited`). The partner gets an alert push `chat_message` (text only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatMessageRequest' }
+      responses:
+        '201':
+          description: Sent (or the earlier message with the same clientId).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatMessage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/v1/chat/read:
+    post:
+      tags: [ chat ]
+      operationId: markChatRead
+      summary: Mark the chat read up to a message (never moves backwards). Returns the new summary.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatReadRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatSummary' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/chat/summary:
+    get:
+      tags: [ chat ]
+      operationId: getChatSummary
+      summary: Unread count (partner messages after my read marker) and the latest message, for the Today card.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatSummary' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     bearerAuth:
@@ -2133,6 +2222,7 @@ components:
         - trip.update
         - trip.end
         - private_photo.new
+        - chat_message
     PushData:
       type: object
       x-contract: push
@@ -2154,6 +2244,7 @@ components:
         reason: { $ref: '#/components/schemas/UnpairReason', description: 'couple.unpaired only.' }
         mediaId:
           type: string
+        messageId: { type: string, description: 'chat_message only: deep link to the chat. The alert carries text only, never media.' }
     TripActivityPhase:
       type: string
       enum: [ before, inTransit, landed ]
@@ -2411,3 +2502,72 @@ components:
       enum:
         - video/mp4
         - image/jpeg
+    ChatMessageKind:
+      type: string
+      enum: [ text, photo_comment, video_comment, view_once ]
+    ViewOnceStatus:
+      type: string
+      enum: [ unopened, opened, expired ]
+    ChatPhotoRef:
+      type: object
+      required: [ photoId, available, thumbUrl, expiresAt ]
+      properties:
+        photoId: { type: [ string, 'null' ], description: 'Null once the photo was deleted.' }
+        available: { type: boolean }
+        thumbUrl: { type: [ string, 'null' ], format: uri, description: 'Signed thumb (24h), same as Memories. Cache by photo id.' }
+        expiresAt: { type: [ string, 'null' ], format: date-time }
+    ChatVideoRef:
+      type: object
+      required: [ mediaId, available, posterUrl ]
+      properties:
+        mediaId: { type: [ string, 'null' ], description: 'Daily video id (play with getPrivateMediaPlayback). Null once replaced or deleted.' }
+        available: { type: boolean }
+        posterUrl: { type: [ string, 'null' ], format: uri, description: 'No posters are generated yet: always null (show a video glyph).' }
+    ChatViewOnceRef:
+      type: object
+      required: [ mediaId, status, expiresAt, isRecipient ]
+      properties:
+        mediaId: { type: [ string, 'null' ], description: 'Only while unopened; open with openPrivatePhoto (recipient, Premium).' }
+        status: { $ref: '#/components/schemas/ViewOnceStatus' }
+        expiresAt: { type: [ string, 'null' ], format: date-time }
+        isRecipient: { type: boolean }
+    ChatMessage:
+      type: object
+      required: [ id, clientId, author, authorUserId, kind, body, createdAt, photo, video, viewOnce ]
+      properties:
+        id: { type: string }
+        clientId: { type: string }
+        author: { $ref: '#/components/schemas/PhotoAuthor' }
+        authorUserId: { type: string }
+        kind: { $ref: '#/components/schemas/ChatMessageKind' }
+        body: { type: [ string, 'null' ], maxLength: 2000, description: 'Null for view_once.' }
+        createdAt: { type: string, format: date-time }
+        photo: { anyOf: [ { $ref: '#/components/schemas/ChatPhotoRef' }, { type: 'null' } ], description: 'photo_comment only.' }
+        video: { anyOf: [ { $ref: '#/components/schemas/ChatVideoRef' }, { type: 'null' } ], description: 'video_comment only.' }
+        viewOnce: { anyOf: [ { $ref: '#/components/schemas/ChatViewOnceRef' }, { type: 'null' } ], description: 'view_once only.' }
+    ChatMessagePage:
+      type: object
+      required: [ messages, nextBefore ]
+      properties:
+        messages: { type: array, items: { $ref: '#/components/schemas/ChatMessage' }, description: 'Newest first.' }
+        nextBefore: { type: [ string, 'null' ], description: 'Pass as `before` for older messages; null on the last page.' }
+    ChatMessageRequest:
+      type: object
+      required: [ clientId, body ]
+      properties:
+        clientId: { type: string, format: uuid, description: 'Idempotency key generated on the device.' }
+        body: { type: string, minLength: 1, maxLength: 2000 }
+        photoId: { type: string, description: "Comment on my partner's photo." }
+        privateMediaId: { type: string, description: "Comment on my partner's daily video." }
+    ChatReadRequest:
+      type: object
+      required: [ messageId ]
+      properties:
+        messageId: { type: string }
+    ChatSummary:
+      type: object
+      required: [ unreadCount, lastReadMessageId, latest ]
+      properties:
+        unreadCount: { type: integer, minimum: 0 }
+        lastReadMessageId: { type: [ string, 'null' ] }
+        latest: { anyOf: [ { $ref: '#/components/schemas/ChatMessage' }, { type: 'null' } ] }
