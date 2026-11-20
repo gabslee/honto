@@ -9,7 +9,7 @@ test('mobile auth tokens, account-free partner device token and photo moments', 
   globalThis.__hontoTestSql = async (parts, ...values) => (await db.query(parts.reduce((t, p, i) => t + (i ? `$${i}` : '') + p, ''), values)).rows;
   globalThis.__blobPuts = [];
   const hooks = module.registerHooks({ resolve(specifier, context, next) {
-    if (specifier === '@neondatabase/serverless') return { url: 'data:text/javascript,export const neon=()=>globalThis.__hontoTestSql', shortCircuit: true };
+    if (specifier.endsWith('/pg-sql')) return { url: 'data:text/javascript,export const createSql=()=>globalThis.__hontoTestSql', shortCircuit: true };
     if (specifier === '@vercel/blob') return { url: 'data:text/javascript,export async function put(p,b,o){globalThis.__blobPuts.push({p,o,size:b.length});return{url:"https://blob.test/"+p,pathname:p}}', shortCircuit: true };
     if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier)) {
       const ext = /(?:game-contract|multiplayer-service)$/.test(specifier) ? '.js' : '.ts';

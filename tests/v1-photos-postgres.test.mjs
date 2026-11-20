@@ -82,7 +82,7 @@ test('photos, memories and devices', async (t) => {
   const db = new PGlite();
   globalThis.__hontoTestSql = async (parts, ...values) => (await db.query(parts.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, ''), values)).rows;
   const hooks = module.registerHooks({ resolve(specifier, context, next) {
-    if (specifier === '@neondatabase/serverless') return { url: 'data:text/javascript,export const neon=()=>globalThis.__hontoTestSql', shortCircuit: true };
+    if (specifier.endsWith('/pg-sql')) return { url: 'data:text/javascript,export const createSql=()=>globalThis.__hontoTestSql', shortCircuit: true };
     if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier)) return next(new URL(specifier + '.ts', context.parentURL).href, context);
     return next(specifier, context);
   } });

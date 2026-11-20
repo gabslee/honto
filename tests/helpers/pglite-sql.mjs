@@ -1,5 +1,5 @@
-// Neon-like `sql` over PGlite for the route tests: lazy tagged queries (awaited alone, or batched by
-// `sql.transaction([...])` like @neondatabase/serverless) and a real transaction (all or nothing).
+// pg-sql-like `sql` over PGlite for the route tests: lazy tagged queries (awaited alone, or batched by
+// `sql.transaction([...])` like server/pg-sql.ts) and a real transaction (all or nothing).
 export function pgliteSql(db) {
   const sql = (parts, ...values) => {
     const text = parts.reduce((out, part, i) => out + (i ? `$${i}` : '') + part, '');

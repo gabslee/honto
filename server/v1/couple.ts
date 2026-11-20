@@ -1,5 +1,5 @@
 import { citiesFor, cityDistanceKm } from './city';
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../pg-sql";
 import type { Avatar, Couple, Entitlement, EntitlementSource, Features, Invite, Me, NudgeState, PartnerInfo, PartnerStatus, PeriodType, Photo, Reunion, Today, Trip } from "../../contracts/honto-api";
 import { database } from "../../app/server-auth";
 import { apiError, isCouplePremium, noStore, normalizeTimeZone, requireCouple, requireUser, toApiUser, type V1Couple, type V1Partner, type V1User } from "./context";
@@ -8,7 +8,6 @@ import { todayMilestones } from "./milestones";
 import { avatarsFor } from "./profile";
 import { weatherFor } from "./weather";
 
-type Sql = NeonQueryFunction<false, false>;
 type Row = Record<string, unknown>;
 type Paired = { user: V1User; couple: V1Couple; partner: V1Partner };
 

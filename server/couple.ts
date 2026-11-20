@@ -1,7 +1,6 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "./pg-sql";
 import { coupleKeyFor, roomCoupleId, validPartnerKey } from "../app/couple-identity.js";
 
-type Sql = NeonQueryFunction<false, false>;
 let ready: Promise<void> | null = null;
 
 /** Idempotent schema + safe migration of room-scoped daily/history data to couple-scoped data. */

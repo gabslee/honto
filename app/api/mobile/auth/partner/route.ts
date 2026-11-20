@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   const existing = await getMobileToken(request);
   const partnerKey = existing?.kind === "device" && existing.partnerKey ? existing.partnerKey : validPartnerKey(body.partnerKey) ? String(body.partnerKey) : crypto.randomUUID();
   const headers = new Headers(); // never forward a host account into the partner seat
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- shared Neon client
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- shared database client
   await ensureCoupleSchema(sql as any);
   const room = (await sql`SELECT id, multiplayer FROM rooms WHERE code = ${code}`)[0];
   if (!room) return Response.json({ error: "That room does not exist." }, { status: 404, headers: noStore });

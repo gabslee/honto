@@ -1,11 +1,10 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../pg-sql";
 import type { AuthSession, EmailStartResponse, Platform, User } from "../../contracts/honto-api";
 import { createMobileToken, createUserSession, database, userCookie } from "../../app/server-auth";
 import { apiError, noStore } from "./context";
 import { clientIp, ensureLifecycleSchema, hitRateLimit, saltedHash } from "./lifecycle";
 import { issueRefreshToken, REFRESH_TTL_DAYS } from "./refresh-tokens";
 
-type Sql = NeonQueryFunction<false, false>;
 type Env = Record<string, string | undefined>;
 
 export const EMAIL_TOKEN_MINUTES = 15;

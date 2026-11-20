@@ -1,7 +1,7 @@
 // Build 8 Profile tab: profile photo (avatar) and display name. The avatar reuses the photos upload flow
 // (presigned PUT of a full image and a device-made thumbnail, then complete), stored privately under
 // avatars/<userId>/<avatarId>/ and served as 24 h presigned GETs. In-app only: widgets never read it.
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../pg-sql";
 import type { Avatar, AvatarUploadResponse, PhotoContentType, User } from "../../contracts/honto-api";
 import { database } from "../../app/server-auth";
 import { headObject, presignPut, StorageError, storageConfig } from "../../app/storage";
@@ -9,7 +9,6 @@ import { apiError, noStore, requireUser, toApiUser } from "./context";
 import { ensureFoundationSchema } from "./foundation-schema";
 import { ensureLifecycleSchema, getObjectStore, hitRateLimit, randomId, type ObjectStore } from "./lifecycle";
 
-type Sql = NeonQueryFunction<false, false>;
 type AvatarRow = { id: string; userId: string; status: "pending" | "ready"; objectKey: string; thumbKey: string; contentType: string; bytes: number; thumbContentType: string; thumbBytes: number; updatedAt: string };
 
 const ISO = 'YYYY-MM-DD"T"HH24:MI:SS"Z"';

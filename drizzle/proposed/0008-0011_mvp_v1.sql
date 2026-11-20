@@ -1,5 +1,5 @@
 -- =====================================================================================================
--- Honto MVP /api/v1: schema migration PLAN (W0). NOT APPLIED. Do not run against Neon from this file.
+-- Honto MVP /api/v1: schema migration PLAN (W0). NOT APPLIED. Do not run against a production database from this file.
 --
 -- Follows the repo pattern: idempotent raw SQL (CREATE ... IF NOT EXISTS / ALTER ... ADD COLUMN IF NOT
 -- EXISTS) that each backend workstream copies into

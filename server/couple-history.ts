@@ -1,4 +1,4 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "./pg-sql";
 import { localDay } from "../app/daily-card.js";
 import { daysUntil, summarizeMoment, validReunionDate } from "../app/couple-history.js";
 import { roleFor } from "../app/couple-identity.js";
@@ -6,7 +6,6 @@ import { ensureCoupleSchema, resolveCouple } from "./couple";
 import { dailyCardText } from "./daily-card";
 import { couplePhotos, publicPhoto } from "./photo-moments";
 
-type Sql = NeonQueryFunction<false, false>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic SQL rows
 type Row = Record<string, any>;
 const parse = (value: unknown) => { try { return typeof value === "string" ? JSON.parse(value) : (value ?? {}); } catch { return {}; } };

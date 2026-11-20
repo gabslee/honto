@@ -1,9 +1,8 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "./pg-sql";
 import { roleFor } from "../app/couple-identity.js";
 import { JAPANESE_PHRASES } from "../app/photo-moments.js";
 import { resolveCouple } from "./couple";
 
-type Sql = NeonQueryFunction<false, false>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic SQL rows
 type Row = Record<string, any>;
 

@@ -74,7 +74,7 @@ const clearPushEnv = () => setEnv({ APNS_KEY_P8: undefined, APNS_KEY_ID: undefin
 
 const hooks = module.registerHooks({ resolve(specifier, context, next) {
   if (specifier === 'node:http2') return { url: `data:text/javascript,${encodeURIComponent('export const connect = (...a) => globalThis.__hontoHttp2.connect(...a);')}`, shortCircuit: true };
-  if (specifier === '@neondatabase/serverless') return { url: 'data:text/javascript,export const neon=()=>globalThis.__hontoTestSql', shortCircuit: true };
+  if (specifier.endsWith('/pg-sql')) return { url: 'data:text/javascript,export const createSql=()=>globalThis.__hontoTestSql', shortCircuit: true };
   if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier)) return next(new URL(specifier + '.ts', context.parentURL).href, context);
   return next(specifier, context);
 } });

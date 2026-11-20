@@ -12,7 +12,7 @@ export async function resolveMobileRoom(request: Request, body: Record<string, u
   const device = await getMobileToken(request);
   if (device?.kind === "device" && device.partnerKey) {
     body.partnerKey = device.partnerKey;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- shared Neon client
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- shared database client
     await ensureCoupleSchema(sql as any);
     if (!body.code || !body.token) {
       const rows = await sql`SELECT r.code, p.token FROM players p JOIN rooms r ON r.id = p.room_id WHERE p.partner_key = ${device.partnerKey} AND p.is_host = false AND NOT r.multiplayer ORDER BY p.joined_at DESC LIMIT 1`;

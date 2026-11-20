@@ -24,7 +24,7 @@ globalThis.__hontoTestSql = async (parts, ...values) => (await activeDb.query(pa
 const columns = async (db) => (await db.query(`SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name IN ('user_weather', 'couple_nudges') ORDER BY table_name, column_name`)).rows;
 
 const hooks = () => module.registerHooks({ resolve(specifier, context, next) {
-  if (specifier === '@neondatabase/serverless') return { url: 'data:text/javascript,export const neon=()=>globalThis.__hontoTestSql', shortCircuit: true };
+  if (specifier.endsWith('/pg-sql')) return { url: 'data:text/javascript,export const createSql=()=>globalThis.__hontoTestSql', shortCircuit: true };
   if (specifier === 'next/server') return next('next/server.js', context);
   if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier) && !context.parentURL?.includes('/node_modules/')) return next(new URL(specifier + '.ts', context.parentURL).href, context);
   return next(specifier, context);

@@ -1,7 +1,7 @@
 // Couple chat ("Just between you", Free): GET/POST /api/v1/chat/messages, POST /api/v1/chat/read,
 // GET /api/v1/chat/summary. Comments reference the partner's photo or daily video; view-once messages are created
 // by the private-media flow (Premium) and keep only a status here, never a URL or bytes.
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../pg-sql";
 import type { ChatMessage, ChatMessageKind, ChatPhotoRef, ChatSummary, ViewOnceStatus } from "../../contracts/honto-api";
 import { notifyPartner, type NotifySummary, type PushEvent } from "../../app/push/index";
 import { database } from "../../app/server-auth";
@@ -11,7 +11,6 @@ import { resolveEntitlement } from "./couple";
 import { ensureLaunchSchema } from "./launch-schema";
 import { hitRateLimit, randomId } from "./lifecycle";
 
-type Sql = NeonQueryFunction<false, false>;
 
 export const CHAT_BODY_MAX = 2000;
 export const CHAT_PAGE_DEFAULT = 30;

@@ -1,14 +1,13 @@
 // Push fan-out to the partner's devices: APNs alert + APNs widget (iOS) and FCM data (Android).
 // Payloads follow the contract (`PushData` in contracts/openapi.yaml). Sending never throws and never logs
 // device tokens; with the APNs / FCM settings unset it is a logged no-op so the endpoints keep working.
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../../server/pg-sql";
 import type { PushData, UnpairReason } from "../../contracts/honto-api";
 import { ensurePhotosSchema } from "../../server/v1/photos-schema";
 import { database } from "../server-auth";
 import { apnsConfig, sendApns, type ApnsEnv, type ApnsMessage, type ApnsResult } from "./apns";
 import { fcmConfig, sendFcm, type FcmResult } from "./fcm";
 
-type Sql = NeonQueryFunction<false, false>;
 
 /** Events W2a sends (plus `nudge.new`, feedback r1). `reunion.changed` is a widget refresh only (no visible alert). */
 export type PushEvent =

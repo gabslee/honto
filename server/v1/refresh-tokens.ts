@@ -1,10 +1,9 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../pg-sql";
 import type { AuthPlatform, AuthSession, User } from "../../contracts/honto-api";
 import { createMobileToken, database, revokeMobileToken } from "../../app/server-auth";
 import { apiError, noStore } from "./context";
 import { clientIp, ensureLifecycleSchema, hitRateLimit, randomId, saltedHash, sessionTokenHash } from "./lifecycle";
 
-type Sql = NeonQueryFunction<false, false>;
 
 export const REFRESH_TTL_DAYS = 365;
 /** A refresh token presented again within this window is a client retry (two requests raced), not theft. */

@@ -1,7 +1,7 @@
-import type { NeonQueryFunction } from '@neondatabase/serverless';
+import type { Sql } from '../pg-sql';
 import { ensureLifecycleSchema } from './lifecycle';
 import { ensurePhotosSchema } from './photos-schema';
-export type LaunchSql = NeonQueryFunction<false, false>;
+export type LaunchSql = Sql;
 const pending = new WeakMap<LaunchSql, Promise<void>>();
 export function ensureLaunchSchema(sql: LaunchSql) {
   const existing = pending.get(sql); if (existing) return existing;

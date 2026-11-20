@@ -7,7 +7,8 @@ App Store Connect / Play builds. Never commit values.
 
 | Name | Used by | Notes |
 |---|---|---|
-| `DATABASE_URL` | all | existing (Neon) |
+| `DATABASE_URL` | all | PostgreSQL connection string (Railway Postgres; was Neon). Use the public TCP proxy URL from Vercel. `?sslmode=disable` turns TLS off, `verify-full` verifies the certificate, anything else (or none on a remote host) encrypts without verifying, which Railway's proxy needs. Shared `pg` pool in `server/pg-sql.ts` |
+| `DATABASE_POOL_MAX` | all | optional, connections per server instance, default 5 (keep instances x this below Postgres `max_connections`) |
 | `AUTH_SESSION_SALT` | auth | existing; also salts `email_login_tokens.token_hash` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`, `GOOGLE_ANDROID_CLIENT_ID` | auth | existing audiences for Google ID tokens |
 | `APPLE_IOS_BUNDLE_ID` | auth | existing, default `com.hontogame.app` |

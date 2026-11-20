@@ -6,7 +6,7 @@ Builds on `docs/launch-private-media.md`. Requires the matching Flutter branch.
 
 - New file `drizzle/0019_couple_chat.sql`: tables `couple_messages` and `couple_chat_reads`. 0018 is unchanged.
 - The same statements run idempotently at runtime from `server/v1/launch-schema.ts` (`ensureLaunchSchema`), like 0018.
-- **The migration has NOT been applied to any database** (no Neon, no remote). Only isolated PGlite tests ran it.
+- **The migration has NOT been applied to any database** (no remote database). Only isolated PGlite tests ran it.
 
 `couple_messages`: `couple_id` and `author_user_id` cascade on delete; `UNIQUE(author_user_id, client_id)` makes sends
 idempotent; `kind` in `text | photo_comment | video_comment | view_once`; `body` is trimmed, 1-2000 characters, and null
