@@ -122,6 +122,21 @@ test('couple chat over isolated PostgreSQL', async t => {
       assert.equal(p.body, 'Love this');
     });
 
+    await t.test('a video comment follows the video 24 hour expiry: no new comments, existing ones turn unavailable', async () => {
+      await video('pm_v24', 'c', 'b', 'a');
+      await db.query("UPDATE private_media SET ready_at = now() - interval '1 hour', expires_at = now() + interval '23 hours', local_day = current_date - 1 WHERE id = 'pm_v24'");
+      const ok = await send('a', {clientId: uuid(30), body: 'still here', privateMediaId: 'pm_v24'});
+      assert.equal(ok.status, 201, 'a video of an earlier local day is commentable while live');
+      assert.deepEqual(ok.body.video, {mediaId: 'pm_v24', available: true, posterUrl: null});
+      await db.query("UPDATE private_media SET expires_at = now() - interval '1 second' WHERE id = 'pm_v24'");
+      assert.equal((await send('a', {clientId: uuid(31), body: 'too late', privateMediaId: 'pm_v24'})).status, 422);
+      const [v] = (await list('b', '?limit=1')).body.messages.filter(m => m.body === 'still here');
+      assert.deepEqual(v.video, {mediaId: null, available: false, posterUrl: null});
+      await db.query("UPDATE private_media SET expires_at = NULL, ready_at = now() - interval '25 hours' WHERE id = 'pm_v24'");
+      assert.equal((await send('a', {clientId: uuid(32), body: 'legacy', privateMediaId: 'pm_v24'})).status, 422, 'NULL expiry reads as ready_at + 24h');
+      await db.exec("DELETE FROM private_media WHERE id = 'pm_v24'");
+    });
+
     await t.test('Free couples get no thumbnail for photos outside the 7-day window', async () => {
       await photo('ph_old', 'c', 'b', "current_date - 30");
       const old = await send('a', {clientId: uuid(16), body: 'Throwback', photoId: 'ph_old'});

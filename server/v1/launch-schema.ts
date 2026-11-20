@@ -2,6 +2,12 @@ import type { Sql } from '../pg-sql';
 import { ensureLifecycleSchema } from './lifecycle';
 import { ensurePhotosSchema } from './photos-schema';
 export type LaunchSql = Sql;
+/** Daily videos are live for 24 hours after they became ready. Ready videos without an `expires_at` (written before
+ *  that rule) get ready_at + 24 hours, so the cleanup sweep removes them from the database and the object store.
+ *  Idempotent: only rows still NULL are touched, and it never moves an existing expiry. */
+export async function backfillDailyVideoExpiry(sql: LaunchSql) {
+  await sql`UPDATE private_media SET expires_at = coalesce(ready_at, created_at) + interval '24 hours' WHERE kind = 'daily_video' AND status = 'ready' AND expires_at IS NULL`;
+}
 const pending = new WeakMap<LaunchSql, Promise<void>>();
 export function ensureLaunchSchema(sql: LaunchSql) {
   const existing = pending.get(sql); if (existing) return existing;
@@ -12,6 +18,7 @@ export function ensureLaunchSchema(sql: LaunchSql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_private_media_inbox ON private_media(recipient_user_id, expires_at) WHERE kind = 'view_once' AND status = 'ready'`;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_private_media_daily ON private_media(couple_id, author_user_id, local_day) WHERE kind = 'daily_video' AND status = 'ready'`;
     await sql`CREATE TABLE IF NOT EXISTS private_video_slots (couple_id text NOT NULL REFERENCES couples(id) ON DELETE CASCADE, author_user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, local_day date NOT NULL, PRIMARY KEY(couple_id,author_user_id,local_day))`;
+    await backfillDailyVideoExpiry(sql);
     // Couple chat (mirrors drizzle/0019_couple_chat.sql).
     await ensurePhotosSchema(sql);
     await sql`CREATE TABLE IF NOT EXISTS couple_messages (id text PRIMARY KEY, couple_id text NOT NULL REFERENCES couples(id) ON DELETE CASCADE, author_user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, client_id text NOT NULL, kind text NOT NULL CHECK (kind IN ('text','photo_comment','video_comment','view_once')), body text CHECK (body IS NULL OR char_length(body) BETWEEN 1 AND 2000), photo_id text REFERENCES couple_photos(id) ON DELETE SET NULL, private_media_id text REFERENCES private_media(id) ON DELETE SET NULL, media_expires_at timestamptz, media_opened_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(author_user_id, client_id), CHECK ((kind = 'view_once') = (body IS NULL)))`;

@@ -28,7 +28,7 @@ export function setChatNotifier(notifier: ChatNotifier | null | undefined) { cha
 type MessageRow = {
   id: string; clientId: string; authorUserId: string; kind: ChatMessageKind; body: string | null; createdAt: string;
   photoId: string | null; photoReady: boolean | null; photoLocalDay: string | null; storage: string | null; url: string | null; objectKey: string | null; thumbKey: string | null;
-  mediaId: string | null; mediaKind: string | null; mediaStatus: string | null; mediaLive: boolean | null;
+  mediaId: string | null; mediaKind: string | null; mediaStatus: string | null; mediaLive: boolean | null; videoLive: boolean | null;
   mediaExpiresAt: string | null; mediaOpenedAt: string | null;
 };
 
@@ -40,6 +40,7 @@ async function readMessages(sql: Sql, coupleId: string, options: { id?: string; 
   return await sql`SELECT m.id, m.client_id AS "clientId", m.author_user_id AS "authorUserId", m.kind, m.body, to_char(m.created_at AT TIME ZONE 'UTC', ${ISO}) AS "createdAt",
       p.id AS "photoId", (p.status = 'ready' AND (p.delete_after IS NULL OR p.delete_after > now())) AS "photoReady", to_char(p.local_day, 'YYYY-MM-DD') AS "photoLocalDay", p.storage, p.url, p.object_key AS "objectKey", p.thumb_key AS "thumbKey",
       pm.id AS "mediaId", pm.kind AS "mediaKind", pm.status AS "mediaStatus", (pm.expires_at IS NULL OR pm.expires_at > now()) AS "mediaLive",
+      (coalesce(pm.expires_at, coalesce(pm.ready_at, pm.created_at) + interval '24 hours') > now()) AS "videoLive",
       to_char(m.media_expires_at AT TIME ZONE 'UTC', ${ISO}) AS "mediaExpiresAt", m.media_opened_at AS "mediaOpenedAt"
     FROM couple_messages m LEFT JOIN couple_photos p ON p.id = m.photo_id LEFT JOIN private_media pm ON pm.id = m.private_media_id
     WHERE m.couple_id = ${coupleId} AND (${options.id ?? null}::text IS NULL OR m.id = ${options.id ?? null})
@@ -99,7 +100,7 @@ export async function toChatMessage(row: MessageRow, view: Viewer): Promise<Chat
   };
   if (row.kind === "photo_comment") message.photo = await photoRef(row, view);
   if (row.kind === "video_comment") {
-    const available = row.mediaKind === "daily_video" && row.mediaStatus === "ready";
+    const available = row.mediaKind === "daily_video" && row.mediaStatus === "ready" && row.videoLive === true;
     message.video = { mediaId: available ? row.mediaId : null, available, posterUrl: null };
   }
   if (row.kind === "view_once") {
@@ -179,7 +180,7 @@ export async function sendChatResponse(request: Request) {
   if (photoId && !(await sql`SELECT 1 FROM couple_photos WHERE id = ${photoId} AND couple_id = ${couple.id} AND author_user_id = ${partner.id} AND status = 'ready' AND (delete_after IS NULL OR delete_after > now())`).length) {
     return apiError(422, "media_unavailable", "You can comment on your partner's photos only.");
   }
-  if (mediaId && !(await sql`SELECT 1 FROM private_media WHERE id = ${mediaId} AND couple_id = ${couple.id} AND author_user_id = ${partner.id} AND kind = 'daily_video' AND status = 'ready'`).length) {
+  if (mediaId && !(await sql`SELECT 1 FROM private_media WHERE id = ${mediaId} AND couple_id = ${couple.id} AND author_user_id = ${partner.id} AND kind = 'daily_video' AND status = 'ready' AND coalesce(expires_at, coalesce(ready_at, created_at) + interval '24 hours') > now()`).length) {
     return apiError(422, "media_unavailable", "You can comment on your partner's videos only.");
   }
   const wait = await hitRateLimit(sql, "chat_message", user.id, CHAT_PER_MINUTE, 60);
