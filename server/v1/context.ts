@@ -1,9 +1,8 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../pg-sql";
 import type { ApiError, ErrorCode, User } from "../../contracts/honto-api";
 import { bearerToken, database, getCurrentUser, getMobileToken } from "../../app/server-auth";
 import { ensureFoundationSchema } from "./foundation-schema";
 
-type Sql = NeonQueryFunction<false, false>;
 
 export const noStore = { "Cache-Control": "no-store" };
 

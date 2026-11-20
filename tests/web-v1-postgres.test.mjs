@@ -12,7 +12,7 @@ test('daily card, no-drinking mode and couple history over the real API SQL', as
   };
   const hooks = module.registerHooks({
     resolve(specifier, context, next) {
-      if (specifier === '@neondatabase/serverless') return { url: 'data:text/javascript,export const neon=()=>globalThis.__hontoTestSql', shortCircuit: true };
+      if (specifier.endsWith('/pg-sql')) return { url: 'data:text/javascript,export const createSql=()=>globalThis.__hontoTestSql', shortCircuit: true };
       if (specifier.endsWith('/server-auth')) return { url: 'data:text/javascript,export async function getCurrentUser(r){const id=r.headers.get("x-test-user");return id?{id,role:"user",plan:id.startsWith("premium")?"premium":"free"}:null}export function hasPremiumAccess(u){return u?.plan==="premium"}export function database(){return globalThis.__hontoTestSql}export async function ensureIdentitySchema(){}', shortCircuit: true };
       if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier)) {
         const ext = /(?:game-contract|multiplayer-service)$/.test(specifier) ? '.js' : '.ts';

@@ -1,10 +1,9 @@
 // Shared by /api/v1/photos and /api/v1/memories: photo rows, contract mapping, limits and local days.
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../../../../server/pg-sql";
 import type { Photo, PhotoContentType, PhotoThumb } from "../../../../contracts/honto-api";
 import { apiError } from "../../../../server/v1/context";
 import { GET_TTL_SECONDS, presignGet, storageConfig } from "../../../storage";
 
-type Sql = NeonQueryFunction<false, false>;
 
 /** Contract limits (PhotoCreateRequest): JPEG/WebP only, full ≤ 2 MB, thumb ≤ 256 KB, sides ≤ 4096 px. */
 export const MAX_FULL_BYTES = 2 * 1024 * 1024;

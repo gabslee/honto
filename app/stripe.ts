@@ -1,4 +1,4 @@
-import { neon } from "@neondatabase/serverless";
+import { createSql } from "../server/pg-sql";
 import { ensureIdentitySchema } from "./server-auth";
 
 export const stripeApi = "https://api.stripe.com/v1";
@@ -10,7 +10,7 @@ export const stripeYearlyPrice = () => resolvePriceId("year", "USD", process.env
 export const stripeMonthlyPriceBrl = () => resolvePriceId("month", "BRL", process.env);
 export const stripeYearlyPriceBrl = () => resolvePriceId("year", "BRL", process.env);
 export const priceFor = (interval: "month" | "year", currency: "USD" | "BRL") => resolvePriceId(interval, currency, process.env);
-const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
+const sql = process.env.DATABASE_URL ? createSql(process.env.DATABASE_URL) : null;
 
 export function stripeHeaders() {
   return { authorization: `Bearer ${stripeSecret()}`, "content-type": "application/x-www-form-urlencoded" };

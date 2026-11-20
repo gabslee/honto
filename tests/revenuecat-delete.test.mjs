@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import * as module from 'node:module';
 
 const hooks = module.registerHooks({ resolve(specifier, context, next) {
-  if (specifier === '@neondatabase/serverless') return { url: 'data:text/javascript,export const neon=()=>{throw new Error("no db")}', shortCircuit: true };
+  if (specifier.endsWith('/pg-sql')) return { url: 'data:text/javascript,export const createSql=()=>{throw new Error("no db")}', shortCircuit: true };
   if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier)) return next(new URL(specifier + '.ts', context.parentURL).href, context);
   return next(specifier, context);
 } });

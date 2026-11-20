@@ -1,9 +1,8 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../../../../server/pg-sql";
 import type { CalendarBlock, CalendarBusyResult, CalendarSide, CalendarView, PartnerStatus } from "../../../../contracts/honto-api";
 import { normalizeTimeZone } from "../../../../server/v1/context";
 import { ensureCalendarSchema } from "../../../../server/v1/calendar-schema";
 
-type Sql = NeonQueryFunction<false, false>;
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;

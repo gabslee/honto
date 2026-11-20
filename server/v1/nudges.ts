@@ -1,13 +1,12 @@
 // "Thinking of you" (Free): POST /api/v1/nudges. One tap on the widget (App Intent) or in the app sends the
 // partner a short alert and refreshes their widgets. Rate limit: 1 per 60 s and 30 per rolling 24 h per user.
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../pg-sql";
 import type { NudgeResult, NudgeSource } from "../../contracts/honto-api";
 import { notifyPartner, type NotifySummary, type PushEvent } from "../../app/push/index";
 import { database } from "../../app/server-auth";
 import { apiError, noStore, requireCouple } from "./context";
 import { ensureLifecycleSchema, randomId } from "./lifecycle";
 
-type Sql = NeonQueryFunction<false, false>;
 
 export const NUDGE_INTERVAL_SECONDS = 60;
 export const NUDGES_PER_DAY = 30;

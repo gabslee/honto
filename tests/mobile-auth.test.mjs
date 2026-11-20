@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { generateKeyPair, exportJWK, SignJWT, createLocalJWKSet } from 'jose';
 
 const hooks = module.registerHooks({ resolve(specifier, context, next) {
-  if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier)) return next(new URL(specifier + '.ts', context.parentURL).href, context);
+  if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier) && !context.parentURL?.includes('/node_modules/')) return next(new URL(specifier + '.ts', context.parentURL).href, context);
   return next(specifier, context);
 } });
 const { verifyGoogleIdToken, verifyAppleNativeToken, googleAudiences, appleAudiences } = await import('../app/mobile-auth.ts');

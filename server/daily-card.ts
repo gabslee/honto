@@ -1,11 +1,10 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "./pg-sql";
 import { LONG_DISTANCE_DECKS, type LongDistanceDeckKey } from "../data/long-distance-decks";
 import { hasPremiumAccess, type CurrentUser } from "../app/server-auth";
 import { cleanDailyAnswer, dailyDecks, dailyLimit, localDay, pickDailyCard, previousDay, publicDailyEntry } from "../app/daily-card.js";
 import { roleFor } from "../app/couple-identity.js";
 import { ensureCoupleSchema, resolveCouple } from "./couple";
 
-type Sql = NeonQueryFunction<false, false>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic SQL rows
 type Row = Record<string, any>;
 

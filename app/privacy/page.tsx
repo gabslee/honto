@@ -49,7 +49,7 @@ export default function PrivacyPage() {
         <li>RevenueCat: subscription status for in-app purchases.</li>
         <li>Resend: delivery of sign-in emails.</li>
         <li>Vercel: hosting of our servers and website.</li>
-        <li>Neon: our database.</li>
+        <li>Railway: our database.</li>
         <li>Cloudflare: R2 storage for app photos and photo exports (private bucket), domain name services, email forwarding for our support address and scheduled maintenance jobs.</li>
       </ul>
       <p>We may also disclose information if required by law or to protect the safety of users.</p>

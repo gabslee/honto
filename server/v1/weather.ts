@@ -1,12 +1,11 @@
 // Coarse weather per person (MVP feedback r1): the device reads a coarse location, asks a free weather
 // source on the device and reports only this summary. No coordinates and no place names are stored.
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../pg-sql";
 import type { WeatherCondition, WeatherSummary } from "../../contracts/honto-api";
 import { database } from "../../app/server-auth";
 import { apiError, noStore, requireUser } from "./context";
 import { ensureLifecycleSchema } from "./lifecycle";
 
-type Sql = NeonQueryFunction<false, false>;
 
 export const WEATHER_CONDITIONS: WeatherCondition[] = ["clear", "partly_cloudy", "cloudy", "fog", "drizzle", "rain", "snow", "thunderstorm"];
 /** A summary older than this is not shown in `/today` (the person has not opened the app since). */

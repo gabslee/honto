@@ -2,6 +2,6 @@
   "name": "honto-private-media-cleanup",
   "main": "index.ts",
   "compatibility_date": "2026-10-01",
-  "triggers": { "crons": ["* * * * *"] },
+  "triggers": { "crons": ["*/5 * * * *"] },
   "vars": { "HONTO_API_BASE_URL": "https://hontogame.com" }
 }

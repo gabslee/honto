@@ -10,7 +10,7 @@ test('completed matches archive once and expose only summaries to participating 
     return (await db.query(query, values)).rows;
   };
   const hooks = module.registerHooks({ resolve(specifier, context, next) {
-    if (specifier === '@neondatabase/serverless') return { url: 'data:text/javascript,export const neon=()=>globalThis.__hontoHistorySql', shortCircuit: true };
+    if (specifier.endsWith('/pg-sql')) return { url: 'data:text/javascript,export const createSql=()=>globalThis.__hontoHistorySql', shortCircuit: true };
     if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier)) return next(new URL(`${specifier}.ts`, context.parentURL).href, context);
     return next(specifier, context);
   } });

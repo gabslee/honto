@@ -1,5 +1,5 @@
 import { themeCategories } from "../../i18n";
-import { neon } from "@neondatabase/serverless";
+import { createSql } from "../../../server/pg-sql";
 import { getAdminUser, getCurrentUser, hasPremiumAccess } from "../../server-auth";
 import { SAFE_FOR_WORK_INSTRUCTION, SPICY_INSTRUCTION, allowedCategories, anySexualContent, deckAllowsAdultContent } from "../../content-safety.js";
 
@@ -15,7 +15,7 @@ const PLAYER_AI_DAILY_LIMIT = 10;
 const PLAYER_AI_WEEKLY_LIMIT = 60;
 const PREMIUM_AI_MONTHLY_LIMIT = 300;
 const IP_AI_HOURLY_LIMIT = 30;
-const usageSql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
+const usageSql = process.env.DATABASE_URL ? createSql(process.env.DATABASE_URL) : null;
 let usageSchemaReady: Promise<void> | null = null;
 
 function ensureUsageSchema() {

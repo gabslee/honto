@@ -1,7 +1,6 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../pg-sql";
 import { ensureFoundationSchema } from "./foundation-schema";
 
-type Sql = NeonQueryFunction<false, false>;
 let ready: Promise<void> | null = null;
 
 /**

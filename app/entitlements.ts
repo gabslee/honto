@@ -1,8 +1,7 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../server/pg-sql";
 import type { RevenueCatEvent } from "../contracts/honto-api";
 import { ensureIdentitySchema } from "./server-auth";
 
-type Sql = NeonQueryFunction<false, false>;
 let ready: Promise<void> | null = null;
 
 /** The only entitlement Honto sells (RevenueCat entitlement id). */

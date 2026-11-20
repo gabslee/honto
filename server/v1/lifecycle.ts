@@ -1,4 +1,4 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../pg-sql";
 import type { CronRetentionResult, ExportStatus, UnpairReason, UnpairResult, UnpairState } from "../../contracts/honto-api";
 import { ensureEntitlementsSchema } from "../../app/entitlements";
 import { notifyPartner, type NotifySummary, type PushEvent } from "../../app/push/index";
@@ -6,7 +6,6 @@ import { deleteObjects, getObject, listPrefix, presignGet, putObject, storageCon
 import { deleteRevenueCatCustomer, revokeAppleTokens, type AppleToken } from "./account-cleanup";
 import { ensureFoundationSchema } from "./foundation-schema";
 
-type Sql = NeonQueryFunction<false, false>;
 type Row = Record<string, unknown>;
 let ready: Promise<void> | null = null;
 

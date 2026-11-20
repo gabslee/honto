@@ -1,10 +1,9 @@
 // Third-party cleanup when an account is deleted (after the database transaction commits): the RevenueCat
 // subscriber and the Sign in with Apple grant (App Store guideline 5.1.1(v)). Every call here is best effort:
 // it never throws, never logs a token or key, and is a logged no-op while its settings are missing.
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../pg-sql";
 import { generateAppleClientSecret } from "../../app/apple-auth";
 
-type Sql = NeonQueryFunction<false, false>;
 
 const REVENUECAT_API = "https://api.revenuecat.com/v2/projects/";
 const APPLE_TOKEN_URL = "https://appleid.apple.com/auth/token";

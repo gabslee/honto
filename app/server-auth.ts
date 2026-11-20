@@ -1,8 +1,8 @@
-import { neon } from "@neondatabase/serverless";
+import { createSql } from "../server/pg-sql";
 
 const ADMIN_COOKIE = "honto_admin_session";
 const USER_COOKIE = "honto_session";
-const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
+const sql = process.env.DATABASE_URL ? createSql(process.env.DATABASE_URL) : null;
 let schemaReady: Promise<void> | null = null;
 
 export type AdminUser = { id: string; email: string; displayName: string; role: "admin" };

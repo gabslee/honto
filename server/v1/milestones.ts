@@ -1,10 +1,9 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "../pg-sql";
 import type { CoupleStreak, Milestone, MilestoneList, MilestoneType } from "../../contracts/honto-api";
 import { database } from "../../app/server-auth";
 import { apiError, noStore, requireCouple, type V1Couple, type V1Partner, type V1User } from "./context";
 import { ensureLifecycleSchema, optionalTables, randomId } from "./lifecycle";
 
-type Sql = NeonQueryFunction<false, false>;
 type Row = Record<string, unknown>;
 type Paired = { user: V1User; couple: V1Couple; partner: V1Partner };
 
