@@ -145,7 +145,7 @@ export async function openPrivateResponse(request:Request,id:string) {
   if(!bytes)return apiError(410,'media_unavailable','This photo is no longer available.');
   return json({contentType:'image/jpeg',base64:Buffer.from(bytes).toString('base64')});
 }
-/** Invoke every minute. Access already expires at exactly 24h even before this sweep runs. */
+/** Invoke every 5 minutes (workers/private-media-cleanup). Access already expires at exactly 24h even before this sweep runs. */
 export async function expirePrivateMedia(sql:LaunchSql,store=getObjectStore()) {
   await ensureLaunchSchema(sql);
   const expired=await sql`SELECT p.id FROM private_media p JOIN couples c ON c.id=p.couple_id WHERE (p.expires_at IS NOT NULL AND p.expires_at<=now()) OR (p.status='opening' AND p.opening_at<now()-interval '5 minutes') OR c.unpaired_at IS NOT NULL`;

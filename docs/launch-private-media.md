@@ -11,9 +11,9 @@ Branch: `feat/launch-distance-private-media`. Requires the matching Flutter bran
 
 ## Cleanup activation after approval
 
-Deploy `workers/private-media-cleanup/wrangler.jsonc` after the backend is approved and deployed. Set its `CRON_SECRET` to the same existing backend secret, using the secret manager. The Worker invokes the authenticated cleanup endpoint every minute. No Worker or backend deployment was performed as part of the implementation.
+Deploy `workers/private-media-cleanup/wrangler.jsonc` after the backend is approved and deployed. Set its `CRON_SECRET` to the same existing backend secret, using the secret manager. The Worker invokes the authenticated cleanup endpoint every 5 minutes (it was every minute; a per-minute database hit kept a scale-to-zero Postgres awake around the clock). No Worker or backend deployment was performed as part of the implementation.
 
-Unopened photos become inaccessible exactly at their 24-hour expiry. Physical deletion occurs on the next successful sweep (normally within one minute); object-store outages delay physical deletion, and the outbox retries. Opening removes access immediately even if storage deletion fails. Staging keys are separate from immutable final keys so an old signed PUT cannot recreate a viewed photo. Expired staging and orphaned final objects are swept too.
+Unopened photos become inaccessible exactly at their 24-hour expiry. Physical deletion occurs on the next successful sweep (normally within five minutes); object-store outages delay physical deletion, and the outbox retries. Opening removes access immediately even if storage deletion fails. Staging keys are separate from immutable final keys so an old signed PUT cannot recreate a viewed photo. Expired staging and orphaned final objects are swept too.
 
 ## Validation boundaries
 
