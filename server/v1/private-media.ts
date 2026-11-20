@@ -5,7 +5,7 @@ import { headObject, presignPut } from '../../app/storage';
 import { apiError, noStore, normalizeTimeZone, requireCouple } from './context';
 import { resolveEntitlement } from './couple';
 import { getObjectStore, hitRateLimit, type ObjectStore } from './lifecycle';
-import { ensureLaunchSchema, type LaunchSql } from './launch-schema';
+import { backfillDailyVideoExpiry, ensureLaunchSchema, type LaunchSql } from './launch-schema';
 import { localDayIn } from '../../app/api/v1/photos/photo-rows';
 import { inspectDailyVideo } from './mp4';
 import { postViewOnceMessage } from './chat';
@@ -32,14 +32,19 @@ async function authPremium(request:Request) {
 function item(row:Row,viewer:string):PrivateMediaItem {
   return {id:row.id,kind:row.kind,author:row.author_user_id===viewer?'me':'partner',localDay:String(row.local_day).slice(0,10),createdAt:iso(row.created_at),expiresAt:row.expires_at?iso(row.expires_at):null,durationMs:row.duration_ms};
 }
-export async function readPrivateFeed(sql:LaunchSql,coupleId:string,userId:string,partnerId:string,myDay:string,partnerDay:string):Promise<PrivateMediaFeed> {
+/** A daily video is live for 24 hours from the moment it became ready (`expires_at`); never tied to a calendar day.
+ *  Rows still carrying a NULL `expires_at` (written by a pre-24h build) are read as ready_at + 24 hours; the schema
+ *  backfill and the cleanup sweep persist that value. */
+export async function readPrivateFeed(sql:LaunchSql,coupleId:string,userId:string,partnerId:string):Promise<PrivateMediaFeed> {
   await ensureLaunchSchema(sql);
-  const rows=await sql`SELECT *, to_char(local_day,'YYYY-MM-DD') AS local_day FROM private_media WHERE couple_id=${coupleId} AND status='ready' AND ((kind='daily_video' AND ((author_user_id=${userId} AND local_day=${myDay}::date) OR (author_user_id=${partnerId} AND local_day=${partnerDay}::date))) OR (kind='view_once' AND recipient_user_id=${userId} AND expires_at>now())) ORDER BY created_at DESC LIMIT 60` as Row[];
-  return {meVideo:rows.find(r=>r.kind==='daily_video'&&r.author_user_id===userId)?item(rows.find(r=>r.kind==='daily_video'&&r.author_user_id===userId)!,userId):null,partnerVideo:rows.find(r=>r.kind==='daily_video'&&r.author_user_id===partnerId)?item(rows.find(r=>r.kind==='daily_video'&&r.author_user_id===partnerId)!,userId):null,inbox:rows.filter(r=>r.kind==='view_once').map(r=>item(r,userId))};
+  const rows=await sql`SELECT *, to_char(local_day,'YYYY-MM-DD') AS local_day FROM private_media WHERE couple_id=${coupleId} AND status='ready' AND ((kind='daily_video' AND author_user_id IN (${userId},${partnerId}) AND coalesce(expires_at,coalesce(ready_at,created_at)+interval '24 hours')>now()) OR (kind='view_once' AND recipient_user_id=${userId} AND expires_at>now())) ORDER BY coalesce(ready_at,created_at) DESC, created_at DESC LIMIT 60` as Row[];
+  const latest=(author:string)=>rows.find(r=>r.kind==='daily_video'&&r.author_user_id===author);
+  const mine=latest(userId),theirs=latest(partnerId);
+  return {meVideo:mine?item(mine,userId):null,partnerVideo:theirs?item(theirs,userId):null,inbox:rows.filter(r=>r.kind==='view_once').map(r=>item(r,userId))};
 }
 export async function privateFeedResponse(request:Request) {
   const auth=await authPremium(request);if(auth instanceof Response)return auth;
-  return json(await readPrivateFeed(auth.sql,auth.couple.id,auth.user.id,auth.partner.id,localDayIn(auth.user.timeZone||'UTC'),localDayIn(auth.partner.timeZone||'UTC')));
+  return json(await readPrivateFeed(auth.sql,auth.couple.id,auth.user.id,auth.partner.id));
 }
 export async function createPrivateUploadResponse(request:Request) {
   const auth=await authPremium(request);if(auth instanceof Response)return auth;
@@ -69,14 +74,13 @@ async function flushKeys(sql:LaunchSql,keys:string[],store:ObjectStore) {
 async function queueKeys(sql:LaunchSql,keys:string[]) {
   for(const key of keys)await sql`INSERT INTO storage_deletions (object_key,reason) VALUES (${key},'private_media') ON CONFLICT (object_key) DO NOTHING`;
 }
-/** Serialize a user's daily slot, not the whole couple, and retire old content atomically. */
+/** Serialize a user's daily video per couple (not per calendar day: a video outlives midnight), retire any
+ *  previous video of the author, live or not, and start the 24 hour window now. */
 export async function activateDailyVideo(sql:LaunchSql,row:Row) {
-  const day=String(row.local_day).slice(0,10);
-  await sql`INSERT INTO private_video_slots (couple_id,author_user_id,local_day) VALUES (${row.couple_id},${row.author_user_id},${day}::date) ON CONFLICT DO NOTHING`;
   const results=await sql.transaction([
-    sql`SELECT 1 FROM private_video_slots WHERE couple_id=${row.couple_id} AND author_user_id=${row.author_user_id} AND local_day=${day}::date FOR UPDATE`,
-    sql`WITH gone AS (DELETE FROM private_media WHERE couple_id=${row.couple_id} AND author_user_id=${row.author_user_id} AND local_day=${day}::date AND kind='daily_video' AND status='ready' AND id<>${row.id} RETURNING object_key,upload_key), queued AS (INSERT INTO storage_deletions (object_key,reason) SELECT key,'private_media' FROM gone CROSS JOIN LATERAL (VALUES(gone.object_key),(gone.upload_key)) AS k(key) ON CONFLICT DO NOTHING) SELECT key FROM gone CROSS JOIN LATERAL (VALUES(gone.object_key),(gone.upload_key)) AS k(key)`,
-    sql`UPDATE private_media SET status='ready',ready_at=now(),expires_at=NULL WHERE id=${row.id} AND status='processing' RETURNING id`,
+    sql`SELECT pg_advisory_xact_lock(hashtext(${'daily_video:'+row.couple_id+':'+row.author_user_id}))`,
+    sql`WITH gone AS (DELETE FROM private_media WHERE couple_id=${row.couple_id} AND author_user_id=${row.author_user_id} AND kind='daily_video' AND status='ready' AND id<>${row.id} RETURNING object_key,upload_key), queued AS (INSERT INTO storage_deletions (object_key,reason) SELECT key,'private_media' FROM gone CROSS JOIN LATERAL (VALUES(gone.object_key),(gone.upload_key)) AS k(key) ON CONFLICT DO NOTHING) SELECT key FROM gone CROSS JOIN LATERAL (VALUES(gone.object_key),(gone.upload_key)) AS k(key)`,
+    sql`UPDATE private_media SET status='ready',ready_at=now(),expires_at=now()+interval '24 hours' WHERE id=${row.id} AND status='processing' RETURNING id`,
   ]);
   return results[1].map(r=>String(r.key));
 }
@@ -122,7 +126,7 @@ export async function completePrivateResponse(request:Request,id:string) {
 export async function playbackPrivateResponse(request:Request,id:string) {
   const auth=await authPremium(request);if(auth instanceof Response)return auth;
   const store=getObjectStore();if(!store)return apiError(503,'storage_not_configured','Media storage is unavailable.');
-  const row=(await auth.sql`SELECT object_key FROM private_media WHERE id=${id} AND couple_id=${auth.couple.id} AND kind='daily_video' AND status='ready'`)[0];
+  const row=(await auth.sql`SELECT object_key FROM private_media WHERE id=${id} AND couple_id=${auth.couple.id} AND kind='daily_video' AND status='ready' AND coalesce(expires_at,coalesce(ready_at,created_at)+interval '24 hours')>now()`)[0];
   if(!row)return apiError(404,'not_found','Video not found.');
   return json({url:await store.presignGet(String(row.object_key),60),expiresAt:new Date(Date.now()+60000).toISOString()});
 }
@@ -148,6 +152,7 @@ export async function openPrivateResponse(request:Request,id:string) {
 /** Invoke every 5 minutes (workers/private-media-cleanup). Access already expires at exactly 24h even before this sweep runs. */
 export async function expirePrivateMedia(sql:LaunchSql,store=getObjectStore()) {
   await ensureLaunchSchema(sql);
+  await backfillDailyVideoExpiry(sql); // rows written by a pre-24h build during a rolling deploy
   const expired=await sql`SELECT p.id FROM private_media p JOIN couples c ON c.id=p.couple_id WHERE (p.expires_at IS NOT NULL AND p.expires_at<=now()) OR (p.status='opening' AND p.opening_at<now()-interval '5 minutes') OR c.unpaired_at IS NOT NULL`;
   const keys=await removePrivateRows(sql,expired.map(r=>String(r.id)));
   if(store) {
